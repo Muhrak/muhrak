@@ -54,6 +54,17 @@ curl -X POST http://localhost:4000/v1/auth/register \
 curl http://localhost:4000/v1/auth/me -H "Authorization: Bearer <accessToken>"
 ```
 
+## Branches
+
+| Branch | Purpose | Deploys to |
+|---|---|---|
+| `main` | Production. Only receives merges from `develop`. | Production |
+| `develop` | Development. Day-to-day work lands here. | Staging |
+| `feature/<name>` | Optional, for bigger pieces of work. Branch from `develop`, merge back into `develop`. | — |
+
+Flow: work on `develop` (or a feature branch) → test on staging → open a pull
+request `develop` → `main` to release. Never commit directly to `main`.
+
 ## Creating the web apps
 
 These are generated with the official tool so they start on the current

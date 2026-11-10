@@ -74,6 +74,12 @@ outside the platform and the seller marks the order as paid.
 - Ask the developer before adding a new dependency, changing a decision listed
   above, or building anything outside the current day's scope in `docs/PLAN.md`.
 
+## Git branches
+
+- `main` is production; `develop` is development (staging). Commit and push
+  to `develop` (or a `feature/*` branch off it). Never commit to `main`
+  directly; releases are a pull request `develop` → `main`.
+
 ## Commands
 
 ```bash
