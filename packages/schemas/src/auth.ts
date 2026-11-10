@@ -42,3 +42,9 @@ export const authResponseSchema = z.object({
   refreshToken: z.string(),
 });
 export type AuthResponse = z.infer<typeof authResponseSchema>;
+
+/** GET /v1/auth/me */
+export const meResponseSchema = z.object({
+  user: publicUserSchema,
+});
+export type MeResponse = z.infer<typeof meResponseSchema>;
