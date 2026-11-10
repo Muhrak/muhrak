@@ -1,0 +1,33 @@
+import "dotenv/config";
+import { z } from "zod";
+
+/**
+ * All environment variables are read and validated here, once, at startup.
+ * The rest of the code imports `env` and never touches process.env.
+ * If a value is missing or wrong, the API refuses to start.
+ */
+const envSchema = z.object({
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  PORT: z.coerce.number().int().positive().default(4000),
+  DATABASE_URL: z.string().min(1),
+  REDIS_URL: z.string().min(1),
+  JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
+  ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  CORS_ORIGINS: z
+    .string()
+    .default("http://localhost:3000")
+    .transform((value) => value.split(",").map((origin) => origin.trim()).filter(Boolean)),
+});
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  console.error("Invalid environment variables:");
+  for (const issue of parsed.error.issues) {
+    console.error(`  ${issue.path.join(".")}: ${issue.message}`);
+  }
+  process.exit(1);
+}
+
+export const env = parsed.data;
