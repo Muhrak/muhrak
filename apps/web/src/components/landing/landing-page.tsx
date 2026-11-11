@@ -4,21 +4,39 @@ import { Suspense, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { FaqAccordion } from "./faq-accordion";
 import { NavActions, SignedOutActions } from "./nav-actions";
+import { NAV_LINKS } from "./nav-links";
 
 /**
  * Buyer landing page: Figma "Buyer – Landing v2 (Light)" (node 423:1138).
  *
  * At 1440 px wide every element sits at its Figma position and size.
- * Decorations (auroras, glass parts) are placed on a 1440 px canvas centred
- * in the viewport with `onCanvas(x, y, w, h)`, so on wider screens they stay
- * where the design has them relative to the content. Below `lg` the
- * sections stack for phones.
+ * Decorations (auroras) are placed on a 1440 px canvas centred in the
+ * viewport with `onCanvas(x, y, w, h)`, measured in `--u` design pixels:
+ * 1px on desktop, smaller on phones so the whole colour range stays in view.
+ * Glass parts are anchored to their cards, so they appear on every screen.
  */
 
-/** Absolute position on the centred 1440 px design canvas (x, y in Figma pixels). */
+/**
+ * Absolute position on the centred 1440 px design canvas (x, y in Figma pixels).
+ * Horizontal values scale by --ux and vertical ones by --uy (both 1px on desktop).
+ */
 function onCanvas(x: number, y: number, w: number, h: number): CSSProperties {
-  return { left: `calc(50% - 720px + ${x}px)`, top: y, width: w, height: h };
+  const ux = (n: number) => `calc(${n} * var(--ux, 1px))`;
+  const uy = (n: number) => `calc(${n} * var(--uy, 1px))`;
+  return { left: `calc(50% + ${x - 720} * var(--ux, 1px))`, top: uy(y), width: ux(w), height: uy(h) };
 }
+
+/**
+ * Hero design-pixel units. Desktop (1440 px+): 1px both ways, exact Figma
+ * positions. Narrower screens: the width follows the screen, so the whole
+ * aurora (pink left, blue right) stays in view, while the height shrinks
+ * less, so on a tall phone the colour reaches as far down the hero as on
+ * desktop instead of becoming a thin strip.
+ */
+const heroUnit = {
+  "--ux": "min(1px, calc(100vw / 1440))",
+  "--uy": "max(0.72px, min(1px, calc(100vw / 1440)))",
+} as CSSProperties;
 
 const FIND_A_PART = "/buyer/find-part";
 
@@ -45,11 +63,14 @@ export function LandingPage() {
 
 function Hero() {
   return (
-    <section className="relative h-[620px] overflow-hidden bg-canvas lg:h-[720px]">
-      {/* Aurora 2300×1000 at (-430,-520); the SVG adds a 90 px blur margin on each side. */}
-      <Image src="/landing/hero-aurora.svg" alt="" width={2480} height={1180} priority className="pointer-events-none absolute max-w-none" style={onCanvas(-520, -610, 2480, 1180)} />
-      {/* Light dome 1750×1200 at (-155,70) with a 110 px blur margin. */}
-      <Image src="/landing/hero-dome.svg" alt="" width={1970} height={1420} priority className="pointer-events-none absolute max-w-none" style={onCanvas(-265, -40, 1970, 1420)} />
+    <section className="relative h-[620px] bg-canvas lg:h-[720px]" style={heroUnit}>
+      {/* Clipped decoration layer, so the mobile menu can open past the hero. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        {/* Aurora 2300×1000 at (-430,-520); the SVG adds a 90 px blur margin on each side. */}
+        <Image src="/landing/hero-aurora.svg" alt="" width={2480} height={1180} priority className="absolute max-w-none" style={onCanvas(-520, -610, 2480, 1180)} />
+        {/* Light dome 1750×1200 at (-155,70) with a 110 px blur margin. */}
+        <Image src="/landing/hero-dome.svg" alt="" width={1970} height={1420} priority className="absolute max-w-none" style={onCanvas(-265, -40, 1970, 1420)} />
+      </div>
 
       <SiteNav />
 
@@ -70,22 +91,21 @@ function Hero() {
 
 function SiteNav() {
   return (
-    <header className="relative z-10 flex items-center px-4 py-5 sm:px-12">
+    <header className="relative z-20 flex items-center px-4 py-5 sm:px-12">
       <Link href="/" aria-label="Muhrak home" className="flex rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
         <Image src="/auth/muhrak-logo.svg" alt="Muhrak" width={156.357} height={29.8588} priority />
       </Link>
       <div className="flex-1" />
       <nav aria-label="Main" className="hidden gap-10 text-sm leading-[1.3] text-[rgba(10,11,18,0.78)] lg:flex">
-        <a href="#how-it-works" className="hover:text-ink">
-          Manufacturers
-        </a>
-        <a href="#how-it-works" className="hover:text-ink">
-          Distributors
-        </a>
-        <a href="#muhrak-ai" className="hover:text-ink">
-          Muhrak AI
-        </a>
-        <span>Garage</span>
+        {NAV_LINKS.map((link) =>
+          link.href ? (
+            <a key={link.label} href={link.href} className="hover:text-ink">
+              {link.label}
+            </a>
+          ) : (
+            <span key={link.label}>{link.label}</span>
+          ),
+        )}
       </nav>
       <div className="hidden flex-1 lg:block" />
       <Suspense fallback={<SignedOutActions />}>
@@ -134,12 +154,28 @@ const BENEFITS = [
   { title: "Across the GCC", text: "Sellers in six countries, so the part you need is never far away." },
 ];
 
+/**
+ * Glass parts, positioned relative to the top-left of their card in Figma
+ * pixels (piston on card 1, gear on card 3, bearing on card 4). They use
+ * mix-blend-screen, so they show over the coloured aurora band.
+ */
+const GLASS_PARTS: Record<number, { src: string; x: number; y: number; size: number }> = {
+  0: { src: "/landing/glass-piston.png", x: -70, y: 220, size: 250 },
+  2: { src: "/landing/glass-gear.png", x: 30, y: 290, size: 240 },
+  3: { src: "/landing/glass-bearing.png", x: 140, y: 120, size: 230 },
+};
+
 function Benefits() {
   return (
-    <section id="how-it-works" className="relative overflow-hidden bg-canvas pt-[110px] pb-[160px] lg:h-[1380px] lg:pt-[150px] lg:pb-0">
-      {/* Aurora 2300×720 at (-430,880), 100 px blur margin; light dome 1700×560 at (-130,500), 120 px margin. */}
-      <Image src="/landing/benefits-aurora.svg" alt="" width={2500} height={920} className="pointer-events-none absolute max-w-none" style={onCanvas(-530, 780, 2500, 920)} />
-      <Image src="/landing/benefits-dome.svg" alt="" width={1940} height={800} className="pointer-events-none absolute max-w-none" style={onCanvas(-250, 380, 1940, 800)} />
+    <section
+      id="how-it-works"
+      className="relative overflow-hidden bg-canvas pt-[110px] pb-[120px] min-[1360px]:h-[1380px] min-[1360px]:pt-[150px] min-[1360px]:pb-0"
+    >
+      {/* Desktop: aurora 2300×720 at (-430,880), 100 px blur margin; light dome 1700×560 at (-130,500), 120 px margin. */}
+      <div aria-hidden className={"pointer-events-none absolute inset-0 hidden min-[1360px]:block"}>
+        <Image src="/landing/benefits-aurora.svg" alt="" width={2500} height={920} className="absolute max-w-none" style={onCanvas(-530, 780, 2500, 920)} />
+        <Image src="/landing/benefits-dome.svg" alt="" width={1940} height={800} className="absolute max-w-none" style={onCanvas(-250, 380, 1940, 800)} />
+      </div>
 
       <div className="relative flex flex-col items-center px-4 text-center">
         <Image src="/landing/sparkle.svg" alt="" width={18} height={18} />
@@ -153,39 +189,58 @@ function Benefits() {
         </p>
       </div>
 
-      <ol className="relative mx-auto mt-16 grid max-w-[1324px] gap-5 px-4 sm:grid-cols-2 lg:absolute lg:top-[760px] lg:left-1/2 lg:mt-0 lg:w-[1324px] lg:-translate-x-1/2 lg:grid-cols-4 lg:px-0">
-        {BENEFITS.map((benefit, index) => (
-          <li
-            key={benefit.title}
-            className="relative flex h-[300px] flex-col rounded-[18px] border border-black/10 bg-linear-to-b from-white/78 to-white/50 px-[27px] pt-[31px] backdrop-blur-[15px] lg:h-[430px]"
-          >
-            <h3 className="text-[26px] leading-[1.2] tracking-[-0.01em]">{benefit.title}</h3>
-            <p className="mt-5 max-w-[246px] text-sm leading-[1.55] text-ink-tertiary">{benefit.text}</p>
-            <span aria-hidden className="absolute right-7 bottom-[30px] text-[30px] leading-[1.3] font-light text-ink/22">
-              {String(index + 1).padStart(2, "0")}
-            </span>
-          </li>
-        ))}
-      </ol>
-
-      {/* Glass parts, blended over the cards as in the design. */}
-      <GlassPart src="/landing/glass-piston.png" style={onCanvas(-12, 980, 250, 250)} />
-      <GlassPart src="/landing/glass-gear.png" style={onCanvas(760, 1050, 240, 240)} />
-      <GlassPart src="/landing/glass-bearing.png" style={onCanvas(1206, 880, 230, 230)} />
+      <div
+        // Desktop (1360 px+): one row of 1324 px at Figma y 760. Centred with left, not a transform, so the
+        // glass parts can still blend with the aurora behind (a transform would isolate them).
+        className="relative mx-auto mt-16 max-w-[760px] px-4 min-[1360px]:absolute min-[1360px]:top-[760px] min-[1360px]:left-[calc(50%-662px)] min-[1360px]:mt-0 min-[1360px]:w-[1324px] min-[1360px]:max-w-none min-[1360px]:px-0"
+      >
+        {/*
+          Phones and tablets: the same aurora runs behind the stacked cards, so
+          the cards and glass parts read as they do on desktop. Its blur margins
+          are trimmed so the ellipse spans the screen (all five colours visible).
+        */}
+        <Image
+          src="/landing/benefits-aurora.svg"
+          alt=""
+          aria-hidden
+          width={2500}
+          height={920}
+          className="pointer-events-none absolute top-[4%] left-1/2 h-[calc(96%+120px)] w-[calc(100vw*1.087)] max-w-none -translate-x-1/2 min-[1360px]:hidden"
+        />
+        <ol className="relative grid gap-5 sm:max-[1359px]:grid-cols-2 min-[1360px]:grid-cols-4">
+          {BENEFITS.map((benefit, index) => {
+            const part = GLASS_PARTS[index];
+            return (
+              <li key={benefit.title} className="relative h-[340px] sm:h-[430px]">
+                <div className="relative flex h-full flex-col rounded-[18px] border border-black/10 bg-linear-to-b from-white/78 to-white/50 px-[27px] pt-[31px] backdrop-blur-[15px]">
+                  <h3 className="text-[26px] leading-[1.2] tracking-[-0.01em]">{benefit.title}</h3>
+                  <p className="mt-5 max-w-[246px] text-sm leading-[1.55] text-ink-tertiary">{benefit.text}</p>
+                  <span aria-hidden className="absolute right-7 bottom-[30px] text-[30px] leading-[1.3] font-light text-ink/22">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                </div>
+                {part ? <GlassPart {...part} /> : null}
+              </li>
+            );
+          })}
+        </ol>
+      </div>
     </section>
   );
 }
 
-function GlassPart({ src, style }: { src: string; style: CSSProperties }) {
+/** Full Figma size from `sm` up; 72% on phones, where the cards are shorter. */
+function GlassPart({ src, x, y, size }: { src: string; x: number; y: number; size: number }) {
+  const g = (n: number) => `calc(${n} * var(--g))`;
   return (
     <Image
       src={src}
       alt=""
-      width={Number(style.width)}
-      height={Number(style.height)}
-      sizes={`${Number(style.width)}px`}
-      className="pointer-events-none absolute hidden max-w-none object-cover mix-blend-screen lg:block"
-      style={style}
+      width={size}
+      height={size}
+      sizes={`${size}px`}
+      className="pointer-events-none absolute max-w-none object-cover mix-blend-screen [--g:0.72px] sm:[--g:1px]"
+      style={{ left: g(x), top: g(y), width: g(size), height: g(size) }}
     />
   );
 }
@@ -207,28 +262,45 @@ function MuhrakAiFeature() {
   return (
     <section
       id="muhrak-ai"
-      className="flex flex-col items-center gap-14 bg-canvas px-4 pt-[120px] pb-[100px] lg:h-[740px] lg:flex-row lg:justify-center lg:gap-[110px] lg:px-0 lg:pt-[160px] lg:pb-[140px]"
+      className="flex flex-col items-center gap-14 bg-canvas px-4 pt-[120px] pb-[100px] [--bar-unit:0.8px] sm:[--bar-unit:1px] lg:h-[740px] lg:flex-row lg:justify-center lg:gap-[110px] lg:px-0 lg:pt-[160px] lg:pb-[140px]"
     >
+      {/*
+        Figma 540×440 card. Laid out with flex (not absolute pixels) so it keeps
+        its proportions on phones: at 540 px every element lands on its Figma
+        position (text block at 35,39; Compare at 391,51; rule at y 159; bars
+        38 px wide, 14 px apart, bottom-aligned from x 35).
+      */}
       <div
         aria-hidden
-        // A fixed 540×440 illustration: on narrow screens it is scaled down as a whole (zoom) instead of reflowing.
-        className="relative h-[440px] w-[540px] shrink-0 overflow-hidden rounded-[24px] border border-black/11 bg-linear-to-b from-white/78 to-white/50 max-[600px]:[zoom:0.65] max-[380px]:[zoom:0.55]"
+        className="relative flex h-[380px] w-full max-w-[540px] shrink-0 flex-col overflow-hidden rounded-[24px] border border-black/11 bg-linear-to-b from-white/78 to-white/50 px-5 pt-6 sm:h-[440px] sm:px-[35px] sm:pt-[38px]"
       >
-        <Image src="/landing/ai-glow.svg" alt="" width={600} height={440} className="pointer-events-none absolute top-[229px] left-[-31px] max-w-none" />
-        <p className="absolute top-[39px] left-[35px] text-sm leading-[1.3] text-ink-tertiary">Quotes received</p>
-        <p className="absolute top-[63px] left-[35px] text-[36px] leading-[1.3] tracking-[-0.02em]">38.500 OMR</p>
-        <p className="absolute top-[111px] left-[35px] text-[13px] leading-[1.3] text-ink-tertiary">Best price from 5 sellers</p>
-        <span className="absolute top-[51px] left-[391px] rounded-full bg-ink px-[26px] py-[13px] text-sm leading-[1.3] font-medium text-white">
-          Compare
-        </span>
-        <div className="absolute top-[159px] left-[35px] h-px w-[468px] bg-black/11" />
-        {BARS.map((bar) => (
-          <div
-            key={bar.x}
-            className={cn("absolute w-[38px]", bar.best ? "bg-linear-to-b from-ink to-ink/60" : "bg-linear-to-b from-black/11 to-black/2")}
-            style={{ left: bar.x, top: 439 - bar.h, height: bar.h }}
-          />
-        ))}
+        <Image
+          src="/landing/ai-glow.svg"
+          alt=""
+          width={600}
+          height={440}
+          className="pointer-events-none absolute -bottom-[229px] left-1/2 w-[111%] max-w-none -translate-x-1/2"
+        />
+        <div className="relative flex items-start gap-3">
+          <div className="flex min-w-0 flex-1 flex-col leading-[1.3]">
+            <p className="text-sm text-ink-tertiary">Quotes received</p>
+            <p className="mt-[5px] text-[28px] tracking-[-0.02em] whitespace-nowrap sm:text-[36px]">38.500 OMR</p>
+            <p className="text-[13px] text-ink-tertiary">Best price from 5 sellers</p>
+          </div>
+          <span className="mt-3 shrink-0 rounded-full bg-ink px-5 py-[11px] text-sm leading-[1.3] font-medium text-white sm:px-[26px] sm:py-[13px]">
+            Compare
+          </span>
+        </div>
+        <div className="relative mt-[22px] h-px w-full bg-black/11 sm:mt-[29px]" />
+        <div className="relative mt-auto flex w-[86%] items-end gap-[3.48%] sm:w-[402px] sm:gap-[14px]">
+          {BARS.map((bar) => (
+            <div
+              key={bar.x}
+              className={cn("flex-1 sm:w-[38px] sm:flex-none", bar.best ? "bg-linear-to-b from-ink to-ink/60" : "bg-linear-to-b from-black/11 to-black/2")}
+              style={{ height: `calc(${bar.h} * var(--bar-unit))` }}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="flex w-full max-w-[430px] shrink-0 flex-col items-start">
@@ -276,7 +348,8 @@ function Cta() {
           alt=""
           width={1100}
           height={460}
-          className="pointer-events-none absolute top-[199px] left-1/2 max-w-none -translate-x-1/2"
+          // Figma: 1100×460 at (29,199) in the 1160 px card. Sized as a share of the card so phones see every colour.
+          className="pointer-events-none absolute top-[55%] left-1/2 h-auto w-[94.8%] max-w-none -translate-x-1/2"
         />
         <div className="relative flex flex-col items-center px-4 pt-[71px] text-center">
           <h2 className="text-[34px] leading-[1.12] tracking-[-0.02em] sm:text-[44px]">
