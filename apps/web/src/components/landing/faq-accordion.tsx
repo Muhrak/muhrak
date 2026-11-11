@@ -3,8 +3,10 @@
 import Image from "next/image";
 import { useId, useState } from "react";
 
-/** FAQ items from Figma "Buyer – Landing v2 (Light)" › FAQ. The first one starts open, as in the design. */
-const ITEMS = [
+export type FaqItem = { question: string; answer: string };
+
+/** Buyer FAQ (Figma "Buyer – Landing v2 (Light)" › FAQ). The first item starts open, as in the design. */
+export const BUYER_FAQ: FaqItem[] = [
   {
     question: "What is Muhrak?",
     answer:
@@ -30,13 +32,13 @@ const ITEMS = [
   },
 ];
 
-export function FaqAccordion() {
+export function FaqAccordion({ items }: { items: FaqItem[] }) {
   const [open, setOpen] = useState(0);
   const baseId = useId();
 
   return (
     <div className="flex w-full max-w-[720px] flex-col gap-2.5">
-      {ITEMS.map((item, index) => {
+      {items.map((item, index) => {
         const isOpen = open === index;
         const panelId = `${baseId}-panel-${index}`;
         return (

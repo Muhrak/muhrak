@@ -12,7 +12,9 @@ import { useSession } from "@/features/auth/session";
 import { initials, shortName } from "@/features/auth/user-display";
 import { cn } from "@/lib/utils";
 import { MobileGlow } from "./mobile-glow";
-import { NAV_LINKS } from "./nav-links";
+import { NAV_LINKS, SELLER_NAV_LINKS } from "./nav-links";
+
+export type LandingSide = "buyer" | "seller";
 
 /**
  * Right side of the landing page nav.
@@ -66,18 +68,18 @@ function ThemeToggle({ className }: { className?: string }) {
 }
 
 /** Desktop actions + mobile menu for a visitor (server render and signed-out state). */
-export function SignedOutActions() {
-  return <Actions user={null} />;
+export function SignedOutActions({ side = "buyer" }: { side?: LandingSide }) {
+  return <Actions user={null} side={side} />;
 }
 
 /** Reads the stored session, so it renders in the browser only; wrap in <Suspense fallback={<SignedOutActions />}>. */
-export function NavActions() {
+export function NavActions({ side = "buyer" }: { side?: LandingSide }) {
   use(browser("The session is stored in localStorage."));
   const session = useSession();
-  return <Actions user={session?.user ?? null} />;
+  return <Actions user={session?.user ?? null} side={side} />;
 }
 
-function Actions({ user }: { user: PublicUser | null }) {
+function Actions({ user, side }: { user: PublicUser | null; side: LandingSide }) {
   return (
     <>
       <div className="hidden items-center gap-2.5 lg:flex">
@@ -93,9 +95,9 @@ function Actions({ user }: { user: PublicUser | null }) {
           </Link>
         ) : (
           <>
-            <ThemeToggle />
+            {side === "buyer" ? <ThemeToggle /> : null}
             <Link
-              href={LOGIN_PATH.buyer}
+              href={LOGIN_PATH[side]}
               className={cn("rounded-full border border-black/22 bg-white/60 px-[22px] py-3 text-sm leading-[1.3] whitespace-nowrap text-ink backdrop-blur-[15px] hover:bg-white/80", focus)}
             >
               Sign in
@@ -103,7 +105,7 @@ function Actions({ user }: { user: PublicUser | null }) {
           </>
         )}
       </div>
-      <MobileMenu user={user} />
+      <MobileMenu user={user} side={side} />
     </>
   );
 }
@@ -113,7 +115,7 @@ function Actions({ user }: { user: PublicUser | null }) {
  * button where the hamburger was) so nothing jumps when it opens; links sit
  * under it and the account actions are pinned to the bottom.
  */
-function MobileMenu({ user }: { user: PublicUser | null }) {
+function MobileMenu({ user, side }: { user: PublicUser | null; side: LandingSide }) {
   const [open, setOpen] = useState(false);
   const openButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -163,11 +165,11 @@ function MobileMenu({ user }: { user: PublicUser | null }) {
           className="fixed inset-0 z-50 flex h-dvh flex-col overflow-y-auto bg-canvas/90 backdrop-blur-[24px]"
         >
           {/* Same colour bands as the mobile hero, so the menu feels like part of the page. */}
-          <MobileGlow edge="top" className="h-[40%]" strength={0.8} />
-          <MobileGlow edge="bottom" className="h-[28%]" strength={0.8} />
+          <MobileGlow edge="top" className="h-[40%]" strength={0.8} palette={side} />
+          <MobileGlow edge="bottom" className="h-[28%]" strength={0.8} palette={side} />
 
           <div className="relative flex items-center px-4 py-5 sm:px-12">
-            <Link href="/" onClick={close} aria-label="Muhrak home" className={cn("flex rounded-sm", focus)}>
+            <Link href={side === "seller" ? "/sell" : "/"} onClick={close} aria-label="Muhrak home" className={cn("flex rounded-sm", focus)}>
               <Image src="/auth/muhrak-logo.svg" alt="Muhrak" width={156.357} height={29.8588} />
             </Link>
             <div className="flex-1" />
@@ -200,7 +202,7 @@ function MobileMenu({ user }: { user: PublicUser | null }) {
 
             <p className="px-1 text-[11px] leading-[1.3] tracking-[0.06em] text-ink-tertiary">MENU</p>
             <nav aria-label="Main" className="mt-2 flex flex-col">
-              {NAV_LINKS.map((link) => {
+              {(side === "seller" ? SELLER_NAV_LINKS : NAV_LINKS).map((link) => {
                 const row = "flex items-center justify-between border-b border-black/8 px-1 py-4 text-[28px] leading-[1.2] tracking-[-0.02em]";
                 return link.href ? (
                   <a key={link.label} href={link.href} onClick={close} className={cn(row, "text-ink hover:text-ink-secondary", focus)}>
@@ -217,7 +219,7 @@ function MobileMenu({ user }: { user: PublicUser | null }) {
             </nav>
 
             <div className="mt-auto flex items-center gap-2.5 pt-10">
-              <ThemeToggle className="size-[50px]" />
+              {side === "buyer" ? <ThemeToggle className="size-[50px]" /> : null}
               {user ? (
                 <button
                   type="button"
@@ -231,7 +233,7 @@ function MobileMenu({ user }: { user: PublicUser | null }) {
                 </button>
               ) : (
                 <Link
-                  href={LOGIN_PATH.buyer}
+                  href={LOGIN_PATH[side]}
                   onClick={close}
                   className={cn("flex h-[50px] flex-1 items-center justify-center rounded-full bg-ink text-[15px] leading-[1.3] font-medium text-white hover:opacity-90", focus)}
                 >

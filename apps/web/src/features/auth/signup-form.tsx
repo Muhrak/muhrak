@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterInput } from "@muhrak/schemas";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useForm, type FieldValues, type Path, type UseFormSetError } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -184,12 +184,19 @@ function CompanyForm({ notice, role }: { notice?: string; role: "buyer" | "selle
     register,
     handleSubmit,
     setError,
+    setValue,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(companySchema),
     defaultValues: { companyName: "", crNumber: "", email: "", password: "" },
   });
   const mutation = useRegister(setError, "companyName", ["email", "password"]);
+
+  // The email box on the seller landing page sends ?email=...; fill it in.
+  useEffect(() => {
+    const email = new URLSearchParams(window.location.search).get("email");
+    if (email) setValue("email", email.slice(0, 254));
+  }, [setValue]);
 
   return (
     <form

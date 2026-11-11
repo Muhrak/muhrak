@@ -31,10 +31,11 @@ export function loginPathFor(role: Role): string {
 
 /**
  * Where a role lands right after logging in or signing up, when there is no
- * page to go back to. Buyers go to the landing page (developer decision,
- * 11 Nov 2026), where the profile button leads to their dashboard.
+ * page to go back to (developer decision, 11 Nov 2026): buyers go to the
+ * buyer landing page, sellers to the seller landing page. On both, the
+ * profile button leads to the dashboard.
  */
-const AFTER_LOGIN_PATH: Record<Role, string> = { ...HOME_PATH, buyer: "/" };
+const AFTER_LOGIN_PATH: Record<Role, string> = { ...HOME_PATH, buyer: "/", seller: "/sell" };
 
 /**
  * Where to go after login: the page the user was sent away from (`next`),
