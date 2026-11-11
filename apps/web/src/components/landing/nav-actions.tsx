@@ -162,10 +162,9 @@ function MobileMenu({ user }: { user: PublicUser | null }) {
           aria-label="Menu"
           className="fixed inset-0 z-50 flex h-dvh flex-col overflow-y-auto bg-canvas/90 backdrop-blur-[24px]"
         >
-          {/* Same bands and grain as the mobile hero, so the menu feels like part of the page. */}
+          {/* Same colour bands as the mobile hero, so the menu feels like part of the page. */}
           <MobileGlow edge="top" className="h-[40%]" strength={0.8} />
           <MobileGlow edge="bottom" className="h-[28%]" strength={0.8} />
-          <div aria-hidden className="mobile-grain pointer-events-none absolute inset-0" />
 
           <div className="relative flex items-center px-4 py-5 sm:px-12">
             <Link href="/" onClick={close} aria-label="Muhrak home" className={cn("flex rounded-sm", focus)}>

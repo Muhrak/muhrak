@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 /**
  * Mobile-only background, from the developer's reference (refs/mobile view
  * ref.jpg): soft gradient bands at the top and bottom of the screen with a
- * curved light edge, plus film grain. Recoloured to the buyer palette:
+ * curved light edge (no grain texture, developer decision). Recoloured to the buyer palette:
  * peach #F4A27C, pink #E0457F, purple #7B2FD3, indigo #2D2F9A (no cyan).
  * Hidden from `lg` up, where the Figma desktop design is used unchanged.
  */
@@ -22,18 +22,18 @@ const blob = (b: Blob): CSSProperties => ({
 
 /** Top band: warm pink/peach on the left, purple in the middle, indigo fading out to the right. */
 const TOP: Blob[] = [
-  { x: "-35%", y: "-55%", w: "105%", h: "130%", color: "#e0457f", opacity: 0.85 },
-  { x: "-30%", y: "-20%", w: "70%", h: "85%", color: "#f4a27c", opacity: 0.8 },
-  { x: "18%", y: "-65%", w: "95%", h: "120%", color: "#7b2fd3", opacity: 0.6 },
-  { x: "55%", y: "-75%", w: "85%", h: "110%", color: "#2d2f9a", opacity: 0.35 },
+  { x: "-35%", y: "-55%", w: "105%", h: "130%", color: "#e0457f", opacity: 1 },
+  { x: "-30%", y: "-20%", w: "70%", h: "85%", color: "#f4a27c", opacity: 1 },
+  { x: "18%", y: "-65%", w: "95%", h: "120%", color: "#7b2fd3", opacity: 0.9 },
+  { x: "55%", y: "-75%", w: "85%", h: "110%", color: "#2d2f9a", opacity: 0.6 },
 ];
 
 /** Bottom band: the mirror image, pink on the left rising into purple on the right. */
 const BOTTOM: Blob[] = [
-  { x: "-35%", y: "35%", w: "100%", h: "120%", color: "#e0457f", opacity: 0.75 },
-  { x: "-15%", y: "55%", w: "70%", h: "80%", color: "#f4a27c", opacity: 0.7 },
-  { x: "35%", y: "30%", w: "95%", h: "130%", color: "#7b2fd3", opacity: 0.55 },
-  { x: "70%", y: "45%", w: "70%", h: "100%", color: "#2d2f9a", opacity: 0.3 },
+  { x: "-35%", y: "35%", w: "100%", h: "120%", color: "#e0457f", opacity: 1 },
+  { x: "-15%", y: "55%", w: "70%", h: "80%", color: "#f4a27c", opacity: 0.95 },
+  { x: "35%", y: "30%", w: "95%", h: "130%", color: "#7b2fd3", opacity: 0.85 },
+  { x: "70%", y: "45%", w: "70%", h: "100%", color: "#2d2f9a", opacity: 0.55 },
 ];
 
 /**
@@ -48,7 +48,7 @@ export function MobileGlow({ edge, className, strength = 1 }: { edge: "top" | "b
       className={cn("pointer-events-none absolute inset-x-0 overflow-hidden lg:hidden", edge === "top" ? "top-0" : "bottom-0", className)}
       style={{ opacity: strength }}
     >
-      <div className="absolute inset-0 blur-[28px]">
+      <div className="absolute inset-0 blur-[22px] saturate-[1.15]">
         {blobs.map((b) => (
           <span key={`${b.x}${b.y}`} className="absolute" style={blob(b)} />
         ))}
@@ -64,9 +64,4 @@ export function MobileGlow({ edge, className, strength = 1 }: { edge: "top" | "b
       />
     </div>
   );
-}
-
-/** Film grain over the whole mobile page, like the reference. */
-export function MobileGrain() {
-  return <div aria-hidden className="mobile-grain pointer-events-none absolute inset-0 z-[5] lg:hidden" />;
 }

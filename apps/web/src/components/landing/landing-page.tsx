@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Suspense, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { FaqAccordion } from "./faq-accordion";
-import { MobileGlow, MobileGrain } from "./mobile-glow";
+import { MobileGlow } from "./mobile-glow";
 import { NavActions, SignedOutActions } from "./nav-actions";
 import { NAV_LINKS } from "./nav-links";
 
@@ -49,7 +49,6 @@ const solidPill =
 export function LandingPage() {
   return (
     <div className="relative flex flex-1 flex-col bg-canvas font-sans text-ink">
-      <MobileGrain />
       <Hero />
       <StatsStrip />
       <Benefits />
@@ -150,7 +149,7 @@ const STATS = [
 
 function StatsStrip() {
   return (
-    // Mobile: semi-transparent so the grain and glow carry through; desktop: solid white as in Figma.
+    // Mobile: semi-transparent so the colour glow carries through; desktop: solid white as in Figma.
     <section aria-label="Muhrak in numbers" className="relative grid grid-cols-2 bg-white/60 lg:grid-cols-4 lg:bg-white">
       {STATS.map((stat, index) => (
         <div
