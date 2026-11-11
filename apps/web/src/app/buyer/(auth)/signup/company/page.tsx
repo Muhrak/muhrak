@@ -13,7 +13,7 @@ export default function CompanySignupPage() {
       title="Sign Up Account"
       description="Enter your company details to create a business account."
     >
-      <SignupForm accountType="company" />
+      <SignupForm side="buyer" accountType="company" />
     </AuthShell>
   );
 }

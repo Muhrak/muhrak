@@ -1,9 +1,11 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "../../db/client";
 import {
+  passwordResetTokens,
   refreshTokens,
   users,
   type NewUserRow,
+  type PasswordResetTokenRow,
   type RefreshTokenRow,
   type UserRow,
 } from "../../db/schema";
@@ -68,4 +70,55 @@ export async function revokeAllRefreshTokensForUser(userId: string): Promise<voi
     .update(refreshTokens)
     .set({ revokedAt: new Date() })
     .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
+}
+
+export async function updateUserPassword(userId: string, passwordHash: string): Promise<void> {
+  await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, userId));
+}
+
+// ---------------------------------------------------------------- password reset
+
+export async function insertPasswordResetToken(values: {
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+}): Promise<void> {
+  await db.insert(passwordResetTokens).values(values);
+}
+
+export async function findLatestPasswordResetToken(userId: string): Promise<PasswordResetTokenRow | undefined> {
+  const rows = await db
+    .select()
+    .from(passwordResetTokens)
+    .where(eq(passwordResetTokens.userId, userId))
+    .orderBy(desc(passwordResetTokens.createdAt))
+    .limit(1);
+  return rows[0];
+}
+
+export async function findPasswordResetTokenByHash(tokenHash: string): Promise<PasswordResetTokenRow | undefined> {
+  const rows = await db
+    .select()
+    .from(passwordResetTokens)
+    .where(eq(passwordResetTokens.tokenHash, tokenHash))
+    .limit(1);
+  return rows[0];
+}
+
+/** Mark one token as used. Returns true only if THIS call used it, so a link cannot be used twice. */
+export async function markPasswordResetTokenUsed(id: string): Promise<boolean> {
+  const rows = await db
+    .update(passwordResetTokens)
+    .set({ usedAt: new Date() })
+    .where(and(eq(passwordResetTokens.id, id), isNull(passwordResetTokens.usedAt)))
+    .returning({ id: passwordResetTokens.id });
+  return rows.length === 1;
+}
+
+/** Cancel every unused link for a user, so only the newest email works. */
+export async function invalidatePasswordResetTokensForUser(userId: string): Promise<void> {
+  await db
+    .update(passwordResetTokens)
+    .set({ usedAt: new Date() })
+    .where(and(eq(passwordResetTokens.userId, userId), isNull(passwordResetTokens.usedAt)));
 }

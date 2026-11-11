@@ -14,11 +14,13 @@
   },
   "dependencies": {
     "@muhrak/schemas": "workspace:*",
+    "bullmq": "^5.81.5",
     "cors": "^2.8.5",
     "dotenv": "^16.4.0",
     "drizzle-orm": "^0.44.0",
     "express": "^5.1.0",
     "helmet": "^8.0.0",
+    "ioredis": "^5.11.1",
     "jose": "^6.0.0",
     "pg": "^8.13.0",
     "pino": "^9.6.0",

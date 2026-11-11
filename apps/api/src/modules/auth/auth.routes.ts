@@ -1,11 +1,15 @@
 import { Router } from "express";
 import {
+  forgotPasswordSchema,
   loginSchema,
   refreshSchema,
   registerSchema,
+  resetPasswordSchema,
+  type ForgotPasswordInput,
   type LoginInput,
   type RefreshInput,
   type RegisterInput,
+  type ResetPasswordInput,
 } from "@muhrak/schemas";
 import { unauthorized } from "../../shared/errors";
 import { validateBody } from "../../shared/http";
@@ -40,6 +44,18 @@ authRouter.post("/refresh", validateBody(refreshSchema), async (req, res) => {
 authRouter.post("/logout", validateBody(refreshSchema), async (req, res) => {
   const { refreshToken } = req.body as RefreshInput;
   await authService.logout(refreshToken);
+  res.status(204).end();
+});
+
+/** Always 202 with no body: the response must not reveal whether the email has an account. */
+authRouter.post("/forgot-password", validateBody(forgotPasswordSchema), async (req, res) => {
+  const { email } = req.body as ForgotPasswordInput;
+  await authService.requestPasswordReset(email);
+  res.status(202).end();
+});
+
+authRouter.post("/reset-password", validateBody(resetPasswordSchema), async (req, res) => {
+  await authService.resetPassword(req.body as ResetPasswordInput);
   res.status(204).end();
 });
 

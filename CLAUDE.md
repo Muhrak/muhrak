@@ -27,7 +27,9 @@ outside the platform and the seller marks the order as paid.
   distributors and suppliers are all `seller`. Do not add seller sub-types.
 - Admin is a separate Next.js app (`apps/admin`).
 - Design source: Figma file "Muhrak" (Buyer Side, Seller Side, Platform Admin).
-  Dark theme and English first.
+  Light theme and English first (changed from dark on 11 Nov 2026 by the
+  developer). Use the Figma "(Light)" frames; where a screen exists only in
+  dark, convert it using the "Seller – Dashboard (Light)" palette.
 
 ## Architecture rules
 

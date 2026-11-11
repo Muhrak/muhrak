@@ -43,6 +43,19 @@ export const authResponseSchema = z.object({
 });
 export type AuthResponse = z.infer<typeof authResponseSchema>;
 
+/** POST /v1/auth/forgot-password. Always answers 202, whether or not the email has an account. */
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
+/** POST /v1/auth/reset-password. The token comes from the link in the reset email. */
+export const resetPasswordSchema = z.object({
+  token: z.string().min(20).max(200),
+  password: passwordSchema,
+});
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
 /** GET /v1/auth/me */
 export const meResponseSchema = z.object({
   user: publicUserSchema,

@@ -12,7 +12,7 @@ export default function LoginPage() {
       title="Log In Account"
       description="Enter your email and password to continue."
     >
-      <LoginForm />
+      <LoginForm side="buyer" />
     </AuthShell>
   );
 }

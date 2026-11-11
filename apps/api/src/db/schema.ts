@@ -40,6 +40,27 @@ export const refreshTokens = pgTable(
   (table) => [index("refresh_tokens_user_id_idx").on(table.userId)],
 );
 
+/**
+ * One-time password reset links. Only the SHA-256 hash of the token is
+ * stored; the token itself exists only in the email. A token works once and
+ * expires after a short time.
+ */
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("password_reset_tokens_user_id_idx").on(table.userId)],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type NewUserRow = typeof users.$inferInsert;
 export type RefreshTokenRow = typeof refreshTokens.$inferSelect;
+export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;

@@ -2,6 +2,7 @@ import { createApp } from "./app";
 import { env } from "./config/env";
 import { pool } from "./db/client";
 import { logger } from "./shared/logger";
+import { closeQueues } from "./shared/queue";
 
 const app = createApp();
 
@@ -13,9 +14,8 @@ const server = app.listen(env.PORT, () => {
 function shutdown(signal: string) {
   logger.info(`${signal} received, shutting down`);
   server.close(() => {
-    pool
-      .end()
-      .catch((err: unknown) => logger.error({ err }, "Error closing database pool"))
+    Promise.all([pool.end(), closeQueues()])
+      .catch((err: unknown) => logger.error({ err }, "Error closing database pool or queues"))
       .finally(() => process.exit(0));
   });
   // Do not hang forever if a connection refuses to close.

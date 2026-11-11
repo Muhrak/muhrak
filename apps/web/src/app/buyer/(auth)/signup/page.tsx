@@ -13,7 +13,7 @@ export default function SignupPage() {
       title="Sign Up Account"
       description="Enter your details to create your Muhrak account."
     >
-      <SignupForm accountType="individual" />
+      <SignupForm side="buyer" accountType="individual" />
     </AuthShell>
   );
 }

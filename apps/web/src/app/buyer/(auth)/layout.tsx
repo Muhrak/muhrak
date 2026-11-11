@@ -1,4 +1,4 @@
-/** Auth screens use the light design from Figma, inside the otherwise dark app. */
+/** Auth screens: Figma "Buyer – Log in / Sign up (Light)". */
 export default function AuthLayout({ children }: LayoutProps<"/">) {
-  return <div className="light flex-1 bg-canvas text-ink">{children}</div>;
+  return <div className="flex-1 bg-canvas text-ink">{children}</div>;
 }

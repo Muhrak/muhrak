@@ -4,8 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterInput } from "@muhrak/schemas";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useForm, type FieldValues, type Path, type UseFormSetError } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,8 @@ import { register as registerAccount } from "./api";
 import { OrDivider, primaryButtonClass, SocialButtons } from "./auth-shell";
 import { Field, FormError, FormNotice, PasswordField } from "./field";
 import { applyApiError } from "./form-errors";
+import { RedirectIfSignedIn } from "./guards";
+import { LOGIN_PATH } from "./paths";
 import { saveSession } from "./session";
 
 export type AccountType = "individual" | "company";
@@ -32,24 +33,38 @@ const companySchema = credentials.extend({
   crNumber: z.string().trim().min(1, "Enter your CR number").max(30),
 });
 
-/** Buyer sign-up from Figma "Buyer – Sign up (Individual / Company) (Light)". */
-export function SignupForm({ accountType }: { accountType: AccountType }) {
+/**
+ * Buyer sign-up from Figma "Buyer – Sign up (Individual / Company) (Light)".
+ * Seller sign-up follows "Seller – Sign up", in the light style. There is one
+ * seller type, so the design's "Parts seller / Manufacturer" switch is left out.
+ */
+export function SignupForm(props: { side: "buyer"; accountType: AccountType } | { side: "seller" }) {
   const [notice, setNotice] = useState<string>();
+  const seller = props.side === "seller";
   return (
     <div className="flex flex-col">
-      <AccountTypeTabs current={accountType} />
-      <div className="mt-5">
-        <SocialButtons onUnavailable={(provider) => setNotice(`${provider} sign-up is coming soon. Use your email for now.`)} />
-      </div>
+      <Suspense fallback={null}>
+        <RedirectIfSignedIn />
+      </Suspense>
+      {props.side === "buyer" ? (
+        <div className="mb-5">
+          <AccountTypeTabs current={props.accountType} />
+        </div>
+      ) : null}
+      <SocialButtons onUnavailable={(provider) => setNotice(`${provider} sign-up is coming soon. Use your email for now.`)} />
       <div className="mt-5">
         <OrDivider />
       </div>
       <div className="mt-5">
-        {accountType === "individual" ? <IndividualForm notice={notice} /> : <CompanyForm notice={notice} />}
+        {props.side === "buyer" && props.accountType === "individual" ? (
+          <IndividualForm notice={notice} />
+        ) : (
+          <CompanyForm notice={notice} role={props.side} />
+        )}
       </div>
       <p className="mt-6 text-center text-sm leading-[normal] text-ink-tertiary">
-        Already have an account?{" "}
-        <Link href="/buyer/login" className="font-medium text-ink hover:underline">
+        {seller ? "Already selling on Muhrak?" : "Already have an account?"}{" "}
+        <Link href={LOGIN_PATH[props.side]} className="font-medium text-ink hover:underline">
           Log in
         </Link>
       </p>
@@ -87,13 +102,10 @@ function AccountTypeTabs({ current }: { current: AccountType }) {
 }
 
 function useRegister<T extends FieldValues>(setError: UseFormSetError<T>, nameField: Path<T>, fields: readonly Path<T>[]) {
-  const router = useRouter();
   return useMutation({
     mutationFn: (input: RegisterInput) => registerAccount(input),
-    onSuccess: (auth) => {
-      saveSession(auth);
-      router.push("/account");
-    },
+    // RedirectIfSignedIn moves the new user to their dashboard.
+    onSuccess: saveSession,
     // The API reports name problems on `fullName`; show them on the visible name field.
     onError: (error) => applyApiError(error, setError, fields, { fullName: nameField }),
   });
@@ -166,7 +178,8 @@ function IndividualForm({ notice }: { notice?: string }) {
   );
 }
 
-function CompanyForm({ notice }: { notice?: string }) {
+function CompanyForm({ notice, role }: { notice?: string; role: "buyer" | "seller" }) {
+  const seller = role === "seller";
   const {
     register,
     handleSubmit,
@@ -183,7 +196,7 @@ function CompanyForm({ notice }: { notice?: string }) {
       noValidate
       className="flex flex-col"
       onSubmit={handleSubmit(({ companyName, email, password }) =>
-        mutation.mutate({ role: "buyer", fullName: companyName, email, password }),
+        mutation.mutate({ role, fullName: companyName, email, password }),
       )}
     >
       <div className="flex flex-col gap-[18px]">
@@ -192,7 +205,7 @@ function CompanyForm({ notice }: { notice?: string }) {
             id="companyName"
             label="Company name"
             autoComplete="organization"
-            placeholder="eg. Al Hadi Garage"
+            placeholder={seller ? "eg. Al Noor Spare Parts" : "eg. Al Hadi Garage"}
             error={errors.companyName?.message}
             {...register("companyName")}
           />
@@ -210,7 +223,7 @@ function CompanyForm({ notice }: { notice?: string }) {
           label="Work email"
           type="email"
           autoComplete="email"
-          placeholder="eg. khalid@alhadigarage.om"
+          placeholder={seller ? "eg. ahmed@alnoorparts.om" : "eg. khalid@alhadigarage.om"}
           error={errors.email?.message}
           {...register("email")}
         />

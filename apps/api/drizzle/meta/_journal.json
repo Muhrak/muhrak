@@ -8,6 +8,13 @@
       "when": 1794307798239,
       "tag": "0000_useful_giant_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794395003077,
+      "tag": "0001_bent_ted_forrester",
+      "breakpoints": true
     }
   ]
 }

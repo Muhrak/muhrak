@@ -64,6 +64,7 @@ variables above are what is actually used.
    JWT_SECRET=<new random value, see below>
    RESEND_API_KEY=<from Resend>
    CORS_ORIGINS=<Vercel URL from step 5, fill in later>
+   WEB_APP_URL=<same Vercel URL; used for links in emails>
    ```
 
    Make a fresh `JWT_SECRET` for staging; do not reuse your local one:

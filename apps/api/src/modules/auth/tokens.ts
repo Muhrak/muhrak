@@ -51,6 +51,15 @@ export function hashRefreshToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+/** Random one-time token for links sent by email (password reset). Stored only as a hash. */
+export function generateOneTimeToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+export function hashOneTimeToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
 export function refreshTokenExpiry(now = new Date()): Date {
   return new Date(now.getTime() + env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
 }

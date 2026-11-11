@@ -14,6 +14,13 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  /** Public URL of the web app, used to build links in emails (no trailing slash). */
+  WEB_APP_URL: z
+    .string()
+    .url()
+    .default("http://localhost:3000")
+    .transform((value) => value.replace(/\/+$/, "")),
+  PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(30),
   CORS_ORIGINS: z
     .string()
     .default("http://localhost:3000")
