@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { MobileGlow } from "@/components/landing/mobile-glow";
 import { cn } from "@/lib/utils";
 
 interface AuthShellProps {
@@ -12,7 +13,7 @@ interface AuthShellProps {
   /** Form heading (the page's h1). */
   title: string;
   description: string;
-  /** Which aurora the panel shows: buyer (sunset pink/purple) or seller (orange to blue, Figma "Seller – Sign up"). */
+  /** Panel background: buyer = the landing hero texture (blue palette); seller = seller aurora (Figma "Seller – Sign up"). */
   side?: "buyer" | "seller";
   children: ReactNode;
 }
@@ -25,19 +26,30 @@ interface AuthShellProps {
 export function AuthShell({ panelTitle, panelDescription, steps, title, description, side = "buyer", children }: AuthShellProps) {
   return (
     <div className="grid min-h-dvh grid-cols-[minmax(0,1fr)] lg:grid-cols-[640fr_784fr] lg:py-4 lg:pl-4">
-      <aside className="relative hidden overflow-hidden rounded-[24px] border border-glass-edge bg-white lg:sticky lg:top-4 lg:grid lg:h-[calc(100dvh-2rem)] lg:grid-rows-[minmax(96px,429px)_auto_1fr]">
-        <Image
-          src={side === "seller" ? "/auth/seller-aurora.svg" : "/auth/aurora.svg"}
-          alt=""
-          width={1580}
-          height={1180}
-          priority
-          className="pointer-events-none absolute top-[-661px] left-1/2 h-[1180px] w-[1580px] max-w-none -translate-x-1/2"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-[868px] bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.05)_12%,rgba(255,255,255,0.6)_35%,#fff_55%,#fff_100%)]"
-        />
+      <aside
+        className={cn(
+          "relative hidden overflow-hidden rounded-[24px] border border-glass-edge lg:sticky lg:top-4 lg:grid lg:h-[calc(100dvh-2rem)] lg:grid-rows-[minmax(96px,429px)_auto_1fr]",
+          side === "buyer" ? "bg-canvas" : "bg-white",
+        )}
+      >
+        {side === "buyer" ? (
+          <HeroTexture />
+        ) : (
+          <>
+            <Image
+              src="/auth/seller-aurora.svg"
+              alt=""
+              width={1580}
+              height={1180}
+              priority
+              className="pointer-events-none absolute top-[-661px] left-1/2 h-[1180px] w-[1580px] max-w-none -translate-x-1/2"
+            />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 h-[868px] bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.05)_12%,rgba(255,255,255,0.6)_35%,#fff_55%,#fff_100%)]"
+            />
+          </>
+        )}
 
         <div className="relative row-start-2 flex flex-col items-center px-6 text-center">
           <MuhrakLogo />
@@ -73,8 +85,10 @@ export function AuthShell({ panelTitle, panelDescription, steps, title, descript
         </div>
       </aside>
 
-      <main className="flex items-center justify-center px-4 py-12">
-        <div className="flex w-full max-w-[420px] flex-col items-center">
+      <main className="relative flex items-center justify-center overflow-hidden px-4 py-12">
+        {/* Phones (panel hidden): the same top band as the mobile landing hero. */}
+        {side === "buyer" ? <MobileGlow edge="top" className="h-[300px]" /> : null}
+        <div className="relative flex w-full max-w-[420px] flex-col items-center">
           <div className="mb-8 lg:hidden">
             <MuhrakLogo />
           </div>
@@ -83,6 +97,28 @@ export function AuthShell({ panelTitle, panelDescription, steps, title, descript
           <div className="mt-7 w-full">{children}</div>
         </div>
       </main>
+    </div>
+  );
+}
+
+/**
+ * Buyer panel background: the landing hero's texture (Figma hero aurora
+ * arcing around the light dome, in the blue palette) scaled to the 640 px
+ * panel (hero geometry scaled 0.62 wide × 1.15 tall), centred: aurora 2480×1180 at
+ * (-520,-610) and dome 1970×1420 at (-265,-40) on the 1440 px canvas.
+ */
+/** Width follows the 640 px panel; height is stretched because the panel is tall, so the colour arcs down its sides as on the hero. */
+const HERO_SCALE_X = 0.62;
+const HERO_SCALE_Y = 1.15;
+function heroLayer(x: number, y: number, w: number, h: number) {
+  return { left: `calc(50% + ${(x - 720) * HERO_SCALE_X}px)`, top: y * HERO_SCALE_Y, width: w * HERO_SCALE_X, height: h * HERO_SCALE_Y };
+}
+
+function HeroTexture() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0">
+      <Image src="/landing/hero-aurora.svg" alt="" width={2480} height={1180} priority className="absolute max-w-none" style={heroLayer(-520, -610, 2480, 1180)} />
+      <Image src="/landing/hero-dome.svg" alt="" width={1970} height={1420} priority className="absolute max-w-none" style={heroLayer(-265, -40, 1970, 1420)} />
     </div>
   );
 }
