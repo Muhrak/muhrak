@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 /**
  * Mobile-only background, from the developer's reference (refs/mobile view
  * ref.jpg): soft gradient bands at the top and bottom of the screen with a
- * curved light edge (no grain texture, developer decision). Colours: ONLY those visible on the
- * desktop landing page: pink #E0457F, purple #7B2FD3, indigo #2D2F9A. No peach/orange, no cyan.
+ * curved light edge (no grain texture). Colours: the landing palette from
+ * refs/new ref blue.jpg: periwinkle #577FBA, blue #4A88C1, azure #519ED2, sky #63B6E2.
  * Hidden from `lg` up, where the Figma desktop design is used unchanged.
  */
 
@@ -20,20 +20,20 @@ const blob = (b: Blob): CSSProperties => ({
   background: `radial-gradient(closest-side, ${b.color}, transparent)`,
 });
 
-/** Top band: pink on the left, purple in the middle, indigo fading out to the right. */
+/** Top band: periwinkle on the left, blue and azure in the middle, sky fading out to the right. */
 const TOP: Blob[] = [
-  { x: "-35%", y: "-55%", w: "105%", h: "130%", color: "#e0457f", opacity: 1 },
-  { x: "-30%", y: "-20%", w: "70%", h: "85%", color: "#e0457f", opacity: 0.8 },
-  { x: "18%", y: "-65%", w: "95%", h: "120%", color: "#7b2fd3", opacity: 0.9 },
-  { x: "55%", y: "-75%", w: "85%", h: "110%", color: "#2d2f9a", opacity: 0.6 },
+  { x: "-35%", y: "-55%", w: "105%", h: "130%", color: "#577fba", opacity: 1 },
+  { x: "-30%", y: "-20%", w: "70%", h: "85%", color: "#4a88c1", opacity: 0.85 },
+  { x: "18%", y: "-65%", w: "95%", h: "120%", color: "#519ed2", opacity: 0.9 },
+  { x: "55%", y: "-75%", w: "85%", h: "110%", color: "#63b6e2", opacity: 0.75 },
 ];
 
-/** Bottom band: the mirror image, pink on the left rising into purple on the right. */
+/** Bottom band: the mirror image, periwinkle on the left rising into sky blue on the right. */
 const BOTTOM: Blob[] = [
-  { x: "-35%", y: "35%", w: "100%", h: "120%", color: "#e0457f", opacity: 1 },
-  { x: "-15%", y: "55%", w: "70%", h: "80%", color: "#e0457f", opacity: 0.8 },
-  { x: "35%", y: "30%", w: "95%", h: "130%", color: "#7b2fd3", opacity: 0.85 },
-  { x: "70%", y: "45%", w: "70%", h: "100%", color: "#2d2f9a", opacity: 0.55 },
+  { x: "-35%", y: "35%", w: "100%", h: "120%", color: "#577fba", opacity: 1 },
+  { x: "-15%", y: "55%", w: "70%", h: "80%", color: "#4a88c1", opacity: 0.85 },
+  { x: "35%", y: "30%", w: "95%", h: "130%", color: "#519ed2", opacity: 0.9 },
+  { x: "70%", y: "45%", w: "70%", h: "100%", color: "#63b6e2", opacity: 0.7 },
 ];
 
 /**

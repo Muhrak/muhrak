@@ -237,7 +237,7 @@ function Benefits() {
             const part = GLASS_PARTS[index];
             return (
               <li key={benefit.title} className="relative h-[340px] sm:h-[430px]">
-                <div className="relative flex h-full flex-col rounded-[18px] border border-black/10 bg-linear-to-b from-white/78 to-white/50 px-[27px] pt-[31px] backdrop-blur-[15px]">
+                <div className="relative flex h-full flex-col rounded-[18px] border border-glass-edge bg-linear-to-b from-white/78 to-white/50 px-[27px] pt-[31px] backdrop-blur-[15px]">
                   <h3 className="text-[26px] leading-[1.2] tracking-[-0.01em]">{benefit.title}</h3>
                   <p className="mt-5 max-w-[246px] text-sm leading-[1.55] text-ink-tertiary">{benefit.text}</p>
                   <span aria-hidden className="absolute right-7 bottom-[30px] text-[30px] leading-[1.3] font-light text-ink/22">
@@ -298,7 +298,7 @@ function MuhrakAiFeature() {
       */}
       <div
         aria-hidden
-        className="relative flex h-[380px] w-full max-w-[540px] shrink-0 flex-col overflow-hidden rounded-[24px] border border-black/11 bg-linear-to-b from-white/78 to-white/50 px-5 pt-6 sm:h-[440px] sm:px-[35px] sm:pt-[38px]"
+        className="relative flex h-[380px] w-full max-w-[540px] shrink-0 flex-col overflow-hidden rounded-[24px] border border-glass-edge bg-linear-to-b from-white/78 to-white/50 px-5 pt-6 sm:h-[440px] sm:px-[35px] sm:pt-[38px]"
       >
         <Image
           src="/landing/ai-glow.svg"
@@ -367,7 +367,7 @@ function Faq() {
 function Cta() {
   return (
     <section className="flex flex-col items-center bg-canvas px-4 pb-[120px]">
-      <div className="relative h-[360px] w-full max-w-[1160px] overflow-hidden rounded-[24px] border border-black/11 bg-linear-to-b from-white/78 to-white/50">
+      <div className="relative h-[360px] w-full max-w-[1160px] overflow-hidden rounded-[24px] border border-glass-edge bg-linear-to-b from-white/78 to-white/50">
         <Image src="/landing/cta-grid.svg" alt="" width={1160} height={360} className="pointer-events-none absolute top-[-1px] left-[-1px] max-w-none" />
         <Image
           src="/landing/cta-aurora.svg"

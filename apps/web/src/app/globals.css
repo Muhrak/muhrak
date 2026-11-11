@@ -88,6 +88,17 @@
   --color-brand-blue: #1a5cff;
   --color-side-accent: var(--side-accent); /* primary action colour of the current side */
   --color-seller-orange: #ff5a1f;
+
+  /*
+   * Landing + buyer login/sign-up palette (developer reference
+   * refs/new ref blue.jpg, 11 Nov 2026), left to right.
+   */
+  --color-sky-periwinkle: #577fba;
+  --color-sky-blue: #4a88c1;
+  --color-sky-azure: #519ed2;
+  --color-sky-sky: #63b6e2;
+  --color-sky-light: #84c9e8;
+  --color-glass-edge: #d2e6e7; /* border of the frosted glass card */
   --color-success: #22c55e;
   --color-step-pending: #5b5f70;
   --color-alert: #ff5a1f;
@@ -235,14 +246,15 @@
     position: absolute;
     border-radius: 999px;
     pointer-events: none;
-    /* Only colours visible on the desktop landing page: pink, purple, indigo. */
+    /* Landing palette (refs/new ref blue.jpg): periwinkle, blue, azure, sky. */
     background: conic-gradient(
       from var(--glow-angle),
-      #e0457f,
-      #7b2fd3,
-      #2d2f9a,
-      #7b2fd3,
-      #e0457f
+      #577fba,
+      #4a88c1,
+      #519ed2,
+      #63b6e2,
+      #519ed2,
+      #577fba
     );
     animation: glow-spin 4s linear infinite;
   }

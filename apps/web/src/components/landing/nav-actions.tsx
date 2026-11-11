@@ -27,7 +27,7 @@ import { NAV_LINKS } from "./nav-links";
 const focus = "outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 
 const avatarClass = (user: PublicUser) =>
-  user.role === "seller" ? "bg-seller-orange" : "bg-[linear-gradient(135deg,#f4a27c_0%,#e0457f_28.571%,#7b2fd3_71.429%)]";
+  user.role === "seller" ? "bg-seller-orange" : "bg-[linear-gradient(135deg,#63b6e2_0%,#4a88c1_50%,#577fba_100%)]";
 
 function Avatar({ user, size, textClass = "text-xs" }: { user: PublicUser; size: number; textClass?: string }) {
   return (

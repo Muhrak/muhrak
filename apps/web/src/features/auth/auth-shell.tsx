@@ -25,7 +25,7 @@ interface AuthShellProps {
 export function AuthShell({ panelTitle, panelDescription, steps, title, description, side = "buyer", children }: AuthShellProps) {
   return (
     <div className="grid min-h-dvh grid-cols-[minmax(0,1fr)] lg:grid-cols-[640fr_784fr] lg:py-4 lg:pl-4">
-      <aside className="relative hidden overflow-hidden rounded-[24px] border border-black/6 bg-white lg:sticky lg:top-4 lg:grid lg:h-[calc(100dvh-2rem)] lg:grid-rows-[minmax(96px,429px)_auto_1fr]">
+      <aside className="relative hidden overflow-hidden rounded-[24px] border border-glass-edge bg-white lg:sticky lg:top-4 lg:grid lg:h-[calc(100dvh-2rem)] lg:grid-rows-[minmax(96px,429px)_auto_1fr]">
         <Image
           src={side === "seller" ? "/auth/seller-aurora.svg" : "/auth/aurora.svg"}
           alt=""
