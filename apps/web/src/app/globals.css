@@ -235,13 +235,14 @@
     position: absolute;
     border-radius: 999px;
     pointer-events: none;
+    /* Buyer brand tones only: peach, pink, purple, indigo (no cyan). */
     background: conic-gradient(
       from var(--glow-angle),
       #f4a27c,
       #e0457f,
       #7b2fd3,
       #2d2f9a,
-      #0aa6a6,
+      #7b2fd3,
       #f4a27c
     );
     animation: glow-spin 4s linear infinite;

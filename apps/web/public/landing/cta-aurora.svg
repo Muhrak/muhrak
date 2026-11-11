@@ -9,7 +9,7 @@
 <feGaussianBlur stdDeviation="50" result="effect1_foregroundBlur_0_4"/>
 </filter>
 <linearGradient id="paint0_linear_0_4" x1="100" y1="230" x2="1000" y2="230" gradientUnits="userSpaceOnUse">
-<stop stop-color="#0AA6A6" stop-opacity="0.9"/>
+<stop stop-color="#2D2F9A" stop-opacity="0.9"/>
 <stop offset="0.35" stop-color="#7B2FD3" stop-opacity="0.9"/>
 <stop offset="0.65" stop-color="#E0457F" stop-opacity="0.9"/>
 <stop offset="1" stop-color="#F4A27C" stop-opacity="0.9"/>

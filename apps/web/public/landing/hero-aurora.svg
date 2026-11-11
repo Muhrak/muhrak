@@ -13,7 +13,7 @@
 <stop offset="0.28" stop-color="#E0457F"/>
 <stop offset="0.55" stop-color="#7B2FD3"/>
 <stop offset="0.75" stop-color="#2D2F9A"/>
-<stop offset="1" stop-color="#0AA6A6"/>
+<stop offset="1" stop-color="#2D2F9A"/>
 </linearGradient>
 </defs>
 </svg>
