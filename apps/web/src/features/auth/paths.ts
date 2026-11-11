@@ -30,12 +30,19 @@ export function loginPathFor(role: Role): string {
 }
 
 /**
+ * Where a role lands right after logging in or signing up, when there is no
+ * page to go back to. Buyers go to the landing page (developer decision,
+ * 11 Nov 2026), where the profile button leads to their dashboard.
+ */
+const AFTER_LOGIN_PATH: Record<Role, string> = { ...HOME_PATH, buyer: "/" };
+
+/**
  * Where to go after login: the page the user was sent away from (`next`),
  * if it is a path inside this site that belongs to their role; otherwise
- * their dashboard. Rejects `//evil.com` style values (open redirects).
+ * AFTER_LOGIN_PATH. Rejects `//evil.com` style values (open redirects).
  */
 export function afterLoginPath(role: Role, next: string | null | undefined): string {
-  const home = HOME_PATH[role];
+  const home = AFTER_LOGIN_PATH[role];
   if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return home;
   const ownArea = role === "admin" ? null : `/${role}/`;
   return ownArea && next.startsWith(ownArea) ? next : home;

@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import { Suspense, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { FaqAccordion } from "./faq-accordion";
+import { NavActions, SignedOutActions } from "./nav-actions";
 
 /**
  * Buyer landing page: Figma "Buyer – Landing v2 (Light)" (node 423:1138).
@@ -87,26 +88,9 @@ function SiteNav() {
         <span>Garage</span>
       </nav>
       <div className="hidden flex-1 lg:block" />
-      <div className="flex items-center gap-2.5">
-        {/* Dark theme is not built yet (light first); the toggle is shown as designed. */}
-        <button
-          type="button"
-          aria-label="Dark theme (coming soon)"
-          title="Dark theme coming soon"
-          className="hidden size-11 items-center justify-center rounded-full border border-black/22 outline-none hover:bg-black/4 focus-visible:ring-3 focus-visible:ring-ring/50 sm:flex"
-        >
-          <Image src="/landing/moon.svg" alt="" width={18} height={18} />
-        </button>
-        <Link
-          href="/buyer/signup"
-          className="hidden rounded-full border border-black/22 px-[22px] py-3 text-sm leading-[1.3] text-ink outline-none hover:bg-black/4 focus-visible:ring-3 focus-visible:ring-ring/50 sm:block"
-        >
-          Sign up
-        </Link>
-        <Link href={FIND_A_PART} className="rounded-full bg-ink px-6 py-3 text-sm leading-[1.3] font-medium text-white outline-none hover:opacity-90 focus-visible:ring-3 focus-visible:ring-ring/50">
-          Find a part
-        </Link>
-      </div>
+      <Suspense fallback={<SignedOutActions />}>
+        <NavActions />
+      </Suspense>
     </header>
   );
 }

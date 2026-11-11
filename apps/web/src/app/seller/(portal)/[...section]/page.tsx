@@ -3,6 +3,9 @@ import { Suspense } from "react";
 import { ComingSoon } from "@/components/layout/coming-soon";
 import { allSectionSlugs, sectionLabel } from "@/components/layout/portal-nav";
 
+// Browser-only page inside the signed-in centre (see the layout).
+export const instant = false;
+
 /** Menu pages that are not built yet. Unknown paths are a real 404. */
 export function generateStaticParams() {
   return allSectionSlugs("seller")

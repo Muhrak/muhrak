@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useCurrentUser, useSignOut } from "@/features/auth/hooks";
 import { HOME_PATH, type PortalSide } from "@/features/auth/paths";
+import { initials } from "@/features/auth/user-display";
 import { cn } from "@/lib/utils";
 import { Icon } from "./icon";
 import { isGroup, PORTAL_NAV, type NavGroup, type NavLink } from "./portal-nav";
@@ -38,12 +39,6 @@ const look = {
     accountLabel: "Seller account",
   },
 } as const;
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  const letters = parts.length > 1 ? `${parts[0]?.[0] ?? ""}${parts.at(-1)?.[0] ?? ""}` : (parts[0] ?? "").slice(0, 2);
-  return letters.toUpperCase() || "M";
-}
 
 export function PortalSidebar({ side, onNavigate }: { side: PortalSide; onNavigate?: () => void }) {
   const style = look[side];
