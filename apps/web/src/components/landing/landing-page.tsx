@@ -81,9 +81,9 @@ function Hero() {
           <span className="block">Find Any</span>
           <span className="block">Spare Part</span>
         </h1>
-        <Link href={FIND_A_PART} className={cn(outlinePill, "mt-10")}>
+        <GlowButton href={FIND_A_PART} className="mt-10">
           Find a part
-        </Link>
+        </GlowButton>
       </div>
     </section>
   );
@@ -112,6 +112,24 @@ function SiteNav() {
         <NavActions />
       </Suspense>
     </header>
+  );
+}
+
+/**
+ * Hero "Find a part" with a rotating aurora-coloured border and glow (see
+ * .glow-* in globals.css). Same size as the Figma outline pill: 1px ring
+ * + 26×13 px padding, like its 1px border.
+ */
+function GlowButton({ href, className, children }: { href: string; className?: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className={cn("glow-button relative inline-flex rounded-full p-px outline-none focus-visible:ring-3 focus-visible:ring-ring/50", className)}
+    >
+      <span aria-hidden className="glow-halo" />
+      <span aria-hidden className="glow-ring" />
+      <span className="relative rounded-full bg-canvas px-[26px] py-[13px] text-sm leading-[1.3] text-ink transition-colors">{children}</span>
+    </Link>
   );
 }
 

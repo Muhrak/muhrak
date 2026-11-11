@@ -211,3 +211,66 @@
     @apply font-sans;
   }
 }
+/*
+ * Glowing "Find a part" button (landing hero). A conic gradient in the hero
+ * aurora colours rotates around the pill as its 1px border, with a blurred
+ * copy behind it as the glow. --glow-angle is a registered property so it
+ * can animate. Reduced-motion users get a still ring.
+ */
+@property --glow-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes glow-spin {
+  to {
+    --glow-angle: 360deg;
+  }
+}
+
+@layer components {
+  .glow-ring,
+  .glow-halo {
+    position: absolute;
+    border-radius: 999px;
+    pointer-events: none;
+    background: conic-gradient(
+      from var(--glow-angle),
+      #f4a27c,
+      #e0457f,
+      #7b2fd3,
+      #2d2f9a,
+      #0aa6a6,
+      #f4a27c
+    );
+    animation: glow-spin 4s linear infinite;
+  }
+  .glow-ring {
+    inset: 0;
+  }
+  .glow-halo {
+    inset: -4px;
+    filter: blur(12px);
+    opacity: 0.75;
+    transition: opacity 300ms ease, inset 300ms ease;
+  }
+  .glow-button:hover .glow-ring,
+  .glow-button:hover .glow-halo,
+  .glow-button:focus-visible .glow-ring,
+  .glow-button:focus-visible .glow-halo {
+    animation-duration: 1.6s;
+  }
+  .glow-button:hover .glow-halo,
+  .glow-button:focus-visible .glow-halo {
+    inset: -7px;
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .glow-ring,
+    .glow-halo {
+      animation: none;
+    }
+  }
+}
