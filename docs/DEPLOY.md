@@ -36,7 +36,9 @@ variables above are what is actually used.
 
 - Railway project `charismatic-inspiration`, environment `production`
   (this is our staging): services `muhrak` (API), `worker`, `Postgres`.
+- Web: https://muhrak.vercel.app (Vercel, root directory `apps/web`).
 - API: https://muhrak-production.up.railway.app (`/health/ready` checks the database).
+  `CORS_ORIGINS=https://muhrak.vercel.app`.
 - The developer's machine has the Railway CLI linked to this project
   (`railway status`, `railway logs`, `railway variables`).
 
