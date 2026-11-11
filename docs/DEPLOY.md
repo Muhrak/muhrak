@@ -12,14 +12,33 @@ from the `develop` branch of `github.com/Muhrak/muhrak`.
 | Web (`apps/web`) | Vercel | Root directory `apps/web` |
 | Email | Resend | `RESEND_API_KEY` |
 
-Every service builds from the **repo root**, because the apps import the
-shared `packages/schemas` workspace. Each Railway service points at its own
-`railway.json`, which sets the start command and which file changes trigger
-a redeploy.
+Every service builds from the **repo root** (Root Directory empty), because
+the apps import the shared `packages/schemas` workspace and the lockfile is
+at the root. Setting Root Directory to `apps/api` breaks the install.
 
-Database migrations run automatically before each API deploy
-(`preDeployCommand` in `apps/api/railway.json`). If a migration fails, the
-new version is not started and the old one keeps running.
+Each Railway service picks its app with the `RAILPACK_START_CMD` variable:
+
+| Service | `RAILPACK_START_CMD` |
+|---|---|
+| API (`muhrak`) | `pnpm --filter @muhrak/api db:migrate && pnpm --filter @muhrak/api start` |
+| `worker` | `pnpm --filter @muhrak/worker start` |
+
+Database migrations run at API start. If a migration fails, the API does not
+start and Railway keeps the previous version running.
+
+`apps/api/railway.json` and `apps/worker/railway.json` hold the same settings
+plus a health check and watch patterns. They only apply if the service's
+**Settings → Config-as-code → Railway Config File** is set and the staged
+change is deployed; on 2026-11-11 that setting did not take effect, so the
+variables above are what is actually used.
+
+### Live staging (as of 2026-11-11)
+
+- Railway project `charismatic-inspiration`, environment `production`
+  (this is our staging): services `muhrak` (API), `worker`, `Postgres`.
+- API: https://muhrak-production.up.railway.app (`/health/ready` checks the database).
+- The developer's machine has the Railway CLI linked to this project
+  (`railway status`, `railway logs`, `railway variables`).
 
 ## 1. Railway: project and database
 
@@ -33,10 +52,10 @@ new version is not started and the old one keeps running.
    - **Service name**: `api`
    - **Source → Branch**: `develop`
    - **Root Directory**: leave empty (repo root)
-   - **Config-as-code → Railway Config File**: `/apps/api/railway.json`
 3. **Variables → Raw Editor**, paste and fill in:
 
    ```
+   RAILPACK_START_CMD=pnpm --filter @muhrak/api db:migrate && pnpm --filter @muhrak/api start
    NODE_ENV=production
    DATABASE_URL=${{Postgres.DATABASE_URL}}
    REDIS_URL=<rediss:// URL from Upstash, same as apps/api/.env>
@@ -58,16 +77,20 @@ new version is not started and the old one keeps running.
 ## 3. Railway: worker service
 
 1. **Create → GitHub Repo → Muhrak/muhrak** again.
-2. **Settings**: name `worker`, branch `develop`, root directory empty,
-   config file `/apps/worker/railway.json`. Do **not** generate a domain.
-3. **Variables**:
+2. **Settings**: name `worker`, branch `develop`, root directory empty.
+   Do **not** generate a domain.
+3. **Variables** (the `${{muhrak.X}}` references reuse the API's values):
 
    ```
+   RAILPACK_START_CMD=pnpm --filter @muhrak/worker start
    NODE_ENV=production
-   REDIS_URL=<same rediss:// URL>
+   REDIS_URL=${{muhrak.REDIS_URL}}
    DATABASE_URL=${{Postgres.DATABASE_URL}}
-   RESEND_API_KEY=<from Resend>
+   RESEND_API_KEY=${{muhrak.RESEND_API_KEY}}
    ```
+
+   Or from the CLI: `railway add --service worker --repo Muhrak/muhrak
+   --branch develop --variables "..."` with one `--variables` per line above.
 
 4. Logs should show `Muhrak worker started`.
 
