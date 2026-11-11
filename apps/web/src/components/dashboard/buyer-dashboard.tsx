@@ -24,7 +24,7 @@ export function BuyerDashboard() {
         actions={
           <>
             <OutlinePillLink href="/buyer/find-part">Browse parts</OutlinePillLink>
-            <SolidPillLink href="/buyer/find-part" tone="navy">
+            <SolidPillLink href="/buyer/find-part">
               Ask Muhrak AI
             </SolidPillLink>
           </>

@@ -42,11 +42,12 @@ export function OutlinePillLink({ href, children }: { href: string; children: Re
   );
 }
 
-export function SolidPillLink({ href, icon, tone, children }: { href: string; icon?: IconName; tone: "blue" | "navy"; children: ReactNode }) {
+/** `accent` is the side colour: orange for sellers, navy for buyers. */
+export function SolidPillLink({ href, icon, children }: { href: string; icon?: IconName; children: ReactNode }) {
   return (
     <Link
       href={href}
-      className={cn(pillBase, focusRing, "text-white hover:opacity-90", tone === "blue" ? "bg-brand-blue" : "bg-sidebar-bg")}
+      className={cn(pillBase, focusRing, "bg-side-accent text-white hover:opacity-90")}
     >
       {icon ? <Icon name={icon} className="size-[18px]" /> : null}
       {children}

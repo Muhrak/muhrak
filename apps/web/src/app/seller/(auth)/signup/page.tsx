@@ -8,6 +8,7 @@ export const metadata: Metadata = { title: "Create seller account · Muhrak" };
 export default function SellerSignupPage() {
   return (
     <AuthShell
+      side="seller"
       panelTitle="Start Selling with Us"
       panelDescription="Complete these easy steps to start receiving quote requests on Muhrak."
       steps={["Sign up your account", "Add your products", "Answer quote requests"]}

@@ -72,7 +72,7 @@ export function NavActions() {
           aria-hidden
           className={cn(
             "flex size-[34px] shrink-0 items-center justify-center rounded-full text-xs leading-[1.3] font-semibold text-white",
-            user.role === "seller" ? "bg-brand-blue" : "bg-[linear-gradient(135deg,#f4a27c_0%,#e0457f_28.571%,#7b2fd3_71.429%)]",
+            user.role === "seller" ? "bg-seller-orange" : "bg-[linear-gradient(135deg,#f4a27c_0%,#e0457f_28.571%,#7b2fd3_71.429%)]",
           )}
         >
           {initials(user.fullName)}

@@ -12,6 +12,8 @@ interface AuthShellProps {
   /** Form heading (the page's h1). */
   title: string;
   description: string;
+  /** Which aurora the panel shows: buyer (sunset pink/purple) or seller (orange to blue, Figma "Seller – Sign up"). */
+  side?: "buyer" | "seller";
   children: ReactNode;
 }
 
@@ -20,12 +22,12 @@ interface AuthShellProps {
  * a white panel with the aurora on the left, the form centred on the right.
  * Below `lg` the panel is hidden and the form takes the full width.
  */
-export function AuthShell({ panelTitle, panelDescription, steps, title, description, children }: AuthShellProps) {
+export function AuthShell({ panelTitle, panelDescription, steps, title, description, side = "buyer", children }: AuthShellProps) {
   return (
     <div className="grid min-h-dvh grid-cols-[minmax(0,1fr)] lg:grid-cols-[640fr_784fr] lg:py-4 lg:pl-4">
       <aside className="relative hidden overflow-hidden rounded-[24px] border border-black/6 bg-white lg:sticky lg:top-4 lg:grid lg:h-[calc(100dvh-2rem)] lg:grid-rows-[minmax(96px,429px)_auto_1fr]">
         <Image
-          src="/auth/aurora.svg"
+          src={side === "seller" ? "/auth/seller-aurora.svg" : "/auth/aurora.svg"}
           alt=""
           width={1580}
           height={1180}

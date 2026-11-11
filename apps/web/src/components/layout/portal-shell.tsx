@@ -24,7 +24,7 @@ export function PortalShell({ side, children }: { side: PortalSide; children: Re
   }, [drawerOpen]);
 
   return (
-    <div className="flex min-h-dvh flex-1 bg-surface font-portal text-text-strong">
+    <div data-side={side} className="flex min-h-dvh flex-1 bg-surface font-portal text-text-strong">
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 lg:block">
         <PortalSidebar side={side} />
       </aside>

@@ -34,7 +34,7 @@ const look = {
     padding: "py-6",
     item: "py-[7px] text-sm",
     activeDot: "bg-success",
-    avatar: "bg-brand-blue",
+    avatar: "bg-seller-orange",
     accountCard: "bg-sidebar-card",
     accountLabel: "Seller account",
   },
@@ -48,7 +48,7 @@ export function PortalSidebar({ side, onNavigate }: { side: PortalSide; onNaviga
   const isActive = (slug: string) => pathname === `/${side}/${slug}` || pathname.startsWith(`/${side}/${slug}/`);
 
   return (
-    <div className={cn("flex h-full flex-col gap-1 overflow-y-auto bg-sidebar-bg px-[18px] font-portal", style.padding)}>
+    <div className={cn("flex h-full flex-col gap-1 overflow-y-auto border-r border-sidebar-edge bg-sidebar-bg px-[18px] font-portal", style.padding)}>
       <div className="flex flex-col gap-2 px-2.5 pb-[30px]">
         <Link
           href={HOME_PATH[side]}

@@ -24,7 +24,7 @@ export function SellerDashboard() {
         actions={
           <>
             <OutlinePillLink href="/seller/store">View my store</OutlinePillLink>
-            <SolidPillLink href="/seller/products/new" icon="plus" tone="blue">
+            <SolidPillLink href="/seller/products/new" icon="plus">
               Add product
             </SolidPillLink>
           </>
@@ -63,7 +63,7 @@ const steps = [
   {
     title: "Add your first product",
     text: "Buyers can find you once a product is live.",
-    action: { href: "/seller/products/new", label: "Add product", tone: "blue" as const },
+    action: { href: "/seller/products/new", label: "Add product", tone: "accent" as const },
   },
   {
     title: "Complete company profile",
@@ -120,7 +120,7 @@ function FinishSetup() {
                 href={step.action.href}
                 className={cn(
                   "mt-1 flex h-10 w-fit items-center rounded-full px-5 text-sm leading-[normal] font-semibold outline-none hover:opacity-90 focus-visible:ring-3 focus-visible:ring-white/40",
-                  step.action.tone === "blue" ? "bg-brand-blue text-white" : "bg-white text-sidebar-bg",
+                  step.action.tone === "accent" ? "bg-side-accent text-white" : "bg-white text-sidebar-bg",
                 )}
               >
                 {step.action.label}

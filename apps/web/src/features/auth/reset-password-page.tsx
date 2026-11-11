@@ -12,6 +12,7 @@ export async function ResetPasswordPage({ side, searchParams }: { side: PortalSi
 
   return (
     <AuthShell
+      side={side}
       panelTitle={resetToken ? "Almost Done" : "Forgot Password?"}
       panelDescription={
         side === "seller"
