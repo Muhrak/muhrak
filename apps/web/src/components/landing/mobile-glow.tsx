@@ -36,12 +36,37 @@ const BOTTOM: Blob[] = [
   { x: "70%", y: "45%", w: "70%", h: "100%", color: "#63b6e2", opacity: 0.7 },
 ];
 
+/** Seller palette (Figma "Seller – Sign up" aurora): orange on the left, burnt orange, blue on the right. */
+const SELLER_TOP: Blob[] = [
+  { x: "-35%", y: "-55%", w: "105%", h: "130%", color: "#ff5a1f", opacity: 1 },
+  { x: "-30%", y: "-20%", w: "70%", h: "85%", color: "#ff8a3d", opacity: 0.85 },
+  { x: "18%", y: "-65%", w: "95%", h: "120%", color: "#c2410c", opacity: 0.7 },
+  { x: "55%", y: "-75%", w: "85%", h: "110%", color: "#2b7bd8", opacity: 0.7 },
+];
+const SELLER_BOTTOM: Blob[] = [
+  { x: "-35%", y: "35%", w: "100%", h: "120%", color: "#ff5a1f", opacity: 1 },
+  { x: "-15%", y: "55%", w: "70%", h: "80%", color: "#ff8a3d", opacity: 0.85 },
+  { x: "35%", y: "30%", w: "95%", h: "130%", color: "#c2410c", opacity: 0.7 },
+  { x: "70%", y: "45%", w: "70%", h: "100%", color: "#2b7bd8", opacity: 0.65 },
+];
+
 /**
  * A gradient band with a curved light edge (a large blurred canvas-coloured
  * ellipse, tilted so the edge sweeps up towards one side as in the reference).
  */
-export function MobileGlow({ edge, className, strength = 1 }: { edge: "top" | "bottom"; className?: string; strength?: number }) {
-  const blobs = edge === "top" ? TOP : BOTTOM;
+export function MobileGlow({
+  edge,
+  className,
+  strength = 1,
+  palette = "buyer",
+}: {
+  edge: "top" | "bottom";
+  className?: string;
+  strength?: number;
+  /** buyer: blue landing palette; seller: seller orange palette. */
+  palette?: "buyer" | "seller";
+}) {
+  const blobs = palette === "seller" ? (edge === "top" ? SELLER_TOP : SELLER_BOTTOM) : edge === "top" ? TOP : BOTTOM;
   return (
     <div
       aria-hidden

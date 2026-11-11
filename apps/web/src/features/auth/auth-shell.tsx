@@ -13,7 +13,7 @@ interface AuthShellProps {
   /** Form heading (the page's h1). */
   title: string;
   description: string;
-  /** Panel background: buyer = the landing hero texture (blue palette); seller = seller aurora (Figma "Seller – Sign up"). */
+  /** Panel colours: buyer = blue landing palette; seller = seller orange palette (Figma "Seller – Sign up"). Same hero texture. */
   side?: "buyer" | "seller";
   children: ReactNode;
 }
@@ -28,28 +28,11 @@ export function AuthShell({ panelTitle, panelDescription, steps, title, descript
     <div className="grid min-h-dvh grid-cols-[minmax(0,1fr)] lg:grid-cols-[640fr_784fr] lg:py-4 lg:pl-4">
       <aside
         className={cn(
-          "relative hidden overflow-hidden rounded-[24px] border border-glass-edge lg:sticky lg:top-4 lg:grid lg:h-[calc(100dvh-2rem)] lg:grid-rows-[minmax(96px,429px)_auto_1fr]",
-          side === "buyer" ? "bg-canvas" : "bg-white",
+          "relative hidden overflow-hidden rounded-[24px] border bg-canvas lg:sticky lg:top-4 lg:grid lg:h-[calc(100dvh-2rem)] lg:grid-rows-[minmax(96px,429px)_auto_1fr]",
+          side === "buyer" ? "border-glass-edge" : "border-black/6",
         )}
       >
-        {side === "buyer" ? (
-          <HeroTexture />
-        ) : (
-          <>
-            <Image
-              src="/auth/seller-aurora.svg"
-              alt=""
-              width={1580}
-              height={1180}
-              priority
-              className="pointer-events-none absolute top-[-661px] left-1/2 h-[1180px] w-[1580px] max-w-none -translate-x-1/2"
-            />
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 top-0 h-[868px] bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.05)_12%,rgba(255,255,255,0.6)_35%,#fff_55%,#fff_100%)]"
-            />
-          </>
-        )}
+        <HeroTexture side={side} />
 
         <div className="relative row-start-2 flex flex-col items-center px-6 text-center">
           <MuhrakLogo />
@@ -86,8 +69,8 @@ export function AuthShell({ panelTitle, panelDescription, steps, title, descript
       </aside>
 
       <main className="relative flex items-center justify-center overflow-hidden px-4 py-12">
-        {/* Phones (panel hidden): the same top band as the mobile landing hero. */}
-        {side === "buyer" ? <MobileGlow edge="top" className="h-[300px]" /> : null}
+        {/* Phones (panel hidden): the same top band as the mobile landing hero, in this side palette. */}
+        <MobileGlow edge="top" className="h-[300px]" palette={side} />
         <div className="relative flex w-full max-w-[420px] flex-col items-center">
           <div className="mb-8 lg:hidden">
             <MuhrakLogo />
@@ -102,8 +85,8 @@ export function AuthShell({ panelTitle, panelDescription, steps, title, descript
 }
 
 /**
- * Buyer panel background: the landing hero's texture (Figma hero aurora
- * arcing around the light dome, in the blue palette) scaled to the 640 px
+ * Panel background (both sides): the landing hero's texture (Figma hero aurora
+ * arcing around the light dome; blue for buyers, seller orange for sellers) scaled to the 640 px
  * panel (hero geometry scaled 0.62 wide × 1.15 tall), centred: aurora 2480×1180 at
  * (-520,-610) and dome 1970×1420 at (-265,-40) on the 1440 px canvas.
  */
@@ -114,10 +97,11 @@ function heroLayer(x: number, y: number, w: number, h: number) {
   return { left: `calc(50% + ${(x - 720) * HERO_SCALE_X}px)`, top: y * HERO_SCALE_Y, width: w * HERO_SCALE_X, height: h * HERO_SCALE_Y };
 }
 
-function HeroTexture() {
+function HeroTexture({ side }: { side: "buyer" | "seller" }) {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0">
-      <Image src="/landing/hero-aurora.svg" alt="" width={2480} height={1180} priority className="absolute max-w-none" style={heroLayer(-520, -610, 2480, 1180)} />
+      <Image
+        src={side === "seller" ? "/auth/seller-hero-aurora.svg" : "/landing/hero-aurora.svg"} alt="" width={2480} height={1180} priority className="absolute max-w-none" style={heroLayer(-520, -610, 2480, 1180)} />
       <Image src="/landing/hero-dome.svg" alt="" width={1970} height={1420} priority className="absolute max-w-none" style={heroLayer(-265, -40, 1970, 1420)} />
     </div>
   );
