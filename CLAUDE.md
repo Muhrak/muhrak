@@ -5,6 +5,10 @@ and vehicle parts). Buyers upload a photo of a part, AI identifies it, matched
 sellers receive a quote request, and buyer and seller agree a quotation in
 chat. Prices are in OMR by default.
 
+**Start every session by reading `docs/PROGRESS.md`**: what is built, the
+developer's design and colour rules, staging, open items and what is next.
+Update it whenever work is committed.
+
 Read `docs/PLAN.md` for the 20-day build plan and `docs/ARCHITECTURE.md` for
 the folder structure and rules before making changes.
 
