@@ -183,3 +183,7 @@ Rule for every day: finish by deploying to staging and checking the aim there.
 Online payment with holds and payouts (modules `payment`, `ledger`, `payout`,
 `dispute`), buyer mobile app, Arabic, light theme, and the deferred Seller
 Centre and Admin screens.
+
+## Figma Link 
+
+https://www.figma.com/design/jdy81y47N6nxZ0LtdOz9ml/Muhrak?node-id=41-2411&t=XcoCwsXp5cONXnPI-1
