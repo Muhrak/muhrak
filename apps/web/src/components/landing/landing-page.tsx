@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { FaqAccordion } from "./faq-accordion";
+import { MobileGlow, MobileGrain } from "./mobile-glow";
 import { NavActions, SignedOutActions } from "./nav-actions";
 import { NAV_LINKS } from "./nav-links";
 
@@ -47,7 +48,8 @@ const solidPill =
 
 export function LandingPage() {
   return (
-    <div className="flex flex-1 flex-col bg-canvas font-sans text-ink">
+    <div className="relative flex flex-1 flex-col bg-canvas font-sans text-ink">
+      <MobileGrain />
       <Hero />
       <StatsStrip />
       <Benefits />
@@ -63,9 +65,13 @@ export function LandingPage() {
 
 function Hero() {
   return (
-    <section className="relative h-[620px] bg-canvas lg:h-[720px]" style={heroUnit}>
-      {/* Clipped decoration layer, so the mobile menu can open past the hero. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+    // Phones and tablets: a full-screen hero in the style of the developer reference
+    // (refs/mobile view ref.jpg). Desktop (lg+): the Figma frame, 720 px high.
+    <section className="relative flex h-[100svh] min-h-[620px] flex-col bg-canvas lg:block lg:h-[720px] lg:min-h-0" style={heroUnit}>
+      <MobileGlow edge="top" className="h-[44%]" />
+      <MobileGlow edge="bottom" className="h-[30%]" />
+      {/* Desktop decoration layer, clipped, so the mobile menu can open past the hero. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 hidden overflow-hidden lg:block">
         {/* Aurora 2300×1000 at (-430,-520); the SVG adds a 90 px blur margin on each side. */}
         <Image src="/landing/hero-aurora.svg" alt="" width={2480} height={1180} priority className="absolute max-w-none" style={onCanvas(-520, -610, 2480, 1180)} />
         {/* Light dome 1750×1200 at (-155,70) with a 110 px blur margin. */}
@@ -75,7 +81,7 @@ function Hero() {
       <SiteNav />
 
       {/* Figma: copy starts 190 px from the section top; the 84 px nav is above it in the flow. */}
-      <div className="relative flex flex-col items-center px-4 pt-[66px] text-center lg:pt-[106px]">
+      <div className="relative flex flex-1 flex-col items-center justify-center px-4 pb-[10svh] text-center lg:flex-none lg:justify-start lg:pt-[106px] lg:pb-0">
         <p className="text-[13px] leading-[1.3] tracking-[0.06em] text-[rgba(74,77,89,0.9)]">AI-POWERED SPARE PARTS MARKETPLACE</p>
         <h1 className="mt-10 bg-linear-to-b from-ink via-[#292b36] via-55% to-[#737585] bg-clip-text pb-2 text-[64px] leading-[0.84] font-medium tracking-[-0.05em] text-transparent sm:text-[96px] lg:text-[150px]">
           <span className="block">Find Any</span>
@@ -144,7 +150,8 @@ const STATS = [
 
 function StatsStrip() {
   return (
-    <section aria-label="Muhrak in numbers" className="relative grid grid-cols-2 bg-white lg:grid-cols-4">
+    // Mobile: semi-transparent so the grain and glow carry through; desktop: solid white as in Figma.
+    <section aria-label="Muhrak in numbers" className="relative grid grid-cols-2 bg-white/60 lg:grid-cols-4 lg:bg-white">
       {STATS.map((stat, index) => (
         <div
           key={stat.label}
@@ -280,8 +287,9 @@ function MuhrakAiFeature() {
   return (
     <section
       id="muhrak-ai"
-      className="flex flex-col items-center gap-14 bg-canvas px-4 pt-[120px] pb-[100px] [--bar-unit:0.8px] sm:[--bar-unit:1px] lg:h-[740px] lg:flex-row lg:justify-center lg:gap-[110px] lg:px-0 lg:pt-[160px] lg:pb-[140px]"
+      className="relative flex flex-col items-center gap-14 overflow-hidden bg-canvas px-4 pt-[120px] pb-[100px] [--bar-unit:0.8px] sm:[--bar-unit:1px] lg:h-[740px] lg:flex-row lg:justify-center lg:gap-[110px] lg:px-0 lg:pt-[160px] lg:pb-[140px]"
     >
+      <MobileGlow edge="top" className="h-[320px]" strength={0.45} />
       {/*
         Figma 540×440 card. Laid out with flex (not absolute pixels) so it keeps
         its proportions on phones: at 540 px every element lands on its Figma
@@ -321,7 +329,7 @@ function MuhrakAiFeature() {
         </div>
       </div>
 
-      <div className="flex w-full max-w-[430px] shrink-0 flex-col items-start">
+      <div className="relative flex w-full max-w-[430px] shrink-0 flex-col items-start">
         <h2 className="text-[40px] leading-[1.12] tracking-[-0.02em] sm:text-[48px]">
           <span className="block text-ink">Snap a part,</span>
           <span className="block text-ink-tertiary">get quotes in hours.</span>
@@ -415,8 +423,10 @@ const FOOTER_COLUMNS: { title: string; links: FooterLink[] }[] = [
 
 function Footer() {
   return (
-    <footer className="flex flex-col gap-14 border-t border-black/7 bg-canvas px-4 pt-16 pb-10 sm:px-10 xl:px-[140px]">
-      <div className="flex flex-col gap-10 lg:flex-row lg:gap-6">
+    <footer className="relative flex flex-col gap-14 overflow-hidden border-t border-black/7 bg-canvas px-4 pt-16 pb-10 sm:px-10 xl:px-[140px]">
+      {/* Mobile: the page closes with the same band as the hero's bottom edge. */}
+      <MobileGlow edge="bottom" className="h-[75%]" />
+      <div className="relative flex flex-col gap-10 lg:flex-row lg:gap-6">
         <Link href="/" aria-label="Muhrak home" className="flex self-start rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
           <Image src="/auth/muhrak-logo.svg" alt="Muhrak" width={156.357} height={29.8588} />
         </Link>
@@ -439,7 +449,7 @@ function Footer() {
           ))}
         </div>
       </div>
-      <div className="flex min-h-[100px] flex-wrap items-center gap-4">
+      <div className="relative flex min-h-[100px] flex-wrap items-center gap-4">
         <div className="flex items-center gap-[18px]" aria-label="Social media">
           <Image src="/landing/instagram.svg" alt="Instagram" width={16} height={16} />
           <Image src="/landing/x.svg" alt="X" width={16} height={16} />

@@ -284,3 +284,16 @@
     }
   }
 }
+
+/*
+ * Film grain for the mobile landing page (developer reference
+ * refs/mobile view ref.jpg). Monochrome fractal noise, blended so it
+ * speckles both the colour bands and the light middle.
+ */
+.mobile-grain {
+  /* Fine coloured fractal noise (like the reference speckle), tiled. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27160%27 height=%27160%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%271.1%27 numOctaves=%272%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url(%23n)%27/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  mix-blend-mode: overlay;
+  opacity: 0.32;
+}

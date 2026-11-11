@@ -11,6 +11,7 @@ import { HOME_PATH, LOGIN_PATH } from "@/features/auth/paths";
 import { useSession } from "@/features/auth/session";
 import { initials, shortName } from "@/features/auth/user-display";
 import { cn } from "@/lib/utils";
+import { MobileGlow } from "./mobile-glow";
 import { NAV_LINKS } from "./nav-links";
 
 /**
@@ -161,15 +162,10 @@ function MobileMenu({ user }: { user: PublicUser | null }) {
           aria-label="Menu"
           className="fixed inset-0 z-50 flex h-dvh flex-col overflow-y-auto bg-canvas/90 backdrop-blur-[24px]"
         >
-          {/* Same soft aurora as the hero, so the menu feels like part of the page. */}
-          <Image
-            src="/landing/hero-aurora.svg"
-            alt=""
-            aria-hidden
-            width={2480}
-            height={1180}
-            className="pointer-events-none absolute top-[-420px] left-1/2 h-[700px] w-[1100px] max-w-none -translate-x-1/2 opacity-60"
-          />
+          {/* Same bands and grain as the mobile hero, so the menu feels like part of the page. */}
+          <MobileGlow edge="top" className="h-[40%]" strength={0.8} />
+          <MobileGlow edge="bottom" className="h-[28%]" strength={0.8} />
+          <div aria-hidden className="mobile-grain pointer-events-none absolute inset-0" />
 
           <div className="relative flex items-center px-4 py-5 sm:px-12">
             <Link href="/" onClick={close} aria-label="Muhrak home" className={cn("flex rounded-sm", focus)}>
