@@ -54,17 +54,26 @@ muhrak/
 │   │   └── src/
 │   │       ├── app/
 │   │       │   ├── (public)/  landing, sell, sellers, products, search, legal
-│   │       │   ├── (auth)/    login, signup, reset-password
-│   │       │   ├── buyer/     dashboard, find-part, requests, messages,
-│   │       │   │              orders, settings
-│   │       │   └── seller/    dashboard, onboarding, products, rfq-inbox,
-│   │       │                  quotations, messages, orders, settings
+│   │       │   ├── buyer/
+│   │       │   │   ├── (auth)/    BUYER auth: login, signup (+ signup/company),
+│   │       │   │   │              reset-password  → /buyer/login, /buyer/signup
+│   │       │   │   └── (portal)/  dashboard, find-part, requests, messages,
+│   │       │   │                  orders, settings  (layout.tsx = buyer guard)
+│   │       │   └── seller/
+│   │       │       ├── (auth)/    SELLER auth: login, signup, reset-password
+│   │       │       │              → /seller/login, /seller/signup
+│   │       │       └── (portal)/  dashboard, onboarding, products, rfq-inbox,
+│   │       │                      quotations, messages, orders, settings
+│   │       │                      (layout.tsx = seller guard)
 │   │       ├── features/      one folder per API module name
 │   │       ├── components/    ui/, layout/
 │   │       └── lib/
 │   └── admin/
-│       └── src/app/           login, dashboard, sellers, users, products,
-│                              rfqs, orders, ai
+│       └── src/
+│           ├── app/(auth)/    login
+│           ├── app/(portal)/  dashboard, sellers, users, products, rfqs,
+│           │                  orders, ai  (layout.tsx = admin guard)
+│           ├── features/, components/ (ui, layout), lib/
 └── packages/
     ├── schemas/               Zod schemas and types, one file per module
     ├── api-client/            typed functions for every /v1 endpoint

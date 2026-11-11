@@ -37,7 +37,7 @@ export function AccountSummary() {
     const refreshToken = stored.ready ? stored.session?.refreshToken : undefined;
     if (refreshToken) await logout(refreshToken).catch(() => undefined);
     clearSession();
-    router.push("/login");
+    router.push("/buyer/login");
   }
 
   if (!stored.ready || (accessToken && me.isPending)) {
@@ -54,7 +54,7 @@ export function AccountSummary() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Link href="/login" className={buttonVariants({ size: "lg", className: "h-10 w-full" })}>
+          <Link href="/buyer/login" className={buttonVariants({ size: "lg", className: "h-10 w-full" })}>
             Log in
           </Link>
         </CardContent>

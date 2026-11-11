@@ -2,7 +2,9 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* `.light` inside the dark root opts a subtree back into the light theme
+   (the auth screens are designed in light; see Figma "Buyer – Log in (Light)"). */
+@custom-variant dark (&:is(.dark *):not(:is(.light, .light *)));
 
 @theme inline {
   --color-background: var(--background);
@@ -46,9 +48,17 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Figma "Muhrak" light palette */
+  --color-ink: #0a0b12;
+  --color-ink-secondary: #4d4f5c;
+  --color-ink-tertiary: #666975;
+  --color-ink-placeholder: #9a9ca8;
+  --color-canvas: #f6f6f9;
 }
 
-:root {
+:root,
+.light {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

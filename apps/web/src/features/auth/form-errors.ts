@@ -9,11 +9,13 @@ export function applyApiError<T extends FieldValues>(
   error: unknown,
   setError: UseFormSetError<T>,
   fieldNames: readonly Path<T>[],
+  /** API field path → form field, when the form names a field differently (e.g. `fullName` → `firstName`). */
+  aliases: Partial<Record<string, Path<T>>> = {},
 ): void {
   if (error instanceof ApiError) {
     let placedOnField = false;
     for (const fieldError of error.fieldErrors) {
-      const name = fieldNames.find((field) => field === fieldError.path);
+      const name = aliases[fieldError.path] ?? fieldNames.find((field) => field === fieldError.path);
       if (name) {
         setError(name, { type: "server", message: fieldError.message });
         placedOnField = true;

@@ -5,90 +5,230 @@ import { registerSchema, type RegisterInput } from "@muhrak/schemas";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm, useWatch } from "react-hook-form";
+import { useState } from "react";
+import { useForm, type FieldValues, type Path, type UseFormSetError } from "react-hook-form";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { register as registerAccount } from "./api";
-import { Field, FormError } from "./field";
+import { OrDivider, primaryButtonClass, SocialButtons } from "./auth-shell";
+import { Field, FormError, FormNotice, PasswordField } from "./field";
 import { applyApiError } from "./form-errors";
 import { saveSession } from "./session";
 
-const FIELDS = ["email", "password", "fullName", "role"] as const;
+export type AccountType = "individual" | "company";
 
-const ROLE_OPTIONS = [
-  { value: "buyer", title: "I want to buy parts", description: "Find parts by photo and get quotes from sellers." },
-  { value: "seller", title: "I want to sell parts", description: "Receive quote requests and reply with prices." },
-] as const;
+const credentials = registerSchema.pick({ email: true, password: true });
+const PASSWORD_HINT = "Must be at least 10 characters.";
 
-export function SignupForm() {
+const individualSchema = credentials.extend({
+  firstName: z.string().trim().min(1, "Enter your first name").max(60),
+  lastName: z.string().trim().min(1, "Enter your last name").max(60),
+});
+
+const companySchema = credentials.extend({
+  companyName: z.string().trim().min(2, "Enter your company name").max(120),
+  // Collected for the market test; not stored by the API yet (no company profile).
+  crNumber: z.string().trim().min(1, "Enter your CR number").max(30),
+});
+
+/** Buyer sign-up from Figma "Buyer – Sign up (Individual / Company) (Light)". */
+export function SignupForm({ accountType }: { accountType: AccountType }) {
+  const [notice, setNotice] = useState<string>();
+  return (
+    <div className="flex flex-col">
+      <AccountTypeTabs current={accountType} />
+      <div className="mt-5">
+        <SocialButtons onUnavailable={(provider) => setNotice(`${provider} sign-up is coming soon. Use your email for now.`)} />
+      </div>
+      <div className="mt-5">
+        <OrDivider />
+      </div>
+      <div className="mt-5">
+        {accountType === "individual" ? <IndividualForm notice={notice} /> : <CompanyForm notice={notice} />}
+      </div>
+      <p className="mt-6 text-center text-sm leading-[normal] text-ink-tertiary">
+        Already have an account?{" "}
+        <Link href="/buyer/login" className="font-medium text-ink hover:underline">
+          Log in
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+function AccountTypeTabs({ current }: { current: AccountType }) {
+  const tabs = [
+    { value: "individual", label: "Individual", href: "/buyer/signup" },
+    { value: "company", label: "Company", href: "/buyer/signup/company" },
+  ] as const;
+  return (
+    <nav aria-label="Account type" className="flex gap-1 rounded-full border border-black/9 bg-black/4 p-1">
+      {tabs.map((tab) => {
+        const active = tab.value === current;
+        return (
+          <Link
+            key={tab.value}
+            href={tab.href}
+            replace
+            scroll={false}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "flex h-[38px] flex-1 items-center justify-center rounded-full text-sm leading-[normal] font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+              active ? "bg-ink text-white" : "text-ink-secondary hover:text-ink",
+            )}
+          >
+            {tab.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function useRegister<T extends FieldValues>(setError: UseFormSetError<T>, nameField: Path<T>, fields: readonly Path<T>[]) {
   const router = useRouter();
-  const {
-    register,
-    handleSubmit,
-    setError,
-    control,
-    formState: { errors },
-  } = useForm({
-    resolver: zodResolver(registerSchema),
-    defaultValues: { role: "buyer" as const, fullName: "", email: "", password: "" },
-  });
-  const selectedRole = useWatch({ control, name: "role" });
-
-  const mutation = useMutation({
+  return useMutation({
     mutationFn: (input: RegisterInput) => registerAccount(input),
     onSuccess: (auth) => {
       saveSession(auth);
       router.push("/account");
     },
-    onError: (error) => applyApiError(error, setError, FIELDS),
+    // The API reports name problems on `fullName`; show them on the visible name field.
+    onError: (error) => applyApiError(error, setError, fields, { fullName: nameField }),
   });
+}
+
+function IndividualForm({ notice }: { notice?: string }) {
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(individualSchema),
+    defaultValues: { firstName: "", lastName: "", email: "", password: "" },
+  });
+  const mutation = useRegister(setError, "firstName", ["email", "password"]);
 
   return (
-    <form onSubmit={handleSubmit((values) => mutation.mutate(values))} noValidate className="grid gap-5">
-      <fieldset className="grid gap-3">
-        <legend className="mb-2 text-sm font-medium">Account type</legend>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {ROLE_OPTIONS.map((option) => (
-            <label
-              key={option.value}
-              className={cn(
-                "cursor-pointer rounded-xl border p-4 transition-colors hover:bg-muted/50 has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
-                selectedRole === option.value ? "border-primary bg-muted/40" : "border-border",
-              )}
-            >
-              <input type="radio" value={option.value} className="sr-only" {...register("role")} />
-              <span className="block text-sm font-medium">{option.title}</span>
-              <span className="mt-1 block text-sm text-muted-foreground">{option.description}</span>
-            </label>
-          ))}
+    <form
+      noValidate
+      className="flex flex-col"
+      onSubmit={handleSubmit(({ firstName, lastName, email, password }) =>
+        mutation.mutate({ role: "buyer", fullName: `${firstName} ${lastName}`, email, password }),
+      )}
+    >
+      <div className="flex flex-col gap-[18px]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field
+            id="firstName"
+            label="First Name"
+            autoComplete="given-name"
+            placeholder="eg. Khalid"
+            error={errors.firstName?.message}
+            {...register("firstName")}
+          />
+          <Field
+            id="lastName"
+            label="Last Name"
+            autoComplete="family-name"
+            placeholder="eg. Al Amri"
+            error={errors.lastName?.message}
+            {...register("lastName")}
+          />
         </div>
-        {errors.role?.message ? <p className="text-sm text-destructive">{errors.role.message}</p> : null}
-      </fieldset>
-
-      <Field id="fullName" label="Full name" autoComplete="name" error={errors.fullName?.message} {...register("fullName")} />
-      <Field id="email" label="Email" type="email" autoComplete="email" error={errors.email?.message} {...register("email")} />
-      <Field
-        id="password"
-        label="Password"
-        type="password"
-        autoComplete="new-password"
-        hint="At least 10 characters."
-        error={errors.password?.message}
-        {...register("password")}
-      />
-
-      <FormError message={errors.root?.server?.message} />
-
-      <Button type="submit" size="lg" className="h-10" disabled={mutation.isPending}>
-        {mutation.isPending ? "Creating account…" : "Create account"}
+        <Field
+          id="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          placeholder="eg. khalid@email.com"
+          error={errors.email?.message}
+          {...register("email")}
+        />
+        <PasswordField
+          id="password"
+          label="Password"
+          autoComplete="new-password"
+          placeholder="Enter your password"
+          hint={PASSWORD_HINT}
+          error={errors.password?.message}
+          {...register("password")}
+        />
+        <FormNotice message={notice} />
+        <FormError message={errors.root?.server?.message} />
+      </div>
+      <Button type="submit" disabled={mutation.isPending} className={cn("mt-7", primaryButtonClass)}>
+        {mutation.isPending ? "Creating account…" : "Sign Up"}
       </Button>
+    </form>
+  );
+}
 
-      <p className="text-center text-sm text-muted-foreground">
-        Already have an account?{" "}
-        <Link href="/login" className="text-foreground underline underline-offset-4">
-          Log in
-        </Link>
-      </p>
+function CompanyForm({ notice }: { notice?: string }) {
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(companySchema),
+    defaultValues: { companyName: "", crNumber: "", email: "", password: "" },
+  });
+  const mutation = useRegister(setError, "companyName", ["email", "password"]);
+
+  return (
+    <form
+      noValidate
+      className="flex flex-col"
+      onSubmit={handleSubmit(({ companyName, email, password }) =>
+        mutation.mutate({ role: "buyer", fullName: companyName, email, password }),
+      )}
+    >
+      <div className="flex flex-col gap-[18px]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field
+            id="companyName"
+            label="Company name"
+            autoComplete="organization"
+            placeholder="eg. Al Hadi Garage"
+            error={errors.companyName?.message}
+            {...register("companyName")}
+          />
+          <Field
+            id="crNumber"
+            label="CR number"
+            inputMode="numeric"
+            placeholder="eg. 1234567"
+            error={errors.crNumber?.message}
+            {...register("crNumber")}
+          />
+        </div>
+        <Field
+          id="email"
+          label="Work email"
+          type="email"
+          autoComplete="email"
+          placeholder="eg. khalid@alhadigarage.om"
+          error={errors.email?.message}
+          {...register("email")}
+        />
+        <PasswordField
+          id="password"
+          label="Password"
+          autoComplete="new-password"
+          placeholder="Enter your password"
+          hint={PASSWORD_HINT}
+          error={errors.password?.message}
+          {...register("password")}
+        />
+        <FormNotice message={notice} />
+        <FormError message={errors.root?.server?.message} />
+      </div>
+      <Button type="submit" disabled={mutation.isPending} className={cn("mt-7", primaryButtonClass)}>
+        {mutation.isPending ? "Creating account…" : "Sign Up"}
+      </Button>
     </form>
   );
 }

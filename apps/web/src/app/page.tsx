@@ -10,10 +10,10 @@ export default function Home() {
         Snap a photo of a spare part, get it identified, and receive quotes from verified sellers across the GCC.
       </p>
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Link href="/signup" className={buttonVariants({ size: "lg", className: "h-10 px-5" })}>
+        <Link href="/buyer/signup" className={buttonVariants({ size: "lg", className: "h-10 px-5" })}>
           Create an account
         </Link>
-        <Link href="/login" className={buttonVariants({ variant: "outline", size: "lg", className: "h-10 px-5" })}>
+        <Link href="/buyer/login" className={buttonVariants({ variant: "outline", size: "lg", className: "h-10 px-5" })}>
           Log in
         </Link>
       </div>
