@@ -249,11 +249,20 @@
   .glow-ring {
     inset: 0;
   }
+  /*
+   * The blur must fade out INSIDE this element: some mobile browsers (iOS
+   * Safari) clip or skip repainting a blur that spills outside its box,
+   * which shows as a rectangle. So the box is 32px bigger than the button on
+   * every side and the colour is painted only in the content box (the pill
+   * 4px around the button), leaving 28px of transparent room for the blur.
+   */
   .glow-halo {
-    inset: -4px;
+    inset: -32px;
+    padding: 28px;
+    background-clip: content-box;
     filter: blur(12px);
     opacity: 0.75;
-    transition: opacity 300ms ease, inset 300ms ease;
+    transition: opacity 300ms ease, padding 300ms ease;
   }
   .glow-button:hover .glow-ring,
   .glow-button:hover .glow-halo,
@@ -263,7 +272,7 @@
   }
   .glow-button:hover .glow-halo,
   .glow-button:focus-visible .glow-halo {
-    inset: -7px;
+    padding: 25px;
     opacity: 1;
   }
 
