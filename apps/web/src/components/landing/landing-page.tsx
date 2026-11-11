@@ -220,8 +220,9 @@ function Benefits() {
       >
         {/*
           Phones and tablets: the same aurora runs behind the stacked cards, so
-          the cards and glass parts read as they do on desktop. Its blur margins
-          are trimmed so the ellipse spans the screen (all five colours visible).
+          the cards and glass parts read as they do on desktop. It is sized and
+          offset like the desktop crop (2500 px wide at x -530 of 1440), so phones
+          see the same colours as desktop and none of the cropped-off ends.
         */}
         <Image
           src="/landing/benefits-aurora.svg"
@@ -229,7 +230,7 @@ function Benefits() {
           aria-hidden
           width={2500}
           height={920}
-          className="pointer-events-none absolute top-[4%] left-1/2 h-[calc(96%+120px)] w-[calc(100vw*1.087)] max-w-none -translate-x-1/2 min-[1360px]:hidden"
+          className="pointer-events-none absolute top-[4%] left-[calc(50%-50vw-36.8vw)] h-[calc(96%+120px)] w-[173.6vw] max-w-none min-[1360px]:hidden"
         />
         <ol className="relative grid gap-5 sm:max-[1359px]:grid-cols-2 min-[1360px]:grid-cols-4">
           {BENEFITS.map((benefit, index) => {

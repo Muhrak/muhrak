@@ -235,15 +235,14 @@
     position: absolute;
     border-radius: 999px;
     pointer-events: none;
-    /* Buyer brand tones only: peach, pink, purple, indigo (no cyan). */
+    /* Only colours visible on the desktop landing page: pink, purple, indigo. */
     background: conic-gradient(
       from var(--glow-angle),
-      #f4a27c,
       #e0457f,
       #7b2fd3,
       #2d2f9a,
       #7b2fd3,
-      #f4a27c
+      #e0457f
     );
     animation: glow-spin 4s linear infinite;
   }
