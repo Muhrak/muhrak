@@ -15,24 +15,24 @@ import { NAV_LINKS } from "./nav-links";
 
 /**
  * Right side of the landing page nav.
- * - Desktop (lg+), signed out: Figma "Buyer – Landing v2 (Light)" › Nav › Actions.
- * - Desktop, signed in: Figma "Buyer – Landing v2 (Signed in)" › Nav › Actions
- *   in light colours; the profile button opens the user's dashboard.
- * - Below lg: one hamburger button opening a panel (same glass style as the
- *   page's cards) with every link and action, including the profile.
+ * - Desktop (lg+), signed out: theme toggle + "Sign in".
+ * - Desktop, signed in: the profile button from Figma
+ *   "Buyer – Landing v2 (Signed in)" in light colours; it opens the dashboard.
+ * - Below lg: a hamburger button opening a full-screen menu.
+ * "Find a part" is not in the nav: the hero has the dedicated button
+ * (developer decision, 11 Nov 2026).
  */
 
-const FIND_A_PART = "/buyer/find-part";
 const focus = "outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 
 const avatarClass = (user: PublicUser) =>
   user.role === "seller" ? "bg-seller-orange" : "bg-[linear-gradient(135deg,#f4a27c_0%,#e0457f_28.571%,#7b2fd3_71.429%)]";
 
-function Avatar({ user, size }: { user: PublicUser; size: number }) {
+function Avatar({ user, size, textClass = "text-xs" }: { user: PublicUser; size: number; textClass?: string }) {
   return (
     <span
       aria-hidden
-      className={cn("flex shrink-0 items-center justify-center rounded-full text-xs leading-[1.3] font-semibold text-white", avatarClass(user))}
+      className={cn("flex shrink-0 items-center justify-center rounded-full leading-[1.3] font-semibold text-white", textClass, avatarClass(user))}
       style={{ width: size, height: size }}
     >
       {initials(user.fullName)}
@@ -50,17 +50,6 @@ function Chevron({ className }: { className?: string }) {
   );
 }
 
-function FindAPart({ className }: { className?: string }) {
-  return (
-    <Link
-      href={FIND_A_PART}
-      className={cn("rounded-full bg-ink px-6 py-3 text-center text-sm leading-[1.3] font-medium whitespace-nowrap text-white hover:opacity-90", focus, className)}
-    >
-      Find a part
-    </Link>
-  );
-}
-
 function ThemeToggle({ className }: { className?: string }) {
   // Dark theme is not built yet (light first); the toggle is shown as designed.
   return (
@@ -68,7 +57,7 @@ function ThemeToggle({ className }: { className?: string }) {
       type="button"
       aria-label="Dark theme (coming soon)"
       title="Dark theme coming soon"
-      className={cn("flex size-11 shrink-0 items-center justify-center rounded-full border border-black/22 hover:bg-black/4", focus, className)}
+      className={cn("flex size-11 shrink-0 items-center justify-center rounded-full border border-black/22 bg-white/60 backdrop-blur-[15px] hover:bg-white/80", focus, className)}
     >
       <Image src="/landing/moon.svg" alt="" width={18} height={18} />
     </button>
@@ -92,25 +81,24 @@ function Actions({ user }: { user: PublicUser | null }) {
     <>
       <div className="hidden items-center gap-2.5 lg:flex">
         {user ? (
-          <>
-            <FindAPart />
-            <Link
-              href={HOME_PATH[user.role]}
-              aria-label={`${user.fullName}: open your dashboard`}
-              className={cn("flex items-center gap-2 rounded-full border border-black/22 py-1 pr-3.5 pl-1 hover:bg-black/4", focus)}
-            >
-              <Avatar user={user} size={34} />
-              <span className="max-w-[140px] truncate text-sm leading-[1.3] text-ink">{shortName(user.fullName)}</span>
-              <Chevron />
-            </Link>
-          </>
+          <Link
+            href={HOME_PATH[user.role]}
+            aria-label={`${user.fullName}: open your dashboard`}
+            className={cn("flex items-center gap-2 rounded-full border border-black/22 bg-white/60 py-1 pr-3.5 pl-1 backdrop-blur-[15px] hover:bg-white/80", focus)}
+          >
+            <Avatar user={user} size={34} />
+            <span className="max-w-[140px] truncate text-sm leading-[1.3] text-ink">{shortName(user.fullName)}</span>
+            <Chevron />
+          </Link>
         ) : (
           <>
             <ThemeToggle />
-            <Link href={LOGIN_PATH.buyer} className={cn("rounded-full border border-black/22 px-[22px] py-3 text-sm leading-[1.3] whitespace-nowrap text-ink hover:bg-black/4", focus)}>
+            <Link
+              href={LOGIN_PATH.buyer}
+              className={cn("rounded-full border border-black/22 bg-white/60 px-[22px] py-3 text-sm leading-[1.3] whitespace-nowrap text-ink backdrop-blur-[15px] hover:bg-white/80", focus)}
+            >
               Sign in
             </Link>
-            <FindAPart />
           </>
         )}
       </div>
@@ -119,48 +107,48 @@ function Actions({ user }: { user: PublicUser | null }) {
   );
 }
 
+/**
+ * Full-screen menu below lg. The top row repeats the nav (logo left, close
+ * button where the hamburger was) so nothing jumps when it opens; links sit
+ * under it and the account actions are pinned to the bottom.
+ */
 function MobileMenu({ user }: { user: PublicUser | null }) {
   const [open, setOpen] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const openButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const signOut = useSignOut();
   const close = () => setOpen(false);
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        buttonRef.current?.focus();
-      }
-    };
-    const onPointer = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!panelRef.current?.contains(target) && !buttonRef.current?.contains(target)) setOpen(false);
-    };
+    const opener = openButtonRef.current;
+    closeButtonRef.current?.focus();
+    const { overflow } = document.body.style;
+    document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
     window.addEventListener("keydown", onKey);
-    window.addEventListener("pointerdown", onPointer);
     return () => {
+      document.body.style.overflow = overflow;
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("pointerdown", onPointer);
+      opener?.focus();
     };
   }, [open]);
 
   return (
     <div className="lg:hidden">
       <button
-        ref={buttonRef}
+        ref={openButtonRef}
         type="button"
-        aria-label={open ? "Close menu" : "Open menu"}
+        aria-label="Open menu"
         aria-expanded={open}
         aria-controls="landing-menu"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setOpen(true)}
         className={cn("relative flex size-11 items-center justify-center rounded-full border border-black/22 bg-white/40 text-ink backdrop-blur-[15px] hover:bg-white/70", focus)}
       >
-        {open ? <X aria-hidden className="size-5" strokeWidth={1.6} /> : <Menu aria-hidden className="size-5" strokeWidth={1.6} />}
-        {user && !open ? (
+        <Menu aria-hidden className="size-5" strokeWidth={1.6} />
+        {user ? (
           <span className="absolute -top-1 -right-1 rounded-full ring-2 ring-canvas">
-            <Avatar user={user} size={18} />
+            <Avatar user={user} size={18} textClass="text-[8px]" />
           </span>
         ) : null}
       </button>
@@ -168,69 +156,95 @@ function MobileMenu({ user }: { user: PublicUser | null }) {
       {open ? (
         <div
           id="landing-menu"
-          ref={panelRef}
-          className="absolute inset-x-4 top-[76px] z-30 flex flex-col gap-4 rounded-[18px] border border-black/10 bg-linear-to-b from-white/92 to-white/80 p-4 shadow-[0_24px_60px_-20px_rgba(10,11,18,0.35)] backdrop-blur-[15px] sm:left-auto sm:w-[360px]"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu"
+          className="fixed inset-0 z-50 flex h-dvh flex-col overflow-y-auto bg-canvas/90 backdrop-blur-[24px]"
         >
-          {user ? (
-            <Link
-              href={HOME_PATH[user.role]}
-              onClick={close}
-              className={cn("flex items-center gap-3 rounded-[14px] border border-black/9 bg-black/4 p-3 hover:bg-black/6", focus)}
-            >
-              <Avatar user={user} size={40} />
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-[1.3]">
-                <span className="truncate text-[15px] text-ink">{user.fullName}</span>
-                <span className="text-[13px] text-ink-tertiary">Go to your dashboard</span>
-              </span>
-              <Chevron className="-rotate-90" />
+          {/* Same soft aurora as the hero, so the menu feels like part of the page. */}
+          <Image
+            src="/landing/hero-aurora.svg"
+            alt=""
+            aria-hidden
+            width={2480}
+            height={1180}
+            className="pointer-events-none absolute top-[-420px] left-1/2 h-[700px] w-[1100px] max-w-none -translate-x-1/2 opacity-60"
+          />
+
+          <div className="relative flex items-center px-4 py-5 sm:px-12">
+            <Link href="/" onClick={close} aria-label="Muhrak home" className={cn("flex rounded-sm", focus)}>
+              <Image src="/auth/muhrak-logo.svg" alt="Muhrak" width={156.357} height={29.8588} />
             </Link>
-          ) : null}
-
-          <nav aria-label="Main" className="flex flex-col">
-            {NAV_LINKS.map((link) =>
-              link.href ? (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  onClick={close}
-                  className={cn("rounded-[10px] px-3 py-3 text-[15px] leading-[1.3] text-[rgba(10,11,18,0.78)] hover:bg-black/4 hover:text-ink", focus)}
-                >
-                  {link.label}
-                </a>
-              ) : (
-                <span key={link.label} className="px-3 py-3 text-[15px] leading-[1.3] text-[rgba(10,11,18,0.78)]">
-                  {link.label}
-                </span>
-              ),
-            )}
-          </nav>
-
-          <div className="h-px bg-black/8" />
-
-          <div className="flex items-center gap-2.5">
-            <ThemeToggle />
-            {user ? (
-              <button
-                type="button"
-                onClick={() => {
-                  close();
-                  void signOut(user.role);
-                }}
-                className={cn("flex-1 rounded-full border border-black/22 px-[22px] py-3 text-sm leading-[1.3] text-ink hover:bg-black/4", focus)}
-              >
-                Log out
-              </button>
-            ) : (
-              <Link
-                href={LOGIN_PATH.buyer}
-                onClick={close}
-                className={cn("flex-1 rounded-full border border-black/22 px-[22px] py-3 text-center text-sm leading-[1.3] text-ink hover:bg-black/4", focus)}
-              >
-                Sign in
-              </Link>
-            )}
+            <div className="flex-1" />
+            <button
+              ref={closeButtonRef}
+              type="button"
+              aria-label="Close menu"
+              onClick={close}
+              className={cn("flex size-11 items-center justify-center rounded-full border border-black/22 bg-white/60 text-ink hover:bg-white", focus)}
+            >
+              <X aria-hidden className="size-5" strokeWidth={1.6} />
+            </button>
           </div>
-          <FindAPart className="w-full py-3.5" />
+
+          <div className="relative flex flex-1 flex-col px-4 pt-6 pb-8 sm:px-12">
+            {user ? (
+              <Link
+                href={HOME_PATH[user.role]}
+                onClick={close}
+                className={cn("mb-8 flex items-center gap-3 rounded-[18px] border border-black/10 bg-linear-to-b from-white/78 to-white/50 p-4 hover:from-white", focus)}
+              >
+                <Avatar user={user} size={44} textClass="text-sm" />
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-[1.3]">
+                  <span className="truncate text-base text-ink">{user.fullName}</span>
+                  <span className="text-[13px] text-ink-tertiary">Go to your dashboard</span>
+                </span>
+                <Chevron className="-rotate-90" />
+              </Link>
+            ) : null}
+
+            <p className="px-1 text-[11px] leading-[1.3] tracking-[0.06em] text-ink-tertiary">MENU</p>
+            <nav aria-label="Main" className="mt-2 flex flex-col">
+              {NAV_LINKS.map((link) => {
+                const row = "flex items-center justify-between border-b border-black/8 px-1 py-4 text-[28px] leading-[1.2] tracking-[-0.02em]";
+                return link.href ? (
+                  <a key={link.label} href={link.href} onClick={close} className={cn(row, "text-ink hover:text-ink-secondary", focus)}>
+                    {link.label}
+                    <Chevron className="size-5 -rotate-90 opacity-60" />
+                  </a>
+                ) : (
+                  <span key={link.label} className={cn(row, "text-ink-tertiary")}>
+                    {link.label}
+                    <span className="text-xs tracking-normal">Soon</span>
+                  </span>
+                );
+              })}
+            </nav>
+
+            <div className="mt-auto flex items-center gap-2.5 pt-10">
+              <ThemeToggle className="size-[50px]" />
+              {user ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    close();
+                    void signOut(user.role);
+                  }}
+                  className={cn("h-[50px] flex-1 rounded-full border border-black/22 text-[15px] leading-[1.3] text-ink hover:bg-black/4", focus)}
+                >
+                  Log out
+                </button>
+              ) : (
+                <Link
+                  href={LOGIN_PATH.buyer}
+                  onClick={close}
+                  className={cn("flex h-[50px] flex-1 items-center justify-center rounded-full bg-ink text-[15px] leading-[1.3] font-medium text-white hover:opacity-90", focus)}
+                >
+                  Sign in
+                </Link>
+              )}
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
