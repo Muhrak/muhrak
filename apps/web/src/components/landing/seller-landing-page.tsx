@@ -137,7 +137,13 @@ function Hero() {
   return (
     // Phones and tablets: full-screen hero with the mobile bands in the seller palette.
     // Desktop (lg+): the Figma frame, 820 px high.
-    <section className="relative flex min-h-[100svh] flex-col bg-canvas lg:block lg:h-[820px] lg:min-h-0" style={heroUnit}>
+    // Desktop: as tall as the screen, at most the Figma 820 px. On shorter screens the
+    // spacing, headline, logo wall and glows shrink with --hv / --uy so the whole hero
+    // fits on the first screen; at 820 px+ every value is the exact Figma one.
+    <section
+      className="relative flex min-h-[100svh] flex-col bg-canvas lg:block lg:h-[min(820px,max(640px,100svh))] lg:min-h-0 lg:[--hv:calc((100svh-84px)/736)] lg:[--uy:min(1px,calc(100svh/820))]"
+      style={{ "--ux": heroUnit["--ux" as keyof typeof heroUnit] } as CSSProperties}
+    >
       <MobileGlow edge="top" className="h-[40%]" palette="seller" />
       <MobileGlow edge="bottom" className="h-[34%]" palette="seller" />
       {/*
@@ -157,23 +163,23 @@ function Hero() {
       <SiteNav side="seller" />
 
       {/* Figma y positions: eyebrow 170, headline 212, text 400, email 488, note 566, logos 650 (nav is 84 px). */}
-      <div className="relative flex flex-1 flex-col items-center justify-center px-4 pb-[8svh] text-center lg:block lg:pt-[86px] lg:pb-0">
+      <div className="relative flex flex-1 flex-col items-center justify-center px-4 pb-[8svh] text-center lg:block lg:pt-[min(86px,calc(86*var(--hv)))] lg:pb-0">
         <p className="text-[13px] leading-[1.3] tracking-[0.06em] text-[rgba(74,77,89,0.9)]">SELL ON THE GULF’S SPARE PARTS MARKETPLACE</p>
-        <h1 className="mx-auto mt-6 max-w-[1000px] bg-linear-to-b from-ink via-[#292b36] via-55% to-[#737585] bg-clip-text text-[40px] leading-none font-medium tracking-[-0.04em] text-transparent sm:text-[56px] lg:mt-[25px] lg:text-[80px]">
+        <h1 className="mx-auto mt-6 max-w-[1000px] bg-linear-to-b from-ink via-[#292b36] via-55% to-[#737585] bg-clip-text text-[40px] leading-none font-medium tracking-[-0.04em] text-transparent sm:text-[56px] lg:mt-[min(25px,calc(25*var(--hv)))] lg:text-[min(80px,calc(80*var(--hv)))]">
           <span className="block">Grow your parts business,</span>
           <span className="block">sell across the Gulf.</span>
         </h1>
-        <p className="mx-auto mt-6 max-w-[760px] text-base leading-[1.5] text-ink-secondary lg:mt-7 lg:text-[17px]">
+        <p className="mx-auto mt-6 max-w-[760px] text-base leading-[1.5] text-ink-secondary lg:mt-[min(28px,calc(28*var(--hv)))] lg:text-[17px]">
           Workshops, fleets and contractors search Muhrak for parts every day.
           <br className="hidden sm:block" /> One seller account puts your store in front of them.
         </p>
-        <SellerEmailCapture className="mx-auto mt-8 lg:mt-[37px]" />
-        <p className="mt-5 text-[13px] leading-[1.3] text-ink-tertiary">No listing fees · Free seller dashboard · Live in 24 hours</p>
+        <SellerEmailCapture className="mx-auto mt-8 lg:mt-[min(37px,calc(37*var(--hv)))]" />
+        <p className="mt-5 text-[13px] leading-[1.3] text-ink-tertiary lg:mt-[min(20px,calc(20*var(--hv)))]">No listing fees · Free seller dashboard · Live in 24 hours</p>
 
         {/* Desktop: wordmarks at their Figma positions. */}
-        <div aria-label="Sellers on Muhrak" className="relative mx-auto mt-[67px] hidden h-24 w-[1120px] text-[22px] leading-[1.3] text-ink/90 lg:block">
+        <div aria-label="Sellers on Muhrak" className="relative mx-auto mt-[min(67px,calc(67*var(--hv)))] hidden h-[min(96px,calc(96*var(--hv)))] w-[1120px] text-[min(22px,calc(22*var(--hv)))] leading-[1.3] text-ink/90 lg:block">
           {LOGOS.map((logo) => (
-            <span key={logo.name} className={cn("absolute whitespace-nowrap", logo.font)} style={{ left: logo.x, top: logo.y, letterSpacing: logo.tracking }}>
+            <span key={logo.name} className={cn("absolute whitespace-nowrap", logo.font)} style={{ left: logo.x, top: `min(${logo.y}px, calc(${logo.y} * var(--hv)))`, letterSpacing: logo.tracking }}>
               {logo.name}
             </span>
           ))}
