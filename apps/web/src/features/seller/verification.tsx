@@ -252,6 +252,8 @@ function DocumentRow({
 }) {
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState<string>();
+  /** Set when the browser blocked the new tab: the admin opens it with a real link instead (this page is never replaced). */
+  const [blockedUrl, setBlockedUrl] = useState<string>();
 
   const status = !doc
     ? { label: "Required", tone: "warning" as const }
@@ -269,6 +271,7 @@ function DocumentRow({
   async function view() {
     if (!doc) return;
     setError(undefined);
+    setBlockedUrl(undefined);
     setOpening(true);
     // Open the tab now (inside the click), so pop-up blockers allow it.
     const tab = window.open("", "_blank");
@@ -279,7 +282,7 @@ function DocumentRow({
         tab.opener = null;
         tab.location.replace(link.url);
       } else {
-        window.location.assign(link.url);
+        setBlockedUrl(link.url);
       }
     } catch (err) {
       tab?.close();
@@ -329,6 +332,11 @@ function DocumentRow({
           ) : null}
         </div>
       </div>
+      {blockedUrl ? (
+        <a href={blockedUrl} target="_blank" rel="noopener noreferrer" onClick={() => setBlockedUrl(undefined)} className="w-fit pb-2 text-[13px] font-medium text-text-strong underline">
+          Your browser blocked the new tab. Open the document
+        </a>
+      ) : null}
       {error ? (
         <p role="alert" className="pb-2 text-[13px] leading-[normal] text-destructive">
           {error}

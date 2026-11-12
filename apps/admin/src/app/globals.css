@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+/*
+ * Muhrak admin console. Light theme (developer decision, 11 Nov 2026): the
+ * Figma "07 · Platform Admin" frames exist only in dark and are converted
+ * with the "Seller – Dashboard (Light)" palette, like the seller centre.
+ * The sidebar stays dark, as in the buyer and seller centres.
+ */
+@theme inline {
+  --font-sans: var(--font-albert-sans);
+
+  --color-surface: #f5f5f7; /* page background */
+  --color-panel: #ffffff; /* cards */
+  --color-line: #dedee3; /* outlines on white */
+  --color-text-strong: #0a0a0a;
+  --color-text-body: #3a3a40;
+  --color-text-muted: #6b6b73;
+  --color-text-subtle: #8e8e96;
+
+  /* Figma "Admin Sidebar" */
+  --color-sidebar-bg: #0d0d13;
+  --color-sidebar-text: #c3c7da;
+  --color-sidebar-group: #8e8e96;
+  --color-sidebar-meta: #9ea3b5;
+  --color-sidebar-danger: #f87171;
+
+  --color-brand-blue: #1a5cff;
+  --color-admin-orange: #ff5a1f;
+  --color-success: #22c55e;
+  --color-destructive: #dc2626;
+}
+
+/* "Admin Console" label and avatar: Figma gradient #FF8A3D → #E0457F → #7B2FD3. */
+@utility bg-admin-gradient {
+  background-image: linear-gradient(90deg, #ff8a3d 0%, #e0457f 50%, #7b2fd3 100%);
+}
+
+/* Draw a single-colour SVG from /public/icons in the current text colour. */
+@utility icon-mask {
+  background-color: currentColor;
+  mask-image: var(--icon);
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+
+@layer base {
+  body {
+    background: var(--color-surface);
+    color: var(--color-text-strong);
+  }
+}

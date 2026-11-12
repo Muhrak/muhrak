@@ -155,6 +155,31 @@ export async function logout(refreshToken: string): Promise<void> {
   }
 }
 
+/** For other modules: public details of several users (e.g. sellers in the admin queue). */
+export async function getUsersByIds(ids: string[]): Promise<PublicUser[]> {
+  return (await repo.findUsersByIds([...new Set(ids)])).map(toPublicUser);
+}
+
+/**
+ * Create an admin, or set a new password for an existing admin, from the
+ * command line (scripts/admin.ts). There is no admin sign-up endpoint.
+ * A new password signs out every session of that admin.
+ */
+export async function upsertAdminAccount(input: { email: string; fullName: string; password: string }): Promise<"created" | "updated"> {
+  const existing = await repo.findUserByEmail(input.email);
+  if (existing && existing.role !== "admin") {
+    throw conflict("This email belongs to a buyer or seller account. Use a different email for the admin.");
+  }
+  const passwordHash = await hashPassword(input.password);
+  if (existing) {
+    await repo.updateUserPassword(existing.id, passwordHash);
+    await repo.revokeAllRefreshTokensForUser(existing.id);
+    return "updated";
+  }
+  await repo.insertUser({ email: input.email, passwordHash, fullName: input.fullName, role: "admin" });
+  return "created";
+}
+
 export async function getCurrentUser(userId: string): Promise<PublicUser> {
   const user = await repo.findUserById(userId);
   if (!user) {
@@ -188,7 +213,9 @@ export async function requestPasswordReset(email: string, now = new Date()): Pro
     return;
   }
   const user = await repo.findUserByEmail(email);
-  if (!user) {
+  // Admin passwords are reset only from the command line (scripts/admin.ts),
+  // so a stolen inbox is not enough to take over an admin account.
+  if (!user || user.role === "admin") {
     return;
   }
 

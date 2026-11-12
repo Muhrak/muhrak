@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../../db/client";
 import {
   sellerDocuments,
@@ -102,4 +102,102 @@ export async function insertDocument(tx: Tx, values: typeof sellerDocuments.$inf
   const row = rows[0];
   if (!row) throw new Error("Seller document insert returned no row");
   return row;
+}
+
+// ---------------------------------------------------------------- admin queries
+
+export interface ListCursor {
+  at: Date;
+  userId: string;
+}
+
+/**
+ * One page of seller profiles for the admin console (keyset pagination,
+ * each order backed by an index):
+ * - pending: oldest submission first (the review queue),
+ * - another status: most recently changed first,
+ * - no status: newest seller first.
+ */
+export async function listProfiles(input: {
+  status?: SellerProfileRow["verificationStatus"];
+  cursor: ListCursor | null;
+  limit: number;
+}): Promise<SellerProfileRow[]> {
+  const { status, cursor, limit } = input;
+  const id = sellerProfiles.userId;
+  if (status === "pending") {
+    const at = sellerProfiles.submittedAt;
+    return db
+      .select()
+      .from(sellerProfiles)
+      .where(and(eq(sellerProfiles.verificationStatus, "pending"), cursor ? sql`(${at}, ${id}) > (${cursor.at}, ${cursor.userId})` : undefined))
+      .orderBy(asc(at), asc(id))
+      .limit(limit);
+  }
+  const at = status ? sellerProfiles.updatedAt : sellerProfiles.createdAt;
+  return db
+    .select()
+    .from(sellerProfiles)
+    .where(
+      and(
+        status ? eq(sellerProfiles.verificationStatus, status) : undefined,
+        cursor ? sql`(${at}, ${id}) < (${cursor.at}, ${cursor.userId})` : undefined,
+      ),
+    )
+    .orderBy(desc(at), desc(id))
+    .limit(limit);
+}
+
+export async function countProfilesByStatus(): Promise<{ status: SellerProfileRow["verificationStatus"]; count: number }[]> {
+  return db
+    .select({ status: sellerProfiles.verificationStatus, count: sql<number>`count(*)::int` })
+    .from(sellerProfiles)
+    .groupBy(sellerProfiles.verificationStatus);
+}
+
+export async function findOldestPendingSubmission(): Promise<Date | null> {
+  const rows = await db
+    .select({ at: sql<Date | null>`min(${sellerProfiles.submittedAt})` })
+    .from(sellerProfiles)
+    .where(eq(sellerProfiles.verificationStatus, "pending"));
+  const value = rows[0]?.at;
+  return value ? new Date(value) : null;
+}
+
+/** Current documents of several sellers (for the list's "documents" column). */
+export async function findCurrentDocumentsForSellers(sellerUserIds: string[]): Promise<SellerDocumentRow[]> {
+  if (sellerUserIds.length === 0) return [];
+  return db
+    .select()
+    .from(sellerDocuments)
+    .where(and(inArray(sellerDocuments.sellerUserId, sellerUserIds), isNull(sellerDocuments.supersededAt)));
+}
+
+/** A seller's verification history, newest first. */
+export async function findVerificationEvents(sellerUserId: string, limit = 50) {
+  return db
+    .select()
+    .from(sellerVerificationEvents)
+    .where(eq(sellerVerificationEvents.sellerUserId, sellerUserId))
+    .orderBy(desc(sellerVerificationEvents.createdAt))
+    .limit(limit);
+}
+
+/** Record the admin's decision on one current document. Returns false if it is no longer current. */
+export async function reviewDocument(
+  tx: Tx,
+  input: { id: string; sellerUserId: string; status: "approved" | "rejected"; rejectionReason: string | null; reviewedBy: string; reviewedAt: Date },
+): Promise<boolean> {
+  const rows = await tx
+    .update(sellerDocuments)
+    .set({ status: input.status, rejectionReason: input.rejectionReason, reviewedBy: input.reviewedBy, reviewedAt: input.reviewedAt })
+    .where(
+      and(
+        eq(sellerDocuments.id, input.id),
+        eq(sellerDocuments.sellerUserId, input.sellerUserId),
+        isNull(sellerDocuments.supersededAt),
+      ),
+    )
+    .returning({ id: sellerDocuments.id });
+  return rows.length === 1;
 }

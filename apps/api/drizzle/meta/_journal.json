@@ -29,6 +29,13 @@
       "when": 1794483731565,
       "tag": "0003_lowly_mercury",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794485532658,
+      "tag": "0004_hesitant_epoch",
+      "breakpoints": true
     }
   ]
 }

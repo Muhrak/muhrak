@@ -2,6 +2,7 @@ import cors from "cors";
 import express, { Router } from "express";
 import helmet from "helmet";
 import { env } from "./config/env";
+import { adminRouter } from "./modules/admin";
 import { authRouter } from "./modules/auth";
 import { healthRouter } from "./modules/health/health.routes";
 import { sellerRouter } from "./modules/seller";
@@ -30,6 +31,7 @@ export function createApp() {
   v1.use("/auth", authRouter);
   v1.use("/uploads", uploadRouter);
   v1.use("/seller", sellerRouter);
+  v1.use("/admin", adminRouter);
   app.use("/v1", v1);
 
   app.use(notFoundHandler);

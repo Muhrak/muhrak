@@ -1,4 +1,5 @@
 import { EMAIL_QUEUE, emailJobSchema, type EmailJob } from "@muhrak/schemas";
+import { env } from "../../config/env";
 import { defaultJobOptions, getQueue } from "../../shared/queue";
 
 /**
@@ -32,5 +33,51 @@ export async function sendPasswordResetEmail(input: {
     },
     // BullMQ job ids may not contain ":".
     `password-reset-${input.dedupeKey}`,
+  );
+}
+
+/** Tell a seller their company was verified. `dedupeKey`: unique per decision. */
+export async function sendSellerVerifiedEmail(input: {
+  to: string;
+  fullName: string;
+  companyName: string;
+  dedupeKey: string;
+}): Promise<void> {
+  await enqueueEmail(
+    {
+      template: "seller-verified",
+      to: input.to,
+      data: {
+        fullName: input.fullName,
+        companyName: input.companyName,
+        dashboardUrl: `${env.WEB_APP_URL}/seller/verification`,
+      },
+    },
+    `seller-verified-${input.dedupeKey}`,
+  );
+}
+
+/** Tell a seller what to fix before they can be verified. `dedupeKey`: unique per decision. */
+export async function sendSellerChangesNeededEmail(input: {
+  to: string;
+  fullName: string;
+  companyName: string;
+  reason: string | null;
+  documents: { label: string; reason: string }[];
+  dedupeKey: string;
+}): Promise<void> {
+  await enqueueEmail(
+    {
+      template: "seller-changes-needed",
+      to: input.to,
+      data: {
+        fullName: input.fullName,
+        companyName: input.companyName,
+        reason: input.reason,
+        documents: input.documents,
+        verificationUrl: `${env.WEB_APP_URL}/seller/verification`,
+      },
+    },
+    `seller-changes-needed-${input.dedupeKey}`,
   );
 }

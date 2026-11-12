@@ -158,5 +158,5 @@ pnpm --filter @muhrak/worker dev
 The initial scaffold was written without running `pnpm install`. Dependency
 versions in the `package.json` files are unverified. First task: run
 `pnpm install`, `pnpm typecheck` and `pnpm test`, fix whatever fails, and
-commit the lockfile. `apps/web` and `apps/admin` do not exist yet; create them
-with `create-next-app` as described in `README.md`.
+commit the lockfile. (Done: `apps/web` and `apps/admin` both exist now;
+the admin app was set up on 12 Nov 2026 from the web app's configuration.)

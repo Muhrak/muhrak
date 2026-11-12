@@ -1,14 +1,24 @@
-import type {
-  DocumentType,
-  SellerAccount,
-  SellerDocument,
-  SellerProfile,
-  SellerProfileData,
-  Verification,
-  VerificationStatus,
+import {
+  DOCUMENT_LABELS,
+  type AdminSellerDetail,
+  type AdminSellerList,
+  type AdminSellerListQuery,
+  type AdminSellerStats,
+  type DocumentType,
+  type ReviewSellerData,
+  type SellerAccount,
+  type SellerDocument,
+  type SellerProfile,
+  type SellerProfileData,
+  type Verification,
+  type VerificationStatus,
 } from "@muhrak/schemas";
 import type { SellerDocumentRow, SellerProfileRow } from "../../db/schema";
 import { AppError, badRequest, conflict, notFound } from "../../shared/errors";
+import { logger } from "../../shared/logger";
+import { recordAudit } from "../audit";
+import { getUsersByIds } from "../auth";
+import { sendSellerChangesNeededEmail, sendSellerVerifiedEmail } from "../notification";
 import { attachUpload, getDownloadLink, getUploads } from "../upload";
 import * as repo from "./seller.repository";
 
@@ -53,6 +63,8 @@ async function transition(
   const updated = await repo.updateProfile(tx, profile.userId, {
     verificationStatus: to,
     ...(to === "pending" ? { submittedAt: now, rejectionReason: null } : {}),
+    ...(to === "approved" ? { reviewedAt: now, reviewedBy: actorUserId, rejectionReason: null } : {}),
+    ...(to === "rejected" ? { reviewedAt: now, reviewedBy: actorUserId, rejectionReason: reason } : {}),
   });
   await repo.insertVerificationEvent(tx, {
     sellerUserId: profile.userId,
@@ -255,4 +267,213 @@ export async function submitForReview(userId: string, now = new Date()): Promise
     await transition(tx, profile, "pending", userId, now);
   });
   return getAccount(userId);
+}
+
+// ---------------------------------------------------------------- admin (Day 4)
+
+/**
+ * The functions below are for the admin console only. The admin routes
+ * check the admin role before calling them; every decision and every
+ * document view is written to the audit log.
+ */
+
+function encodeCursor(row: SellerProfileRow, status: VerificationStatus | undefined): string {
+  const at = status === "pending" ? row.submittedAt : status ? row.updatedAt : row.createdAt;
+  return Buffer.from(JSON.stringify([at?.toISOString() ?? "", row.userId])).toString("base64url");
+}
+
+function decodeCursor(cursor: string | undefined): repo.ListCursor | null {
+  if (!cursor) return null;
+  try {
+    const [at, userId] = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as [unknown, unknown];
+    const date = typeof at === "string" ? new Date(at) : null;
+    if (!date || Number.isNaN(date.getTime()) || typeof userId !== "string" || !/^[0-9a-f-]{36}$/i.test(userId)) {
+      throw new Error("bad cursor");
+    }
+    return { at: date, userId };
+  } catch {
+    throw badRequest("This page link is not valid. Go back to the first page.");
+  }
+}
+
+export async function listSellersForAdmin(query: AdminSellerListQuery): Promise<AdminSellerList> {
+  const rows = await repo.listProfiles({ status: query.status, cursor: decodeCursor(query.cursor), limit: query.limit + 1 });
+  const page = rows.slice(0, query.limit);
+  const ids = page.map((row) => row.userId);
+  const [users, documents] = await Promise.all([getUsersByIds(ids), repo.findCurrentDocumentsForSellers(ids)]);
+  const userById = new Map(users.map((user) => [user.id, user]));
+  const last = page.at(-1);
+  return {
+    items: page.map((row) => {
+      const user = userById.get(row.userId);
+      const required = requiredDocuments(row.vatRegistered);
+      return {
+        userId: row.userId,
+        email: user?.email ?? "",
+        fullName: user?.fullName ?? "",
+        companyName: row.companyName,
+        country: row.country as SellerProfile["country"],
+        city: row.city,
+        status: row.verificationStatus,
+        documents: required.filter((type) => documents.some((doc) => doc.sellerUserId === row.userId && doc.type === type)),
+        submittedAt: row.submittedAt?.toISOString() ?? null,
+        createdAt: row.createdAt.toISOString(),
+      };
+    }),
+    nextCursor: rows.length > query.limit && last ? encodeCursor(last, query.status) : null,
+  };
+}
+
+export async function getSellerStatsForAdmin(): Promise<AdminSellerStats> {
+  const [counts, oldest] = await Promise.all([repo.countProfilesByStatus(), repo.findOldestPendingSubmission()]);
+  const by = (status: VerificationStatus) => counts.find((row) => row.status === status)?.count ?? 0;
+  return {
+    total: counts.reduce((sum, row) => sum + row.count, 0),
+    draft: by("draft"),
+    pending: by("pending"),
+    approved: by("approved"),
+    rejected: by("rejected"),
+    oldestPendingAt: oldest?.toISOString() ?? null,
+  };
+}
+
+export async function getSellerForAdmin(sellerUserId: string): Promise<AdminSellerDetail> {
+  const [profile, documents, events, users] = await Promise.all([
+    repo.findProfile(sellerUserId),
+    repo.findCurrentDocuments(sellerUserId),
+    repo.findVerificationEvents(sellerUserId),
+    getUsersByIds([sellerUserId]),
+  ]);
+  const user = users[0];
+  if (!profile || !user || user.role !== "seller") throw notFound("Seller not found");
+  const actors = new Map((await getUsersByIds(events.map((event) => event.actorUserId))).map((actor) => [actor.id, actor]));
+  return {
+    user,
+    profile: await toProfile(profile),
+    documents: await toDocuments(documents),
+    verification: computeVerification(profile, documents),
+    history: events.map((event) => {
+      const actor = actors.get(event.actorUserId);
+      return {
+        fromStatus: event.fromStatus,
+        toStatus: event.toStatus,
+        actorRole: actor?.role === "admin" ? ("admin" as const) : ("seller" as const),
+        actorName: actor?.fullName ?? "Unknown",
+        reason: event.reason,
+        createdAt: event.createdAt.toISOString(),
+      };
+    }),
+  };
+}
+
+/** A 5-minute link to a seller's document for an admin. Every view is audit logged (identity documents). */
+export async function getDocumentLinkForAdmin(admin: { userId: string; ip: string | null }, sellerUserId: string, documentId: string) {
+  const document = await repo.findOwnDocument(documentId, sellerUserId);
+  if (!document) throw notFound("Document not found");
+  await recordAudit({
+    actorUserId: admin.userId,
+    action: "seller.document_viewed",
+    entityType: "seller",
+    entityId: sellerUserId,
+    details: { documentId: document.id, type: document.type },
+    ip: admin.ip,
+  });
+  return getDownloadLink(document.uploadId, DOCUMENT_LINK_SECONDS);
+}
+
+/**
+ * Approve or reject a seller under review. Rules:
+ * - only while the seller is pending (checked under a row lock, so a double
+ *   click or two admins cannot decide twice);
+ * - the admin decides on exactly the documents that are current now (if
+ *   the seller's documents changed since the page loaded, refuse);
+ * - approving needs every required document approved;
+ * - rejecting needs a reason, and every rejected document needs a reason.
+ * The decision, the document results and the audit entry are saved in one
+ * transaction. The email to the seller is queued after it commits.
+ */
+export async function reviewSeller(
+  admin: { userId: string; ip: string | null },
+  sellerUserId: string,
+  input: ReviewSellerData,
+  now = new Date(),
+): Promise<AdminSellerDetail> {
+  if (input.decision === "reject" && !input.reason) throw badRequest("Write the reason the seller will see.");
+  for (const doc of input.documents) {
+    if (doc.status === "rejected" && !doc.reason) throw badRequest("Give a reason for every rejected document.");
+  }
+  if (input.decision === "approve" && input.documents.some((doc) => doc.status !== "approved")) {
+    throw badRequest("Approve every document before approving the seller, or reject the seller instead.");
+  }
+  if (new Set(input.documents.map((doc) => doc.id)).size !== input.documents.length) {
+    throw badRequest("Each document can be reviewed once.");
+  }
+
+  const result = await repo.inTransaction(async (tx) => {
+    const profile = await repo.lockProfile(tx, sellerUserId);
+    if (!profile) throw notFound("Seller not found");
+    if (profile.verificationStatus !== "pending") {
+      throw conflict("This seller is not waiting for review any more. Reload the page.");
+    }
+    const required = requiredDocuments(profile.vatRegistered);
+    const current = (await repo.findCurrentDocuments(sellerUserId, tx)).filter((doc) => required.includes(doc.type));
+    const reviewedIds = new Set(input.documents.map((doc) => doc.id));
+    const changed =
+      current.length !== required.length || current.length !== reviewedIds.size || current.some((doc) => !reviewedIds.has(doc.id));
+    if (changed) throw conflict("The seller's documents changed. Reload the page and review again.");
+
+    const rejectedDocuments: { label: string; reason: string }[] = [];
+    const reviewed: { id: string; type: DocumentType; status: string; reason: string | null }[] = [];
+    for (const decision of input.documents) {
+      const doc = current.find((row) => row.id === decision.id);
+      if (!doc) throw conflict("The seller's documents changed. Reload the page and review again.");
+      const reason = decision.status === "rejected" ? decision.reason : null;
+      const ok = await repo.reviewDocument(tx, {
+        id: doc.id,
+        sellerUserId,
+        status: decision.status,
+        rejectionReason: reason,
+        reviewedBy: admin.userId,
+        reviewedAt: now,
+      });
+      if (!ok) throw conflict("The seller's documents changed. Reload the page and review again.");
+      reviewed.push({ id: doc.id, type: doc.type, status: decision.status, reason });
+      if (reason) rejectedDocuments.push({ label: DOCUMENT_LABELS[doc.type], reason });
+    }
+
+    await transition(tx, profile, input.decision === "approve" ? "approved" : "rejected", admin.userId, now, input.reason);
+    await recordAudit(
+      {
+        actorUserId: admin.userId,
+        action: input.decision === "approve" ? "seller.approved" : "seller.rejected",
+        entityType: "seller",
+        entityId: sellerUserId,
+        details: { reason: input.reason, documents: reviewed },
+        ip: admin.ip,
+      },
+      tx,
+    );
+    return { companyName: profile.companyName, rejectedDocuments };
+  });
+
+  // The decision is saved. A failed email must not undo it; it is logged so it can be resent.
+  const seller = (await getUsersByIds([sellerUserId]))[0];
+  if (seller) {
+    const dedupeKey = `${sellerUserId}-${now.getTime()}`;
+    try {
+      await (input.decision === "approve"
+        ? sendSellerVerifiedEmail({ to: seller.email, fullName: seller.fullName, companyName: result.companyName, dedupeKey })
+        : sendSellerChangesNeededEmail({
+            to: seller.email,
+            fullName: seller.fullName,
+            companyName: result.companyName,
+            reason: input.reason,
+            documents: result.rejectedDocuments,
+            dedupeKey,
+          }));
+    } catch (err) {
+      logger.error({ err, sellerUserId }, "Could not queue the seller decision email");
+    }
+  }
+  return getSellerForAdmin(sellerUserId);
 }

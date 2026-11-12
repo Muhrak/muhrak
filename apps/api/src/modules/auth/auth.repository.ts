@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../../db/client";
 import {
   passwordResetTokens,
@@ -24,6 +24,11 @@ export async function findUserByEmail(email: string): Promise<UserRow | undefine
 export async function findUserById(id: string): Promise<UserRow | undefined> {
   const rows = await db.select().from(users).where(eq(users.id, id)).limit(1);
   return rows[0];
+}
+
+export async function findUsersByIds(ids: string[]): Promise<UserRow[]> {
+  if (ids.length === 0) return [];
+  return db.select().from(users).where(inArray(users.id, ids));
 }
 
 export async function insertUser(values: NewUserRow): Promise<UserRow> {

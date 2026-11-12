@@ -67,5 +67,67 @@ export function renderEmail(job: EmailJob): RenderedEmail {
         ),
       };
     }
+
+    case "seller-verified": {
+      const { fullName, companyName, dashboardUrl } = job.data;
+      const url = escapeHtml(dashboardUrl);
+      return {
+        subject: `${companyName} is now verified on Muhrak`,
+        text: [
+          `Hi ${fullName},`,
+          "",
+          `Good news: ${companyName} is now a verified seller on Muhrak.`,
+          "Buyers see a verified badge on your store and every product.",
+          "",
+          `Open your Seller Centre: ${dashboardUrl}`,
+        ].join("\n"),
+        html: layout(
+          "Your company is verified",
+          `<tr><td style="font-size:15px;line-height:1.5;color:#3a3a40;padding-bottom:24px;">
+            Hi ${escapeHtml(fullName)}, good news: <strong>${escapeHtml(companyName)}</strong> is now a verified seller on Muhrak.
+            Buyers see a verified badge on your store and every product.
+          </td></tr>
+          <tr><td style="padding-bottom:8px;">
+            <a href="${url}" style="display:inline-block;background:#0a0b12;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold;padding:14px 28px;border-radius:999px;">Open Seller Centre</a>
+          </td></tr>`,
+        ),
+      };
+    }
+
+    case "seller-changes-needed": {
+      const { fullName, companyName, reason, documents, verificationUrl } = job.data;
+      const url = escapeHtml(verificationUrl);
+      const documentLines = documents.map((doc) => `- ${doc.label}: ${doc.reason}`);
+      const documentHtml = documents
+        .map((doc) => `<li style="margin-bottom:6px;"><strong>${escapeHtml(doc.label)}</strong>: ${escapeHtml(doc.reason)}</li>`)
+        .join("");
+      return {
+        subject: `Changes needed to verify ${companyName}`,
+        text: [
+          `Hi ${fullName},`,
+          "",
+          `We reviewed ${companyName} and need a few changes before we can verify it.`,
+          ...(reason ? ["", reason] : []),
+          ...(documentLines.length > 0 ? ["", "Documents to replace:", ...documentLines] : []),
+          "",
+          `Fix these and submit again: ${verificationUrl}`,
+        ].join("\n"),
+        html: layout(
+          "Changes needed",
+          `<tr><td style="font-size:15px;line-height:1.5;color:#3a3a40;padding-bottom:16px;">
+            Hi ${escapeHtml(fullName)}, we reviewed <strong>${escapeHtml(companyName)}</strong> and need a few changes before we can verify it.
+          </td></tr>
+          ${reason ? `<tr><td style="font-size:15px;line-height:1.5;color:#0a0a0a;padding-bottom:16px;white-space:pre-line;">${escapeHtml(reason)}</td></tr>` : ""}
+          ${
+            documentHtml
+              ? `<tr><td style="font-size:15px;line-height:1.5;color:#3a3a40;padding-bottom:16px;">Documents to replace:<ul style="padding-left:20px;margin:8px 0 0;">${documentHtml}</ul></td></tr>`
+              : ""
+          }
+          <tr><td style="padding-bottom:8px;">
+            <a href="${url}" style="display:inline-block;background:#0a0b12;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold;padding:14px 28px;border-radius:999px;">Fix and submit again</a>
+          </td></tr>`,
+        ),
+      };
+    }
   }
 }

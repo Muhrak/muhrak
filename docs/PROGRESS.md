@@ -7,9 +7,9 @@ Last updated: Thu 12 Nov 2026. Branch `develop`.
 
 ## Status
 
-About 17% of the 20-day plan. Days 1 to 3 are done, and the landing pages
-planned for later (P1) are done early. Next is Day 4 (admin app and the
-seller verification queue).
+About 22% of the 20-day plan. Days 1 to 4 are done (Day 4 on Thu 12 Nov,
+a day early, because Fri 13 Nov is off), and the landing pages planned for
+later (P1) are done early. Next is Day 5 (categories and products).
 
 ## Done
 
@@ -67,6 +67,39 @@ seller verification queue).
   buyer on seller endpoints, locked fields).
 - `drizzle-orm` upgraded to 0.45 (SQL injection advisory in identifier
   escaping; Muhrak never passed user input there, fixed anyway).
+
+### Day 4: admin console and seller review (Thu 12 Nov, a day early)
+- `apps/admin`: separate Next.js app (port 3002), same security headers as
+  the web app plus `X-Robots-Tag: noindex`, its own `/api` proxy, so the
+  admin session cookie (`muhrak_rt_admin`) lives on the admin domain only.
+  Pages: `/login`, `/sellers` (Figma "Admin – Sellers" 405:1892, light),
+  `/sellers/[id]` (review page, no Figma frame; same style). Other Figma
+  sidebar items open "Coming soon".
+- First admin: `pnpm --filter @muhrak/api admin` asks for email, name and
+  password (hidden, 14+ characters). The same script sets a new password
+  and signs that admin out everywhere. There is no admin sign-up, and admin
+  passwords cannot be reset by email.
+- API `admin` module (`/v1/admin/*`, admin role only, per-user rate
+  limits): seller stats, paginated lists (keyset cursors; queue oldest
+  first), seller detail with history, document links, review.
+- Review rules (`reviewSeller` in `seller.service.ts`): only while
+  pending, under a row lock (a double click or two admins cannot decide
+  twice: tested, exactly one of two simultaneous reviews succeeds); the
+  admin must decide on exactly the current documents, else 409; approve
+  needs every document approved; reject needs a message and a reason per
+  rejected document. Documents, status, history and the audit row are one
+  transaction; the email is queued after it ("You're verified" or "Changes
+  needed" with the reasons; a failed email never undoes a decision).
+- `audit` module and `audit_log` table (append only): `seller.approved`,
+  `seller.rejected`, and `seller.document_viewed` (every time an admin
+  opens a seller's document), each with admin, seller, details and IP.
+- Admin list timestamps on `seller_profiles` are stored to the millisecond
+  so page cursors are exact.
+- Opening a document: if the browser blocks the new tab, a link appears
+  instead (the page is never replaced, so a half-done review is not lost).
+  Same fix on the seller Verification page.
+- Tests: 7 review tests (abuse cases), 27-check API run (wrong side, wrong
+  role, tampered cursor, stale review, race), browser run of the console.
 
 ### Landing pages (P1, done early)
 - Buyer landing `/` from Figma "Buyer – Landing v2 (Light)" (423:1138).
@@ -194,8 +227,6 @@ Still open (Day 3 files):
 - **Developer action:** on Vercel set `STORAGE_ORIGIN` (see DEPLOY.md);
   without it the CSP blocks uploads on the website. Also put the four AWS
   variables in `apps/worker/.env` (only the API has them locally).
-- Day 4 must approve and reject with a conditional update (`where status =
-  pending`) and record the admin in the audit log and the events table.
 - Replaced logos and documents stay in the bucket (the API has no
   delete permission, on purpose). Fine for now; a cleanup job can come later.
 - Images are not re-encoded, so photo metadata (e.g. GPS in an ID photo)
@@ -216,11 +247,24 @@ Other:
   About, Contact, Careers, legal pages, the theme toggle (dark not built).
 - `refs/` (design references) is kept locally and not committed.
 
-## Next up: Day 4 (Fri 13 Nov), see `docs/PLAN.md`
+Still open (Day 4 admin):
+- **Developer action:** deploy the admin app as a second Vercel project and
+  add its URL to `CORS_ORIGINS` on Railway; create the first admin on
+  staging with the script (steps in `docs/DEPLOY.md`, "Admin console").
+- There is one admin level (no "super admin" or roles yet). Every admin can
+  approve and reject. The Figma "Admin Users & Roles" page is for later.
+- Admin sessions use the same 30-day refresh cookie as buyers and sellers.
+  Consider shorter admin sessions and two-factor login before launch.
+- No admin page shows the audit log yet ("Activity Logs" is Coming soon);
+  the rows are in the `audit_log` table.
+- The worker uses the API's AWS key it does not need yet. On Day 6 give it
+  its own read-only IAM user (s3:GetObject only), then remove the shared key.
 
-- Admin app (`apps/admin`) with admin login; first admin created by a
-  script.
-- Sellers list and verification queue; approve, or reject with a reason
-  (per document and overall).
-- Email the seller the decision; record the admin action in an audit log.
-- Aim: an admin approves a seller and the seller sees "Verified".
+## Next up: Day 5 (Sat 14 Nov), see `docs/PLAN.md`
+
+- Categories table with starting data.
+- Products: name, part number, category, condition, price or "price on
+  request", stock, description, photos, status.
+- Add product form (manual), product list, edit and delete. Only verified
+  sellers can publish.
+- Aim: a verified seller publishes a product with photos.

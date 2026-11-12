@@ -10,7 +10,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "admin": "tsx src/scripts/admin.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1167.0",

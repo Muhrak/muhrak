@@ -17,5 +17,26 @@ export const emailJobSchema = z.discriminatedUnion("template", [
       expiresInMinutes: z.number().int().positive(),
     }),
   }),
+  z.object({
+    template: z.literal("seller-verified"),
+    to: z.string().email(),
+    data: z.object({
+      fullName: z.string(),
+      companyName: z.string(),
+      dashboardUrl: z.string().url(),
+    }),
+  }),
+  z.object({
+    template: z.literal("seller-changes-needed"),
+    to: z.string().email(),
+    data: z.object({
+      fullName: z.string(),
+      companyName: z.string(),
+      reason: z.string().nullable(),
+      /** Rejected documents with the reason for each. */
+      documents: z.array(z.object({ label: z.string(), reason: z.string() })),
+      verificationUrl: z.string().url(),
+    }),
+  }),
 ]);
 export type EmailJob = z.infer<typeof emailJobSchema>;

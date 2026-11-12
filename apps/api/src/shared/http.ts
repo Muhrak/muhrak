@@ -33,6 +33,22 @@ export function validateParams<T>(schema: ZodType<T>): RequestHandler {
   };
 }
 
+/**
+ * Parse req.query with a Zod schema. Express 5 makes req.query read-only,
+ * so the parsed value is stored on res.locals.query for the handler.
+ */
+export function validateQuery<T>(schema: ZodType<T>): RequestHandler {
+  return (req, res, next) => {
+    const result = schema.safeParse(req.query);
+    if (!result.success) {
+      next(result.error);
+      return;
+    }
+    res.locals.query = result.data;
+    next();
+  };
+}
+
 export const notFoundHandler: RequestHandler = (req, res) => {
   res.status(404).json({
     error: { code: "not_found", message: `No route for ${req.method} ${req.path}` },

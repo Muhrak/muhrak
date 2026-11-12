@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 /**
  * Database tables. Every module's tables are declared in this one file so
@@ -128,14 +128,20 @@ export const sellerProfiles = pgTable(
     logoUploadId: uuid("logo_upload_id").references(() => uploads.id),
     verificationStatus: verificationStatus("verification_status").notNull().default("draft"),
     rejectionReason: text("rejection_reason"),
-    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    // Millisecond precision (like JavaScript dates) so admin list cursors are exact.
+    submittedAt: timestamp("submitted_at", { withTimezone: true, precision: 3 }),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     reviewedBy: uuid("reviewed_by").references(() => users.id),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   },
   // The admin review queue (Day 4) lists sellers by status, oldest submission first.
-  (table) => [index("seller_profiles_status_submitted_idx").on(table.verificationStatus, table.submittedAt)],
+  (table) => [
+    index("seller_profiles_status_submitted_idx").on(table.verificationStatus, table.submittedAt),
+    // Admin lists: one status, most recently changed first; and all sellers, newest first.
+    index("seller_profiles_status_updated_idx").on(table.verificationStatus, table.updatedAt),
+    index("seller_profiles_created_idx").on(table.createdAt),
+  ],
 );
 
 /**
@@ -188,6 +194,33 @@ export const sellerVerificationEvents = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("seller_verification_events_seller_idx").on(table.sellerUserId, table.createdAt)],
+);
+
+// ---------------------------------------------------------------- audit
+
+/**
+ * Every admin action: who, what, on which record, from where. Append only:
+ * the code never updates or deletes a row here.
+ */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => users.id),
+    /** e.g. "seller.approved", "seller.rejected", "seller.document_viewed". */
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    details: jsonb("details").notNull().default({}),
+    ip: text("ip"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("audit_log_entity_idx").on(table.entityType, table.entityId, table.createdAt),
+    index("audit_log_actor_idx").on(table.actorUserId, table.createdAt),
+  ],
 );
 
 export type UploadRow = typeof uploads.$inferSelect;
