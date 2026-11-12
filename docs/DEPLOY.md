@@ -203,10 +203,22 @@ A second Vercel project for the admin app:
 First admin on staging (the password is typed into a hidden prompt, never
 into chat or a file):
 
+One-time setup on the dev machine: `ssh-keygen -t ed25519` (Railway offers to
+register the key on the first `railway ssh`), and `railway link` in the repo
+folder (project charismatic-inspiration, environment production).
+
 ```bash
 railway ssh --service muhrak
-pnpm --filter @muhrak/api admin
+# Now on the Railway server (prompt root@…:/app#). pnpm and node are not on
+# the PATH of an SSH session, so find node and run the script directly:
+cd /app/apps/api
+export PATH="$(dirname "$(find / -type f -path '*/bin/node' 2>/dev/null | head -1)")":$PATH
+./node_modules/.bin/tsx src/scripts/admin.ts
+exit
 ```
+
+Check the prompt before running the script: if it still starts with `C:`,
+the script runs on your own computer and changes only the LOCAL database.
 
 The same command sets a new password for an existing admin and signs that
 admin out everywhere.
