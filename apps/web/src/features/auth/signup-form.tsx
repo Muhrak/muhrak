@@ -42,7 +42,7 @@ export function SignupForm(props: { side: "buyer"; accountType: AccountType } | 
   const [notice, setNotice] = useState<string>();
   const seller = props.side === "seller";
   return (
-    <SignedOutOnly>
+    <SignedOutOnly side={props.side}>
       <div className="flex flex-col">
         {props.side === "buyer" ? (
           <div className="mb-5">
@@ -103,8 +103,8 @@ function AccountTypeTabs({ current }: { current: AccountType }) {
 function useRegister<T extends FieldValues>(setError: UseFormSetError<T>, nameField: Path<T>, fields: readonly Path<T>[]) {
   return useMutation({
     mutationFn: (input: RegisterInput) => registerAccount(input),
-    // SignedOutOnly moves the new user to their dashboard.
-    onSuccess: saveSession,
+    // Stored on the side the account was made for; SignedOutOnly then moves the new user on.
+    onSuccess: (session) => saveSession(session.user.role === "seller" ? "seller" : "buyer", session),
     // The API reports name problems on `fullName`; show them on the visible name field.
     onError: (error) => applyApiError(error, setError, fields, { fullName: nameField }),
   });

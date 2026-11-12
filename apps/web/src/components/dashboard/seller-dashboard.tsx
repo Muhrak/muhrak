@@ -12,7 +12,7 @@ import { AccountBadge, EmptyPanel, OutlinePillLink, PageHeader, PanelRow, SolidP
  * products (Day 5) and RFQs (Day 10) exist.
  */
 export function SellerDashboard() {
-  const user = useCurrentUser();
+  const user = useCurrentUser("seller");
   if (!user) return null;
 
   return (

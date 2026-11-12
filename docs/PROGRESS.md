@@ -51,6 +51,13 @@ planned for later (P1) are done early. Next is Day 3.
   or Back). `SignedOutOnly` in `features/auth/guards.tsx` keeps the form
   invisible until the session is read; signed-in users see "You're signed
   in. Taking you to your account…" and are redirected. Buyer and seller.
+- Buyer and seller are now fully isolated (developer's strict rule): one
+  session per side in `features/auth/session.ts`, every auth helper takes
+  the side, login sends `role` and the API refuses an account from the
+  other side with 403 ("This is a buyer account. Log in on the buyer
+  side."). Both can be signed in at once in one browser; logging out of
+  one leaves the other. 5 new service tests (`login.test.ts`). The old
+  shared session key is dropped, so everyone logs in once more.
 
 ## Decisions and rules (the developer set these; do not change without asking)
 
@@ -72,6 +79,11 @@ Design:
 - **No duplicate calls to action**: the hero has "Find a part" / "Start
   selling now", so the nav does not.
 - Fonts: Geist (landing, auth), Albert Sans (buyer and seller centres).
+
+Accounts:
+- **Buyer and seller are fully isolated. Strict rule.** Separate sessions,
+  separate logins, no effect on each other. Details in `CLAUDE.md`
+  (Security rules).
 
 Product and code: see `CLAUDE.md` (monorepo, modules, money, security,
 one seller type, AI through the worker, etc.).

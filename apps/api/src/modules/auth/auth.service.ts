@@ -1,7 +1,7 @@
 import type { AuthResponse, LoginInput, PublicUser, RegisterInput, ResetPasswordInput, Role } from "@muhrak/schemas";
 import { env } from "../../config/env";
 import type { UserRow } from "../../db/schema";
-import { badRequest, conflict, notFound, unauthorized } from "../../shared/errors";
+import { badRequest, conflict, forbidden, notFound, unauthorized } from "../../shared/errors";
 import { logger } from "../../shared/logger";
 import { sendPasswordResetEmail } from "../notification";
 import * as repo from "./auth.repository";
@@ -62,8 +62,18 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
   if (!user || !(await verifyPassword(input.password, user.passwordHash))) {
     throw unauthorized("Email or password is incorrect");
   }
+  // Buyer, seller and admin are separate sides: an account logs in only on its own.
+  if (user.role !== input.role) {
+    throw forbidden(WRONG_SIDE_MESSAGE[user.role]);
+  }
   return issueTokens(user);
 }
+
+const WRONG_SIDE_MESSAGE: Record<Role, string> = {
+  buyer: "This is a buyer account. Log in on the buyer side.",
+  seller: "This is a seller account. Log in on the seller side.",
+  admin: "This is an admin account. Log in on the admin app.",
+};
 
 /**
  * Exchange a refresh token for a new pair. Each refresh token works once.

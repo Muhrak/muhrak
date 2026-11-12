@@ -12,7 +12,7 @@ import { AccountBadge, EmptyPanel, OutlinePillLink, PageHeader, PanelRow, SolidP
  * itself arrives on Day 6.
  */
 export function BuyerDashboard() {
-  const user = useCurrentUser();
+  const user = useCurrentUser("buyer");
   if (!user) return null;
 
   return (

@@ -63,6 +63,14 @@ outside the platform and the seller marks the order as paid.
 ## Security rules
 
 - Never log passwords, tokens or API keys. Never commit `.env`.
+- **Buyer and seller are fully isolated (strict rule, set by the developer
+  on 12 Nov 2026).** They never share a session or affect each other. The
+  web app keeps a separate session per side (`muhrak.session.buyer`,
+  `muhrak.session.seller`); every auth helper takes the side explicitly;
+  a buyer signed in counts as a visitor on the seller side and the other
+  way round; logging out of one side leaves the other alone. Login sends
+  the side and the API refuses an account from another side (403). Any
+  new auth, session, nav or data-fetching code must keep this.
 - Every endpoint that returns user data checks ownership: a buyer sees only
   their own RFQs, quotes and orders; a seller only theirs.
 - AI: per-user daily limits, a monthly budget cap, an on/off switch, validated

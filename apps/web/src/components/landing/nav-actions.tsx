@@ -72,10 +72,14 @@ export function SignedOutActions({ side = "buyer" }: { side?: LandingSide }) {
   return <Actions user={null} side={side} />;
 }
 
-/** Reads the stored session, so it renders in the browser only; wrap in <Suspense fallback={<SignedOutActions />}>. */
+/**
+ * Reads this side's stored session, so it renders in the browser only; wrap
+ * in <Suspense fallback={<SignedOutActions />}>. STRICT RULE: only `side`'s
+ * session counts; a buyer signed in elsewhere is a visitor on /sell.
+ */
 export function NavActions({ side = "buyer" }: { side?: LandingSide }) {
   use(browser("The session is stored in localStorage."));
-  const session = useSession();
+  const session = useSession(side);
   return <Actions user={session?.user ?? null} side={side} />;
 }
 
@@ -85,7 +89,7 @@ function Actions({ user, side }: { user: PublicUser | null; side: LandingSide })
       <div className="hidden items-center gap-2.5 lg:flex">
         {user ? (
           <Link
-            href={HOME_PATH[user.role]}
+            href={HOME_PATH[side]}
             aria-label={`${user.fullName}: open your dashboard`}
             className={cn("flex items-center gap-2 rounded-full border border-black/22 bg-white/60 py-1 pr-3.5 pl-1 backdrop-blur-[15px] hover:bg-white/80", focus)}
           >
@@ -119,7 +123,7 @@ function MobileMenu({ user, side }: { user: PublicUser | null; side: LandingSide
   const [open, setOpen] = useState(false);
   const openButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const signOut = useSignOut();
+  const signOut = useSignOut(side);
   const close = () => setOpen(false);
 
   useEffect(() => {
@@ -187,7 +191,7 @@ function MobileMenu({ user, side }: { user: PublicUser | null; side: LandingSide
           <div className="relative flex flex-1 flex-col px-4 pt-6 pb-8 sm:px-12">
             {user ? (
               <Link
-                href={HOME_PATH[user.role]}
+                href={HOME_PATH[side]}
                 onClick={close}
                 className={cn("mb-8 flex items-center gap-3 rounded-[18px] border border-black/10 bg-linear-to-b from-white/78 to-white/50 p-4 hover:from-white", focus)}
               >
@@ -225,7 +229,7 @@ function MobileMenu({ user, side }: { user: PublicUser | null; side: LandingSide
                   type="button"
                   onClick={() => {
                     close();
-                    void signOut(user.role);
+                    void signOut();
                   }}
                   className={cn("h-[50px] flex-1 rounded-full border border-black/22 text-[15px] leading-[1.3] text-ink hover:bg-black/4", focus)}
                 >

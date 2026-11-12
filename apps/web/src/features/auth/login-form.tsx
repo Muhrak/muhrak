@@ -17,9 +17,13 @@ import { saveSession } from "./session";
 
 const FIELDS = ["email", "password"] as const;
 
+/** The form collects email and password; the side comes from the page. */
+const formSchema = loginSchema.omit({ role: true });
+
 /**
- * Login for either side. Any account can log in on either page; after
- * login, SignedOutOnly sends each role to its own dashboard.
+ * Login for one side. STRICT RULE: buyer and seller are separate; the API
+ * refuses an account from the other side, and the session is stored only
+ * on this side. After login, SignedOutOnly sends the user on.
  */
 export function LoginForm({ side }: { side: PortalSide }) {
   const [notice, setNotice] = useState<string>();
@@ -29,18 +33,18 @@ export function LoginForm({ side }: { side: PortalSide }) {
     setError,
     formState: { errors },
   } = useForm({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(formSchema),
     defaultValues: { email: "", password: "" },
   });
 
   const mutation = useMutation({
-    mutationFn: (input: LoginInput) => login(input),
-    onSuccess: saveSession,
+    mutationFn: (input: Omit<LoginInput, "role">) => login({ ...input, role: side }),
+    onSuccess: (session) => saveSession(side, session),
     onError: (error) => applyApiError(error, setError, FIELDS),
   });
 
   return (
-    <SignedOutOnly>
+    <SignedOutOnly side={side}>
       <div className="flex flex-col">
         <SocialButtons onUnavailable={(provider) => setNotice(`${provider} sign-in is coming soon. Use your email for now.`)} />
         <div className="mt-5">

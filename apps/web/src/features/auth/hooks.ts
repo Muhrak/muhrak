@@ -1,24 +1,24 @@
 "use client";
 
-import type { Role } from "@muhrak/schemas";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 import { getMe, logout } from "./api";
-import { loginPathFor } from "./paths";
+import { LOGIN_PATH, type PortalSide } from "./paths";
 import { clearSession, getSession, updateSessionUser, useSession } from "./session";
 
 /**
- * The signed-in user. Starts from the stored copy so the page renders at
- * once, then checks with the API (which also catches revoked sessions).
+ * The signed-in user of `side`. Starts from the stored copy so the page
+ * renders at once, then checks with the API (which also catches revoked
+ * sessions).
  */
-export function useCurrentUser() {
-  const session = useSession();
+export function useCurrentUser(side: PortalSide) {
+  const session = useSession(side);
   const query = useQuery({
-    queryKey: ["auth", "me", session?.user.id],
+    queryKey: ["auth", "me", side, session?.user.id],
     queryFn: async () => {
-      const user = await getMe();
-      updateSessionUser(user);
+      const user = await getMe(side);
+      updateSessionUser(side, user);
       return user;
     },
     enabled: Boolean(session),
@@ -27,19 +27,22 @@ export function useCurrentUser() {
   return query.data ?? session?.user ?? null;
 }
 
-/** Log out here and in every other open tab, then go to the login page for this role. */
-export function useSignOut() {
+/**
+ * Log out of `side` here and in every other open tab, then go to that
+ * side's login page. The other side's session is left alone.
+ */
+export function useSignOut(side: PortalSide) {
   const router = useRouter();
   const queryClient = useQueryClient();
   return useCallback(
-    async (role: Role) => {
-      const session = getSession();
-      clearSession();
+    async () => {
+      const session = getSession(side);
+      clearSession(side);
       queryClient.clear();
-      router.replace(loginPathFor(role));
+      router.replace(LOGIN_PATH[side]);
       // Revoke the refresh token on the server. Best effort: the local session is already gone.
       if (session) await logout(session.refreshToken).catch(() => undefined);
     },
-    [queryClient, router],
+    [side, queryClient, router],
   );
 }

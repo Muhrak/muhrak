@@ -43,8 +43,8 @@ const look = {
 export function PortalSidebar({ side, onNavigate }: { side: PortalSide; onNavigate?: () => void }) {
   const style = look[side];
   const pathname = usePathname();
-  const user = useCurrentUser();
-  const signOut = useSignOut();
+  const user = useCurrentUser(side);
+  const signOut = useSignOut(side);
   const isActive = (slug: string) => pathname === `/${side}/${slug}` || pathname.startsWith(`/${side}/${slug}/`);
 
   return (
@@ -121,7 +121,7 @@ export function PortalSidebar({ side, onNavigate }: { side: PortalSide; onNaviga
       </div>
       <button
         type="button"
-        onClick={() => void signOut(side)}
+        onClick={() => void signOut()}
         className={cn(
           "flex w-full items-center gap-3 rounded-full px-3.5 text-left leading-[1.2] text-sidebar-danger outline-none hover:bg-white/5 focus-visible:ring-3 focus-visible:ring-white/30",
           style.item,

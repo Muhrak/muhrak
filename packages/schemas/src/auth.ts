@@ -15,9 +15,14 @@ export const registerSchema = z.object({
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
 
+/**
+ * `role` is the side the user is logging in on. Buyer and seller are fully
+ * separate: an account can only log in on its own side (strict rule).
+ */
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1).max(200),
+  role: roleSchema,
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
