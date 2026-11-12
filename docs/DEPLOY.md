@@ -175,3 +175,9 @@ the signature (S3 refuses any other type or size). The browser PUTs to
 checks the real type with `file-type`, then copies exactly that version
 (ETag match) to `files/<purpose>/<id>.<ext>`. Only then can the upload be
 attached, once, by its owner, to a record of the right purpose.
+
+Note: Vercel builds through Turborepo in strict env mode, which hides any
+variable not listed under `tasks.build.env` in `turbo.json` (except
+`NEXT_PUBLIC_*`). A new build-time variable for the web app must be added
+there, or the build will not see it. The build log prints
+`[muhrak] STORAGE_ORIGIN: allowed …` when the bucket is in the CSP.
