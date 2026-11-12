@@ -28,6 +28,12 @@ const envSchema = z.object({
    */
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
   /**
+   * Shared with the web app's /api proxy, which forwards the visitor's IP
+   * in x-muhrak-client-ip. The header is trusted only with this secret.
+   * Unset locally (the API then uses the connection IP).
+   */
+  API_PROXY_SECRET: z.string().min(32).optional(),
+  /**
    * Path of the refresh-token cookie as the BROWSER sees it. The web app
    * proxies /api/* to this API, so /v1/auth here is /api/v1/auth there.
    */

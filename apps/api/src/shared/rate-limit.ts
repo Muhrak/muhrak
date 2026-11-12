@@ -1,5 +1,6 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { Request, RequestHandler } from "express";
+import { env } from "../config/env";
 import { AppError } from "./errors";
 import { logger } from "./logger";
 import { getRedis } from "./redis";
@@ -127,6 +128,26 @@ export function limitByIp(limit: Limit, message?: string): RequestHandler {
   };
 }
 
+/**
+ * The real client IP:
+ * - via the web app's /api proxy: `x-muhrak-client-ip`, trusted only when
+ *   `x-muhrak-proxy-secret` matches API_PROXY_SECRET (constant-time check);
+ * - otherwise `req.ip`, which honours `trust proxy` (Railway's edge
+ *   replaces any client-supplied X-Forwarded-For, so it cannot be faked).
+ */
 export function clientIp(req: Request): string {
+  const secret = env.API_PROXY_SECRET;
+  const given = req.headers["x-muhrak-proxy-secret"];
+  const forwarded = req.headers["x-muhrak-client-ip"];
+  if (secret && typeof given === "string" && typeof forwarded === "string" && safeEqual(given, secret)) {
+    const ip = forwarded.trim();
+    if (/^[0-9a-fA-F:.]{3,45}$/.test(ip)) return ip;
+  }
   return req.ip ?? req.socket.remoteAddress ?? "unknown";
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const left = createHash("sha256").update(a).digest();
+  const right = createHash("sha256").update(b).digest();
+  return timingSafeEqual(left, right);
 }

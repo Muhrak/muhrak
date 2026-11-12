@@ -121,17 +121,41 @@ Details in `docs/DEPLOY.md`.
 
 ## Open items
 
-Security gaps in the existing code (found 12 Nov 2026, not fixed yet):
-- **No rate limiting** on login, sign-up, password reset. Staging is
-  public, so this is the first thing to fix (needs a dependency, e.g.
-  `express-rate-limit` with a Redis store: ask the developer).
-- **No security headers on the web app** (CSP, HSTS, frame-ancestors,
-  nosniff in `next.config.ts`). The API already uses `helmet`.
-- **Tokens are in localStorage**, so any XSS could steal them. Plan: move
-  the refresh token to an httpOnly cookie once the API has a same-site
-  domain (e.g. `api.muhrak.om`), and add a strict CSP meanwhile.
-- **Database backups** on Railway Postgres not confirmed.
-- No account lockout or CAPTCHA after repeated failed logins.
+Security hardening (12 Nov 2026), done and tested (see docs/DEPLOY.md):
+- Rate limits on every auth endpoint and a site-wide per-IP ceiling (Redis,
+  in-memory fallback). Failed logins: 5 per email+IP per 15 min, 20 per
+  email per hour. Reset emails: 5 per address per hour.
+- No user enumeration by timing (login dummy hash; forgot-password answers
+  before working).
+- Refresh token in an httpOnly, Secure, SameSite=Strict cookie per side via
+  the web app's same-origin `/api` proxy; access token in memory; nothing
+  secret in localStorage. CSRF origin check on login/sign-up/refresh/logout.
+- Web security headers + CSP; SRI; ESLint bans `dangerouslySetInnerHTML`
+  and eval; auth forms are `method="post"` (a password can never land in a
+  URL, even if scripts fail). API: 100 kb body limit, clean 413/400.
+- Staging API: `TRUST_PROXY_HOPS=2` (measured: Railway replaces any
+  client-sent X-Forwarded-For, so direct calls cannot fake their IP).
+
+Still open (security):
+- **Developer action:** set the same `API_PROXY_SECRET` (32+ random chars)
+  on Railway (service `muhrak`) and Vercel (then redeploy both). Until then
+  every visitor coming through the website shares one per-IP limit (the API
+  sees Vercel's IP), so one attacker could slow logins for everyone for 15
+  minutes. Per-email limits work regardless.
+- **Developer action:** enable backups on the Railway Postgres volume
+  (dashboard, volume, Backups). Plan: also a nightly `pg_dump` job from the
+  worker to private storage once the storage provider exists (Day 3).
+- CSP allows inline scripts (`'unsafe-inline'`): Next.js streams page data
+  in inline scripts; removing it needs per-request nonces, which turns off
+  static pages. Revisit before launch. Mitigated: React escaping, lint ban
+  on raw HTML, `connect-src 'self'`, httpOnly refresh cookie.
+- Access tokens stay valid up to 15 min after logout or password reset
+  (stateless JWT). Consider a per-user token version check for money
+  actions.
+- Sign-up says "email already exists" (enumeration via sign-up), limited
+  by the 10/hour per-IP limit. Revisit with email verification.
+- CAPTCHA (e.g. Cloudflare Turnstile) after repeated failures: needs a
+  provider account; ask the developer.
 
 Other:
 
