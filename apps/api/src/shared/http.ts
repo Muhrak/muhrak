@@ -19,6 +19,20 @@ export function validateBody<T>(schema: ZodType<T>): RequestHandler {
   };
 }
 
+/**
+ * Validate route params (e.g. `:id` must be a UUID). A bad param is a 404,
+ * not a 400: it cannot name anything that exists.
+ */
+export function validateParams<T>(schema: ZodType<T>): RequestHandler {
+  return (req, _res, next) => {
+    if (!schema.safeParse(req.params).success) {
+      next(new AppError(404, "not_found", "Not found"));
+      return;
+    }
+    next();
+  };
+}
+
 export const notFoundHandler: RequestHandler = (req, res) => {
   res.status(404).json({
     error: { code: "not_found", message: `No route for ${req.method} ${req.path}` },

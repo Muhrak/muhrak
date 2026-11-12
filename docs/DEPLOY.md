@@ -140,3 +140,38 @@ staging and production at the same database.
   Referrer-Policy, Permissions-Policy) are set in `apps/web/next.config.ts`.
 - Database backups: enable them on the Postgres volume in the Railway
   dashboard (volume, Backups tab). Not available from the CLI.
+
+## File storage: Amazon S3 (12 Nov 2026)
+
+Private bucket `muhrak-staging-private-om7k`, region `eu-north-1`
+(Stockholm). Production gets its own bucket (consider `me-central-1` if data
+must stay in the GCC).
+
+Bucket settings: Block all public access on, ACLs disabled (bucket owner
+enforced), versioning on, default encryption SSE-S3, a bucket policy that
+denies non-HTTPS access, CORS allowing `PUT` and `GET` from the web origins
+(`https://muhrak.vercel.app`, `http://localhost:3000`) with header
+`content-type`. Lifecycle: abort incomplete multipart uploads after 1 day,
+expire `pending/` after 1 day, delete noncurrent versions after 90 days.
+
+IAM user `muhrak-staging-api` (no console access) with one inline policy:
+`s3:PutObject` and `s3:GetObject` on `arn:aws:s3:::<bucket>/*` only. No
+list or delete, on purpose: the API never deletes files, and without
+`s3:ListBucket` S3 answers 403 for a missing file (the code handles that).
+
+Variables:
+- Railway `muhrak` and `worker`: `AWS_REGION`, `AWS_ACCESS_KEY_ID`,
+  `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_PRIVATE`. Without them the upload
+  endpoints answer 503 and the rest of the API works.
+- Vercel: `STORAGE_ORIGIN=https://<bucket>.s3.<region>.amazonaws.com`. The
+  browser uploads straight to the bucket and shows logos from it, so the CSP
+  (`connect-src`, `img-src`) must allow this exact origin. Without it,
+  uploads on the website are blocked by the CSP.
+
+How an upload works: `POST /v1/uploads` checks purpose, type and size and
+returns a 5-minute signed PUT link with Content-Type and Content-Length in
+the signature (S3 refuses any other type or size). The browser PUTs to
+`pending/<id>`. `POST /v1/uploads/:id/complete` reads the stored bytes,
+checks the real type with `file-type`, then copies exactly that version
+(ETag match) to `files/<purpose>/<id>.<ext>`. Only then can the upload be
+attached, once, by its owner, to a record of the right purpose.

@@ -6,10 +6,13 @@ import { allSectionSlugs, sectionLabel } from "@/components/layout/portal-nav";
 // Browser-only page inside the signed-in centre (see the layout).
 export const instant = false;
 
+/** Pages with their own route folder. */
+const BUILT = new Set(["dashboard", "company-profile", "verification"]);
+
 /** Menu pages that are not built yet. Unknown paths are a real 404. */
 export function generateStaticParams() {
   return allSectionSlugs("seller")
-    .filter((slug) => slug !== "dashboard")
+    .filter((slug) => !BUILT.has(slug))
     .map((slug) => ({ section: [slug] }));
 }
 

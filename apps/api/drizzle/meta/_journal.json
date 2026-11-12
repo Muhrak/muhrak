@@ -15,6 +15,13 @@
       "when": 1794395003077,
       "tag": "0001_bent_ted_forrester",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794478561854,
+      "tag": "0002_overrated_the_fallen",
+      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,8 @@ import helmet from "helmet";
 import { env } from "./config/env";
 import { authRouter } from "./modules/auth";
 import { healthRouter } from "./modules/health/health.routes";
+import { sellerRouter } from "./modules/seller";
+import { uploadRouter } from "./modules/upload";
 import { errorHandler, notFoundHandler } from "./shared/http";
 import { limitByIp } from "./shared/rate-limit";
 
@@ -26,6 +28,8 @@ export function createApp() {
   // Ceiling for any single IP across the whole API; endpoints add tighter limits.
   v1.use(limitByIp({ name: "api:ip", max: 600, windowMs: 60_000 }));
   v1.use("/auth", authRouter);
+  v1.use("/uploads", uploadRouter);
+  v1.use("/seller", sellerRouter);
   app.use("/v1", v1);
 
   app.use(notFoundHandler);

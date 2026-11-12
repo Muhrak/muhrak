@@ -10,6 +10,23 @@ const isDev = process.env.NODE_ENV === "development";
 const API_ORIGIN = (process.env.API_ORIGIN ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
 /**
+ * The private S3 bucket. Browsers upload files straight to it with signed
+ * links, and show logos from it, so the CSP allows exactly this one origin.
+ * Only an https S3 origin is accepted; anything else is ignored.
+ */
+const STORAGE_ORIGIN = (() => {
+  const value = process.env.STORAGE_ORIGIN?.trim();
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    const ok = url.protocol === "https:" && /\.s3[.-][a-z0-9-]+\.amazonaws\.com$/.test(url.hostname);
+    return ok ? url.origin : "";
+  } catch {
+    return "";
+  }
+})();
+
+/**
  * Content Security Policy. The site loads nothing from other origins, so
  * everything is 'self'. Script files also carry build-time integrity
  * hashes (SRI, below).
@@ -27,9 +44,9 @@ const csp = [
   // keeps injected code from sending data anywhere but this site.
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob:${STORAGE_ORIGIN ? ` ${STORAGE_ORIGIN}` : ""}`,
   "font-src 'self'",
-  `connect-src 'self'${isDev ? " ws:" : ""}`,
+  `connect-src 'self'${STORAGE_ORIGIN ? ` ${STORAGE_ORIGIN}` : ""}${isDev ? " ws:" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

@@ -7,8 +7,9 @@ Last updated: Thu 12 Nov 2026. Branch `develop`.
 
 ## Status
 
-About 12% of the 20-day plan. Days 1 and 2 are done, and the landing pages
-planned for later (P1) are done early. Next is Day 3.
+About 17% of the 20-day plan. Days 1 to 3 are done, and the landing pages
+planned for later (P1) are done early. Next is Day 4 (admin app and the
+seller verification queue).
 
 ## Done
 
@@ -34,6 +35,37 @@ planned for later (P1) are done early. Next is Day 3.
 - Buyer Centre and Seller Centre shells: sidebars from Figma, empty
   dashboards, mobile drawer, "Coming soon" pages for menu items not built.
 - Staging on Railway (API, worker, Postgres, EU West) and Vercel (web).
+
+### Day 3: uploads, company profile, verification (Thu 12 Nov)
+- Storage: private Amazon S3 bucket (setup and variables in
+  `docs/DEPLOY.md`). `upload` module: signed 5-minute PUT links with type
+  and size in the signature; after the upload the API checks the real file
+  type from its bytes (`file-type`) and copies exactly that version from
+  `pending/` to `files/`. An upload is attached once, by its owner, for its
+  purpose only. PDF, JPG, PNG; documents 10 MB, logo 2 MB, cover 5 MB.
+- `seller` module: company profile (name, GCC country, city, phone,
+  website, about, brands, VAT registered, logo, cover) and documents (CR,
+  VAT certificate only if VAT registered, owner ID, bank proof). Documents
+  are never deleted: a new file marks the old one superseded.
+- Verification state machine in `seller.service.ts`: draft → pending →
+  approved / rejected; approved → pending when the company name, country,
+  VAT status or a document changes; rejected → pending on resubmit. Every
+  change is recorded in `seller_verification_events`. While pending, the
+  documents and those fields are locked (checked again under a row lock).
+- Web: `/seller/company-profile` and `/seller/verification` from Figma
+  "Seller – Company Profile" (179:797) and "Seller – Verification"
+  (396:6512), both dark only, converted to light. Status chips use the
+  Figma tint with dark text and a coloured dot (green text on white was
+  unreadable). The dashboard step "Complete company profile" turns done
+  once a profile exists. "Why verify" text changed: the Figma item "Faster
+  payouts" does not apply (no online payment), and the UAE trade licence
+  row is left out (not one of the agreed documents).
+- Tests: 18 seller and 10 upload service tests (abuse cases included), 5
+  schema tests, and a 40-check run against the real bucket (another
+  seller's files, reused uploads, renamed .exe, wrong size or type at S3,
+  buyer on seller endpoints, locked fields).
+- `drizzle-orm` upgraded to 0.45 (SQL injection advisory in identifier
+  escaping; Muhrak never passed user input there, fixed anyway).
 
 ### Landing pages (P1, done early)
 - Buyer landing `/` from Figma "Buyer – Landing v2 (Light)" (423:1138).
@@ -157,6 +189,20 @@ Still open (security):
 - CAPTCHA (e.g. Cloudflare Turnstile) after repeated failures: needs a
   provider account; ask the developer.
 
+Still open (Day 3 files):
+- **Developer action:** on Vercel set `STORAGE_ORIGIN` (see DEPLOY.md);
+  without it the CSP blocks uploads on the website. Also put the four AWS
+  variables in `apps/worker/.env` (only the API has them locally).
+- Day 4 must approve and reject with a conditional update (`where status =
+  pending`) and record the admin in the audit log and the events table.
+- Replaced logos, covers and documents stay in the bucket (the API has no
+  delete permission, on purpose). Fine for now; a cleanup job can come later.
+- Images are not re-encoded, so photo metadata (e.g. GPS in an ID photo)
+  stays in the file. Documents are private; strip metadata before any image
+  becomes public (store pages, Day 5 product photos).
+- No virus scanning of uploads. Only PDF, JPG and PNG are accepted (checked
+  by content), and files are served from the S3 domain, never ours.
+
 Other:
 
 - Resend has no verified domain, so emails only reach the Resend account
@@ -169,14 +215,11 @@ Other:
   About, Contact, Careers, legal pages, the theme toggle (dark not built).
 - `refs/` (design references) is kept locally and not committed.
 
-## Next up: Day 3 (Thu 12 Nov), see `docs/PLAN.md`
+## Next up: Day 4 (Fri 13 Nov), see `docs/PLAN.md`
 
-Waiting on the developer's storage choice (recommended: Cloudflare R2 via
-the S3 client). The developer also mentioned Day 4 and 5; parts of those
-that do not need storage could go first.
-
-- File upload module (direct to storage). Needs a storage provider choice.
-- Seller company profile: name, country, city, description, logo.
-- Verification documents (CR, VAT certificate, owner ID, bank proof);
-  status pending, approved or rejected.
-- Aim: a seller completes the profile and submits documents for review.
+- Admin app (`apps/admin`) with admin login; first admin created by a
+  script.
+- Sellers list and verification queue; approve, or reject with a reason
+  (per document and overall).
+- Email the seller the decision; record the admin action in an audit log.
+- Aim: an admin approves a seller and the seller sees "Verified".

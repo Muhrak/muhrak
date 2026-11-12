@@ -129,6 +129,27 @@ export function limitByIp(limit: Limit, message?: string): RequestHandler {
 }
 
 /**
+ * Middleware: limit requests per signed-in user (use after requireAuth).
+ * Stops one account from flooding an endpoint from many IPs.
+ */
+export function limitByUser(limit: Limit, message?: string): RequestHandler {
+  return async (req, res, next) => {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      next(new AppError(401, "unauthorized", "Not signed in"));
+      return;
+    }
+    const result = await hit(limit, userId);
+    if (!result.allowed) {
+      logger.warn({ limit: limit.name, userId, path: req.path }, "Rate limit reached");
+      next(tooManyRequests(result.retryAfterMs, message));
+      return;
+    }
+    next();
+  };
+}
+
+/**
  * The real client IP:
  * - via the web app's /api proxy: `x-muhrak-client-ip`, trusted only when
  *   `x-muhrak-proxy-secret` matches API_PROXY_SECRET (constant-time check);

@@ -38,6 +38,15 @@ const envSchema = z.object({
    * proxies /api/* to this API, so /v1/auth here is /api/v1/auth there.
    */
   AUTH_COOKIE_PATH: z.string().startsWith("/").default("/api/v1/auth"),
+  /**
+   * Private file storage (Amazon S3). All four are needed for uploads; if
+   * any is missing the upload endpoints answer 503 and nothing else breaks.
+   * The IAM user should only have s3:PutObject and s3:GetObject on this bucket.
+   */
+  AWS_REGION: z.string().regex(/^[a-z]{2}(-[a-z]+)+-\d$/, "AWS_REGION must be a region code, e.g. eu-north-1").optional(),
+  AWS_ACCESS_KEY_ID: z.string().min(16).optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().min(16).optional(),
+  S3_BUCKET_PRIVATE: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/).optional(),
   /** Origins allowed to call the API from a browser (CORS and the auth origin check). Comma separated. */
   CORS_ORIGINS: z
     .string()

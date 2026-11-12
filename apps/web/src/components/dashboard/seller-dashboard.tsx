@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Icon } from "@/components/layout/icon";
 import { useCurrentUser } from "@/features/auth/hooks";
+import { useSellerAccount } from "@/features/seller/api";
 import { cn } from "@/lib/utils";
 import { AccountBadge, EmptyPanel, OutlinePillLink, PageHeader, PanelRow, SolidPillLink, StatCards } from "./parts";
 
@@ -58,7 +59,14 @@ export function SellerDashboard() {
   );
 }
 
-const steps = [
+interface Step {
+  title: string;
+  text: string;
+  done?: boolean;
+  action?: { href: string; label: string; tone: "accent" | "white" };
+}
+
+const STEPS: Step[] = [
   { title: "Account created", text: "Your seller account is ready.", done: true },
   {
     title: "Add your first product",
@@ -73,6 +81,11 @@ const steps = [
 ];
 
 function FinishSetup() {
+  const account = useSellerAccount();
+  const hasProfile = Boolean(account.data?.profile);
+  const steps = STEPS.map((step) =>
+    step.title === "Complete company profile" && hasProfile ? { ...step, done: true, action: undefined } : step,
+  );
   const done = steps.filter((step) => step.done).length;
   return (
     <section aria-label="Finish setting up your store" className="flex flex-col gap-4 rounded-[24px] bg-feature px-5 py-[22px] sm:px-7">

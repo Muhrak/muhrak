@@ -1,4 +1,5 @@
-import { index, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, index, integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 /**
  * Database tables. Every module's tables are declared in this one file so
@@ -59,6 +60,135 @@ export const passwordResetTokens = pgTable(
   },
   (table) => [index("password_reset_tokens_user_id_idx").on(table.userId)],
 );
+
+// ---------------------------------------------------------------- upload
+
+export const uploadPurpose = pgEnum("upload_purpose", ["seller_logo", "seller_cover", "seller_document"]);
+export const uploadStatus = pgEnum("upload_status", ["pending", "ready", "rejected"]);
+
+/**
+ * Every file a user sends to storage. The browser uploads to `pending/…`
+ * with a signed link; only after the API has checked the stored bytes is the
+ * file copied to `files/…` and marked ready. A ready upload is attached to
+ * exactly one record (attachedAt), by its owner only.
+ */
+export const uploads = pgTable(
+  "uploads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerUserId: uuid("owner_user_id")
+      .notNull()
+      .references(() => users.id),
+    purpose: uploadPurpose("purpose").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    /** Where the checked file lives (`files/…`); the pending key is derived from the id. */
+    storageKey: text("storage_key").notNull().unique(),
+    status: uploadStatus("status").notNull().default("pending"),
+    /** Why the stored file was refused (wrong type, wrong size). Server-side only. */
+    rejectedReason: text("rejected_reason"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    attachedAt: timestamp("attached_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("uploads_owner_created_idx").on(table.ownerUserId, table.createdAt)],
+);
+
+// ---------------------------------------------------------------- seller
+
+export const verificationStatus = pgEnum("verification_status", ["draft", "pending", "approved", "rejected"]);
+export const documentType = pgEnum("document_type", [
+  "commercial_registration",
+  "vat_certificate",
+  "owner_id",
+  "bank_proof",
+]);
+export const documentStatus = pgEnum("document_status", ["pending", "approved", "rejected"]);
+
+/** One per seller account. Created the first time the seller saves the profile. */
+export const sellerProfiles = pgTable(
+  "seller_profiles",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id),
+    companyName: text("company_name").notNull(),
+    country: text("country").notNull(),
+    city: text("city").notNull(),
+    phone: text("phone").notNull(),
+    website: text("website"),
+    about: text("about").notNull().default(""),
+    brands: text("brands").array().notNull().default([]),
+    vatRegistered: boolean("vat_registered").notNull(),
+    logoUploadId: uuid("logo_upload_id").references(() => uploads.id),
+    coverUploadId: uuid("cover_upload_id").references(() => uploads.id),
+    verificationStatus: verificationStatus("verification_status").notNull().default("draft"),
+    rejectionReason: text("rejection_reason"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedBy: uuid("reviewed_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  // The admin review queue (Day 4) lists sellers by status, oldest submission first.
+  (table) => [index("seller_profiles_status_submitted_idx").on(table.verificationStatus, table.submittedAt)],
+);
+
+/**
+ * Verification documents. Never deleted: uploading a new file for a type
+ * marks the old row superseded, so the review history is kept. At most one
+ * current (not superseded) document per seller and type.
+ */
+export const sellerDocuments = pgTable(
+  "seller_documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sellerUserId: uuid("seller_user_id")
+      .notNull()
+      .references(() => users.id),
+    type: documentType("type").notNull(),
+    uploadId: uuid("upload_id")
+      .notNull()
+      .unique()
+      .references(() => uploads.id),
+    documentNumber: text("document_number"),
+    status: documentStatus("status").notNull().default("pending"),
+    rejectionReason: text("rejection_reason"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedBy: uuid("reviewed_by").references(() => users.id),
+    supersededAt: timestamp("superseded_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("seller_documents_current_idx")
+      .on(table.sellerUserId, table.type)
+      .where(sql`${table.supersededAt} is null`),
+    index("seller_documents_seller_idx").on(table.sellerUserId, table.createdAt),
+  ],
+);
+
+/** Every change of a seller's verification status, who made it and why. Append only. */
+export const sellerVerificationEvents = pgTable(
+  "seller_verification_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sellerUserId: uuid("seller_user_id")
+      .notNull()
+      .references(() => users.id),
+    fromStatus: verificationStatus("from_status").notNull(),
+    toStatus: verificationStatus("to_status").notNull(),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => users.id),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("seller_verification_events_seller_idx").on(table.sellerUserId, table.createdAt)],
+);
+
+export type UploadRow = typeof uploads.$inferSelect;
+export type SellerProfileRow = typeof sellerProfiles.$inferSelect;
+export type SellerDocumentRow = typeof sellerDocuments.$inferSelect;
 
 export type UserRow = typeof users.$inferSelect;
 export type NewUserRow = typeof users.$inferInsert;
