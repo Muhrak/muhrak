@@ -15,15 +15,25 @@ const API_ORIGIN = (process.env.API_ORIGIN ?? process.env.NEXT_PUBLIC_API_URL ??
  * Only an https S3 origin is accepted; anything else is ignored.
  */
 const STORAGE_ORIGIN = (() => {
-  const value = process.env.STORAGE_ORIGIN?.trim();
-  if (!value) return "";
-  try {
-    const url = new URL(value);
-    const ok = url.protocol === "https:" && /\.s3[.-][a-z0-9-]+\.amazonaws\.com$/.test(url.hostname);
-    return ok ? url.origin : "";
-  } catch {
+  // Tolerate surrounding quotes or spaces pasted into the hosting dashboard.
+  const value = process.env.STORAGE_ORIGIN?.trim().replace(/^["']|["']$/g, "").trim();
+  // Printed in the build log so a missing or refused value is easy to spot.
+  const report = (message: string) => console.log(`[muhrak] STORAGE_ORIGIN: ${message}`);
+  if (!value) {
+    report("not set. File uploads will be blocked by the CSP.");
     return "";
   }
+  try {
+    const url = new URL(value);
+    if (url.protocol === "https:" && /\.s3[.-][a-z0-9-]+\.amazonaws\.com$/.test(url.hostname)) {
+      report(`allowed ${url.origin}`);
+      return url.origin;
+    }
+  } catch {
+    // Not a URL; reported below.
+  }
+  report("refused (must be https://<bucket>.s3.<region>.amazonaws.com). File uploads will be blocked by the CSP.");
+  return "";
 })();
 
 /**
@@ -64,7 +74,7 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   // Never leak full URLs (e.g. password-reset tokens) to other sites.
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
 ];
