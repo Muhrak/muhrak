@@ -69,8 +69,6 @@ export const sellerProfileInputSchema = z.object({
   vatRegistered: z.boolean(),
   /** An upload with purpose seller_logo. Omit to keep the current logo; null removes it. */
   logoUploadId: z.string().uuid().nullable().optional(),
-  /** An upload with purpose seller_cover. Omit to keep; null removes it. */
-  coverUploadId: z.string().uuid().nullable().optional(),
 });
 export type SellerProfileInput = z.input<typeof sellerProfileInputSchema>;
 export type SellerProfileData = z.output<typeof sellerProfileInputSchema>;
@@ -122,7 +120,6 @@ export const sellerProfileSchema = z.object({
   brands: z.array(z.string()),
   vatRegistered: z.boolean(),
   logo: fileLinkSchema.nullable(),
-  cover: fileLinkSchema.nullable(),
   updatedAt: z.string(),
 });
 export type SellerProfile = z.infer<typeof sellerProfileSchema>;

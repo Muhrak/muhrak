@@ -14,7 +14,7 @@ import { z } from "zod";
  * module that owns that record. It can be attached once, by its owner only.
  */
 
-export const uploadPurposeSchema = z.enum(["seller_logo", "seller_cover", "seller_document"]);
+export const uploadPurposeSchema = z.enum(["seller_logo", "seller_document"]);
 export type UploadPurpose = z.infer<typeof uploadPurposeSchema>;
 
 export const uploadContentTypeSchema = z.enum(["application/pdf", "image/jpeg", "image/png"]);
@@ -25,7 +25,6 @@ const MB = 1024 * 1024;
 /** What each purpose accepts. The API enforces this; the web app uses it to warn early. */
 export const UPLOAD_RULES: Record<UploadPurpose, { types: UploadContentType[]; maxBytes: number }> = {
   seller_logo: { types: ["image/png", "image/jpeg"], maxBytes: 2 * MB },
-  seller_cover: { types: ["image/png", "image/jpeg"], maxBytes: 5 * MB },
   seller_document: { types: ["application/pdf", "image/png", "image/jpeg"], maxBytes: 10 * MB },
 };
 

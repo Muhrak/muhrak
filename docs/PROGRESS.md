@@ -42,9 +42,10 @@ seller verification queue).
   and size in the signature; after the upload the API checks the real file
   type from its bytes (`file-type`) and copies exactly that version from
   `pending/` to `files/`. An upload is attached once, by its owner, for its
-  purpose only. PDF, JPG, PNG; documents 10 MB, logo 2 MB, cover 5 MB.
+  purpose only. PDF, JPG, PNG; documents 10 MB, logo 2 MB.
 - `seller` module: company profile (name, GCC country, city, phone,
-  website, about, brands, VAT registered, logo, cover) and documents (CR,
+  website, about, brands, VAT registered, logo; no cover photo, the
+  developer dropped it) and documents (CR,
   VAT certificate only if VAT registered, owner ID, bank proof). Documents
   are never deleted: a new file marks the old one superseded.
 - Verification state machine in `seller.service.ts`: draft → pending →
@@ -195,7 +196,7 @@ Still open (Day 3 files):
   variables in `apps/worker/.env` (only the API has them locally).
 - Day 4 must approve and reject with a conditional update (`where status =
   pending`) and record the admin in the audit log and the events table.
-- Replaced logos, covers and documents stay in the bucket (the API has no
+- Replaced logos and documents stay in the bucket (the API has no
   delete permission, on purpose). Fine for now; a cleanup job can come later.
 - Images are not re-encoded, so photo metadata (e.g. GPS in an ID photo)
   stays in the file. Documents are private; strip metadata before any image

@@ -112,7 +112,7 @@ async function imageLink(uploadId: string | null) {
 }
 
 async function toProfile(row: SellerProfileRow): Promise<SellerProfile> {
-  const [logo, cover] = await Promise.all([imageLink(row.logoUploadId), imageLink(row.coverUploadId)]);
+  const logo = await imageLink(row.logoUploadId);
   return {
     companyName: row.companyName,
     country: row.country as SellerProfile["country"],
@@ -123,7 +123,6 @@ async function toProfile(row: SellerProfileRow): Promise<SellerProfile> {
     brands: row.brands,
     vatRegistered: row.vatRegistered,
     logo,
-    cover,
     updatedAt: row.updatedAt.toISOString(),
   };
 }
@@ -174,9 +173,6 @@ export async function saveProfile(userId: string, input: SellerProfileData, now 
   if (input.logoUploadId && input.logoUploadId !== before?.logoUploadId) {
     await attachUpload(userId, input.logoUploadId, "seller_logo");
   }
-  if (input.coverUploadId && input.coverUploadId !== before?.coverUploadId) {
-    await attachUpload(userId, input.coverUploadId, "seller_cover");
-  }
 
   const fields = {
     companyName: input.companyName,
@@ -188,7 +184,6 @@ export async function saveProfile(userId: string, input: SellerProfileData, now 
     brands: [...new Set(input.brands)],
     vatRegistered: input.vatRegistered,
     ...(input.logoUploadId !== undefined ? { logoUploadId: input.logoUploadId } : {}),
-    ...(input.coverUploadId !== undefined ? { coverUploadId: input.coverUploadId } : {}),
   };
 
   await repo.inTransaction(async (tx) => {

@@ -28,7 +28,6 @@ import { getStorage } from "./storage";
 /** Which accounts may upload for which purpose. */
 const PURPOSE_ROLES: Record<UploadPurpose, Role[]> = {
   seller_logo: ["seller"],
-  seller_cover: ["seller"],
   seller_document: ["seller"],
 };
 
@@ -55,7 +54,8 @@ export function pendingKey(uploadId: string): string {
 function toUpload(row: UploadRow): Upload {
   return {
     id: row.id,
-    purpose: row.purpose,
+    // Rows can only be created with a current purpose (see PURPOSE_ROLES).
+    purpose: row.purpose as UploadPurpose,
     contentType: row.contentType as UploadContentType,
     sizeBytes: row.sizeBytes,
     status: row.status,

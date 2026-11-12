@@ -78,7 +78,6 @@ function ProfileEditor({ account, fallbackName }: { account: SellerAccount; fall
   const [saved, setSaved] = useState(false);
   const [brands, setBrands] = useState<string[]>(account.profile?.brands ?? []);
   const [logo, setLogo] = useState<PickedImage | null>(null);
-  const [cover, setCover] = useState<PickedImage | null>(null);
   const underReview = account.verification.status === "pending";
 
   const {
@@ -95,7 +94,6 @@ function ProfileEditor({ account, fallbackName }: { account: SellerAccount; fall
 
   // Release the local previews when they are replaced or the page closes.
   useEffect(() => () => void (logo && URL.revokeObjectURL(logo.previewUrl)), [logo]);
-  useEffect(() => () => void (cover && URL.revokeObjectURL(cover.previewUrl)), [cover]);
 
   const onSubmit = handleSubmit((values) => {
     setSaved(false);
@@ -110,14 +108,12 @@ function ProfileEditor({ account, fallbackName }: { account: SellerAccount; fall
         brands,
         vatRegistered: values.vatRegistered === "yes",
         ...(logo ? { logoUploadId: logo.uploadId } : {}),
-        ...(cover ? { coverUploadId: cover.uploadId } : {}),
       },
       {
         onSuccess: (next) => {
           reset(valuesFrom(next, fallbackName));
           setSaved(true);
           setLogo(null);
-          setCover(null);
         },
         onError: (error) => applyApiError(error, setError, FIELDS),
       },
@@ -131,7 +127,7 @@ function ProfileEditor({ account, fallbackName }: { account: SellerAccount; fall
   const name = watchedName || fallbackName;
   const parsedCountry = gccCountrySchema.safeParse(countryValue);
   const country = parsedCountry.success ? parsedCountry.data : null;
-  const unsaved = isDirty || logo !== null || cover !== null || brands.join("\n") !== (account.profile?.brands ?? []).join("\n");
+  const unsaved = isDirty || logo !== null || brands.join("\n") !== (account.profile?.brands ?? []).join("\n");
 
   return (
     <>
@@ -176,9 +172,7 @@ function ProfileEditor({ account, fallbackName }: { account: SellerAccount; fall
           about={about}
           brandCount={brands.length}
           logoUrl={logo?.previewUrl ?? account.profile?.logo?.url ?? null}
-          coverUrl={cover?.previewUrl ?? account.profile?.cover?.url ?? null}
           onLogo={setLogo}
-          onCover={setCover}
         />
 
         <form
@@ -327,45 +321,28 @@ function ProfileEditor({ account, fallbackName }: { account: SellerAccount; fall
   );
 }
 
-/** Left card: how the store looks to buyers, with logo and cover pickers. */
+/** Left card: how the store looks to buyers, with the logo picker. */
 function StorePreview({
   name,
   location,
   about,
   brandCount,
   logoUrl,
-  coverUrl,
   onLogo,
-  onCover,
 }: {
   name: string;
   location: string;
   about: string;
   brandCount: number;
   logoUrl: string | null;
-  coverUrl: string | null;
   onLogo: (image: PickedImage) => void;
-  onCover: (image: PickedImage) => void;
 }) {
   const [error, setError] = useState<string>();
   return (
     <section aria-label="Store preview" className="flex w-full shrink-0 flex-col overflow-hidden rounded-[24px] bg-panel lg:w-[400px]">
-      <div className="relative h-[150px] bg-line">
-        {coverUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- signed, short-lived storage URL
-          <img src={coverUrl} alt="" className="absolute inset-0 size-full object-cover" referrerPolicy="no-referrer" />
-        ) : null}
-        <ImagePicker
-          purpose="seller_cover"
-          label={coverUrl ? "Change cover" : "Add cover"}
-          onPicked={onCover}
-          onError={setError}
-          className="absolute top-4 right-4 rounded-full bg-black/55 px-3 py-1.5 text-xs font-medium text-white hover:bg-black/70"
-        />
-      </div>
-      <div className="flex flex-col gap-5 px-7 pb-7">
-        <div className="relative flex flex-col gap-3.5 pt-14">
-          <div className="absolute -top-10 left-0 flex size-20 items-center justify-center overflow-hidden rounded-[20px] border-4 border-panel bg-seller-orange">
+      <div className="flex flex-col gap-5 px-7 pt-7 pb-7">
+        <div className="relative flex flex-col gap-3.5 pt-[94px]">
+          <div className="absolute top-0 left-0 flex size-20 items-center justify-center overflow-hidden rounded-[20px] bg-seller-orange">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- signed, short-lived storage URL
               <img src={logoUrl} alt={`${name} logo`} className="size-full object-cover" referrerPolicy="no-referrer" />
@@ -378,7 +355,7 @@ function StorePreview({
             label={logoUrl ? "Change logo" : "Add logo"}
             onPicked={onLogo}
             onError={setError}
-            className="absolute top-2 left-[92px] rounded-full px-2 py-1 text-xs font-medium text-text-muted underline-offset-2 hover:text-text-strong hover:underline"
+            className="absolute top-[30px] left-[92px] rounded-full px-2 py-1 text-xs font-medium text-text-muted underline-offset-2 hover:text-text-strong hover:underline"
           />
           <div className="flex min-w-0 flex-col gap-1.5 leading-[normal]">
             <p className="text-2xl font-medium tracking-[-0.01em] break-words text-text-strong">{name}</p>

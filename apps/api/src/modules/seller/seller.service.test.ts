@@ -47,7 +47,6 @@ function profile(overrides: Partial<SellerProfileRow> = {}): SellerProfileRow {
     brands: [],
     vatRegistered: false,
     logoUploadId: null,
-    coverUploadId: null,
     verificationStatus: "draft",
     rejectionReason: null,
     submittedAt: null,

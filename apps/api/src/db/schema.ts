@@ -63,6 +63,11 @@ export const passwordResetTokens = pgTable(
 
 // ---------------------------------------------------------------- upload
 
+/**
+ * "seller_cover" is no longer used (store cover photos were dropped on
+ * 12 Nov 2026). It stays in the database enum because removing an enum
+ * value means rebuilding the type; nothing can create one any more.
+ */
 export const uploadPurpose = pgEnum("upload_purpose", ["seller_logo", "seller_cover", "seller_document"]);
 export const uploadStatus = pgEnum("upload_status", ["pending", "ready", "rejected"]);
 
@@ -121,7 +126,6 @@ export const sellerProfiles = pgTable(
     brands: text("brands").array().notNull().default([]),
     vatRegistered: boolean("vat_registered").notNull(),
     logoUploadId: uuid("logo_upload_id").references(() => uploads.id),
-    coverUploadId: uuid("cover_upload_id").references(() => uploads.id),
     verificationStatus: verificationStatus("verification_status").notNull().default("draft"),
     rejectionReason: text("rejection_reason"),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
