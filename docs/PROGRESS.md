@@ -80,6 +80,13 @@ Design:
   selling now", so the nav does not.
 - Fonts: Geist (landing, auth), Albert Sans (buyer and seller centres).
 
+Security (STRICT, 12 Nov 2026):
+- **Maximum security in every aspect; real money flows through Muhrak.**
+  Every feature must pass the checklist in `CLAUDE.md` ("Security
+  standard") before it is called done, abuse cases tested, remaining risks
+  reported. No financial risk or data loss for buyers, sellers or the
+  platform.
+
 Accounts:
 - **Buyer and seller are fully isolated. Strict rule.** Separate sessions,
   separate logins, no effect on each other. Details in `CLAUDE.md`
@@ -113,6 +120,20 @@ Details in `docs/DEPLOY.md`.
   linked (`railway logs`, `railway variables`).
 
 ## Open items
+
+Security gaps in the existing code (found 12 Nov 2026, not fixed yet):
+- **No rate limiting** on login, sign-up, password reset. Staging is
+  public, so this is the first thing to fix (needs a dependency, e.g.
+  `express-rate-limit` with a Redis store: ask the developer).
+- **No security headers on the web app** (CSP, HSTS, frame-ancestors,
+  nosniff in `next.config.ts`). The API already uses `helmet`.
+- **Tokens are in localStorage**, so any XSS could steal them. Plan: move
+  the refresh token to an httpOnly cookie once the API has a same-site
+  domain (e.g. `api.muhrak.om`), and add a strict CSP meanwhile.
+- **Database backups** on Railway Postgres not confirmed.
+- No account lockout or CAPTCHA after repeated failed logins.
+
+Other:
 
 - Resend has no verified domain, so emails only reach the Resend account
   owner. Needs a domain (for example `muhrak.om`) before real users.

@@ -78,6 +78,52 @@ outside the platform and the seller marks the order as paid.
   takes actions. If AI fails, fall back to the manual form.
 - Rate-limit login, sign-up, AI and messaging endpoints before any public deploy.
 
+## Security standard (STRICT, set by the developer on 12 Nov 2026)
+
+Muhrak moves real money between buyers, sellers and the platform. Build
+with the maximum security available in every aspect. Every line of code
+and every feature must pass this checklist before it is called done; no
+loopholes, no financial risk, no data loss for buyers, sellers or the
+company. Actively try to break each feature (wrong user, wrong side,
+tampered IDs and amounts, replay, double submit, races), not only the
+happy path, and report any remaining risk honestly.
+
+1. **Authentication and sessions:** every protected endpoint requires a
+   valid token; short-lived access tokens; refresh tokens single use and
+   revocable; logout and password reset end sessions.
+2. **Authorisation:** check role AND ownership on the server for every
+   read and write (a buyer sees only their RFQs, quotes, orders; a seller
+   only theirs). Never trust IDs, roles or prices sent by the client.
+   Admin actions need the admin role and go in the audit log.
+3. **Buyer/seller isolation:** separate sessions and logins per side (see
+   Security rules). No feature may let one side act as the other.
+4. **Input:** validate every request body, query and param with Zod;
+   limit lengths and sizes; parameterised queries only (Drizzle), never
+   string-built SQL.
+5. **Money and orders:** integer amounts with currency, never floats;
+   amounts and totals computed on the server; state-machine transitions
+   only from the allowed list; database transactions for multi-step
+   writes; idempotency for anything that must not happen twice; row locks
+   or conditional updates against races.
+6. **Abuse:** rate limits on login, sign-up, password reset, AI,
+   messaging and uploads; same error for "no such user" and "wrong
+   password"; no user enumeration.
+7. **Uploads:** type and size checked on the server, private storage with
+   short-lived signed URLs, random file names, no executable content.
+8. **Web:** escape all user content (no `dangerouslySetInnerHTML` with user
+   data); no open redirects; security headers (CSP, HSTS, frame-ancestors,
+   nosniff); CORS limited to our own origins.
+9. **Secrets and logs:** no secrets in code or the repo; never log
+   passwords, tokens, keys or full personal data; generic error messages
+   to clients, details only in server logs.
+10. **Data safety:** no hard deletes of business records (orders, quotes,
+    payments, audit log); migrations reviewed for data loss; database
+    backups on.
+11. **Dependencies:** ask before adding one; prefer well-maintained
+    packages; check for known vulnerabilities.
+12. **Tests:** service tests include the abuse cases (forbidden access,
+    wrong side, invalid transition), not only the success path.
+
 ## How to work in this repo
 
 - Build one module or one screen at a time. Run it and test it before starting
