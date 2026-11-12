@@ -2,22 +2,23 @@ import { authResponseSchema } from "@muhrak/schemas";
 import type { ZodType } from "zod";
 import { ApiError, apiRequest, apiRequestNoContent, type RequestOptions } from "@/lib/api";
 import type { PortalSide } from "./paths";
-import { clearSession, getSession, saveSession, type Session } from "./session";
+import { clearSession, getAccessToken, getSession, saveSession } from "./session";
 
 /**
  * Requests made as the signed-in user of one side (buyer or seller; the
- * two sessions are separate and never mixed). Every feature that calls a
- * protected endpoint goes through `authedRequest(side, ...)`, which:
+ * two are separate and never mixed). Every feature that calls a protected
+ * endpoint goes through `authedRequest(side, ...)`, which:
  *
- * 1. refreshes the access token shortly before it expires,
+ * 1. uses this tab's in-memory access token, getting a new one from the
+ *    refresh cookie when it is missing or about to expire,
  * 2. on a 401, refreshes once and retries the request,
- * 3. if the refresh token is no longer valid, clears the session; the route
- *    guard then sends the user to the login page.
+ * 3. if the refresh cookie is no longer valid, clears the side's sign-in;
+ *    the route guard then sends the user to the login page.
  *
  * Refresh tokens are single use, and the API signs out every session when a
- * used one is presented again. So only one refresh may run at a time, across
- * ALL tabs: a Web Lock serialises them, and inside the lock we re-read the
- * stored session in case another tab already refreshed.
+ * used one is presented again. All tabs share the cookie, so only one
+ * refresh per side may run at a time across ALL tabs: a Web Lock serialises
+ * them, and each refresh rotates the cookie for everyone.
  */
 
 /** Refresh when the access token has less than this long left. */
@@ -27,7 +28,7 @@ const LOCK_NAME: Record<PortalSide, string> = {
   seller: "muhrak-auth-refresh-seller",
 };
 
-const inFlight: Record<PortalSide, Promise<Session | null> | null> = { buyer: null, seller: null };
+const inFlight: Record<PortalSide, Promise<string | null> | null> = { buyer: null, seller: null };
 
 /** Expiry time of a JWT in ms, or 0 if it cannot be read (treated as expired). */
 export function accessTokenExpiresAt(token: string): number {
@@ -41,8 +42,8 @@ export function accessTokenExpiresAt(token: string): number {
   }
 }
 
-function isExpiring(session: Session, now = Date.now()): boolean {
-  return accessTokenExpiresAt(session.accessToken) - now < EXPIRY_MARGIN_MS;
+function isFresh(token: string | null, now = Date.now()): token is string {
+  return token !== null && accessTokenExpiresAt(token) - now >= EXPIRY_MARGIN_MS;
 }
 
 async function withRefreshLock<T>(side: PortalSide, task: () => Promise<T>): Promise<T> {
@@ -53,34 +54,31 @@ async function withRefreshLock<T>(side: PortalSide, task: () => Promise<T>): Pro
 }
 
 /**
- * Exchange the refresh token for a new pair. `stale` is the session the
- * caller was using; if storage already holds a different one, another tab
- * refreshed first and we use that instead of spending a token twice.
+ * Get a new access token for `side` from the refresh cookie. Returns null
+ * (and clears the side's sign-in) if the cookie is missing or no longer
+ * valid. `force` skips the "token still fresh" shortcut (after a 401).
  */
-export function refreshSession(side: PortalSide, stale: Session): Promise<Session | null> {
+export function refreshAccessToken(side: PortalSide, force = false): Promise<string | null> {
   const pending = inFlight[side];
   if (pending) return pending;
   const started = withRefreshLock(side, async () => {
-    const current = getSession(side);
-    if (!current) return null;
-    if (current.refreshToken !== stale.refreshToken && !isExpiring(current)) return current;
+    if (!getSession(side)) return null;
+    const current = getAccessToken(side);
+    if (!force && isFresh(current)) return current;
     try {
-      const next = await apiRequest("/v1/auth/refresh", authResponseSchema, {
-        method: "POST",
-        body: { refreshToken: current.refreshToken },
-      });
+      const next = await apiRequest("/v1/auth/refresh", authResponseSchema, { method: "POST", body: { role: side } });
       if (next.user.role !== side) {
         clearSession(side);
         return null;
       }
       saveSession(side, next);
-      return next;
+      return next.accessToken;
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
         clearSession(side);
         return null;
       }
-      throw error; // Network trouble: keep the session and let the caller retry.
+      throw error; // Network trouble: keep the sign-in and let the caller retry.
     }
   }).finally(() => {
     inFlight[side] = null;
@@ -93,25 +91,24 @@ function signedOutError(): ApiError {
   return new ApiError(401, "unauthorized", "Your session has ended. Please log in again.");
 }
 
-async function currentSession(side: PortalSide): Promise<Session> {
-  let session = getSession(side);
-  if (!session) throw signedOutError();
-  if (isExpiring(session)) {
-    session = await refreshSession(side, session);
-    if (!session) throw signedOutError();
-  }
-  return session;
+async function currentAccessToken(side: PortalSide): Promise<string> {
+  if (!getSession(side)) throw signedOutError();
+  const token = getAccessToken(side);
+  if (isFresh(token)) return token;
+  const renewed = await refreshAccessToken(side);
+  if (!renewed) throw signedOutError();
+  return renewed;
 }
 
 async function withAuth<T>(side: PortalSide, call: (accessToken: string) => Promise<T>): Promise<T> {
-  const session = await currentSession(side);
+  const token = await currentAccessToken(side);
   try {
-    return await call(session.accessToken);
+    return await call(token);
   } catch (error) {
     if (!(error instanceof ApiError) || error.status !== 401) throw error;
-    const renewed = await refreshSession(side, session);
+    const renewed = await refreshAccessToken(side, true);
     if (!renewed) throw signedOutError();
-    return call(renewed.accessToken);
+    return call(renewed);
   }
 }
 

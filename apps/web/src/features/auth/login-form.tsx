@@ -51,7 +51,7 @@ export function LoginForm({ side }: { side: PortalSide }) {
           <OrDivider />
         </div>
 
-        <form onSubmit={handleSubmit((values) => mutation.mutate(values))} noValidate className="mt-5 flex flex-col">
+        <form method="post" onSubmit={handleSubmit((values) => mutation.mutate(values))} noValidate className="mt-5 flex flex-col">
           <div className="flex flex-col gap-[18px]">
             <Field
               id="email"

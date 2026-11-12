@@ -124,6 +124,7 @@ function IndividualForm({ notice }: { notice?: string }) {
 
   return (
     <form
+      method="post"
       noValidate
       className="flex flex-col"
       onSubmit={handleSubmit(({ firstName, lastName, email, password }) =>
@@ -199,6 +200,7 @@ function CompanyForm({ notice, role }: { notice?: string; role: "buyer" | "selle
 
   return (
     <form
+      method="post"
       noValidate
       className="flex flex-col"
       onSubmit={handleSubmit(({ companyName, email, password }) =>

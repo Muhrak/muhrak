@@ -1,18 +1,22 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import {
   forgotPasswordSchema,
   loginSchema,
-  refreshSchema,
   registerSchema,
   resetPasswordSchema,
+  sessionSideSchema,
+  type AuthResponse,
   type ForgotPasswordInput,
   type LoginInput,
-  type RefreshInput,
   type RegisterInput,
   type ResetPasswordInput,
+  type SessionSideInput,
 } from "@muhrak/schemas";
 import { unauthorized } from "../../shared/errors";
 import { validateBody } from "../../shared/http";
+import { logger } from "../../shared/logger";
+import { clientIp, limitByIp, type Limit } from "../../shared/rate-limit";
+import { clearRefreshCookie, readRefreshCookie, requireTrustedOrigin, setRefreshCookie } from "./auth.cookies";
 import { requireAuth } from "./auth.middleware";
 import * as authService from "./auth.service";
 
@@ -22,44 +26,111 @@ import * as authService from "./auth.service";
  *
  * Express 5 forwards errors thrown in async handlers to the error handler,
  * so there is no try/catch in these handlers.
+ *
+ * Security: every endpoint is rate limited per IP; endpoints that set or use
+ * the session cookie require one of our own origins (CSRF); the refresh
+ * token is only ever in an httpOnly cookie, never in a body.
  */
 export const authRouter = Router();
 
-authRouter.post("/register", validateBody(registerSchema), async (req, res) => {
-  const result = await authService.register(req.body as RegisterInput);
-  res.status(201).json(result);
+const MINUTE = 60_000;
+const LIMITS = {
+  login: { name: "login:ip", max: 20, windowMs: 15 * MINUTE },
+  register: { name: "register:ip", max: 10, windowMs: 60 * MINUTE },
+  refresh: { name: "refresh:ip", max: 120, windowMs: 15 * MINUTE },
+  logout: { name: "logout:ip", max: 60, windowMs: 15 * MINUTE },
+  forgotPassword: { name: "forgot:ip", max: 5, windowMs: 15 * MINUTE },
+  resetPassword: { name: "reset:ip", max: 10, windowMs: 15 * MINUTE },
+  me: { name: "me:ip", max: 300, windowMs: 15 * MINUTE },
+} satisfies Record<string, Limit>;
+
+/** Put the refresh token in its cookie and send the rest. */
+function sendSession(res: Response, session: authService.IssuedSession, status = 200) {
+  setRefreshCookie(res, session.user.role, session.refreshToken, session.refreshExpiresAt);
+  const body: AuthResponse = { user: session.user, accessToken: session.accessToken };
+  res.status(status).json(body);
+}
+
+authRouter.post(
+  "/register",
+  limitByIp(LIMITS.register),
+  requireTrustedOrigin,
+  validateBody(registerSchema),
+  async (req, res) => {
+    sendSession(res, await authService.register(req.body as RegisterInput), 201);
+  },
+);
+
+authRouter.post("/login", limitByIp(LIMITS.login), requireTrustedOrigin, validateBody(loginSchema), async (req, res) => {
+  try {
+    sendSession(res, await authService.login(req.body as LoginInput, clientIp(req)));
+  } catch (error) {
+    // Security log: who failed, from where (the full proxy chain, to spot spoofed IPs).
+    logger.info(
+      { ip: clientIp(req), forwardedFor: req.headers["x-forwarded-for"], status: (error as { status?: number }).status },
+      "Login refused",
+    );
+    throw error;
+  }
 });
 
-authRouter.post("/login", validateBody(loginSchema), async (req, res) => {
-  const result = await authService.login(req.body as LoginInput);
-  res.json(result);
-});
+authRouter.post(
+  "/refresh",
+  limitByIp(LIMITS.refresh),
+  requireTrustedOrigin,
+  validateBody(sessionSideSchema),
+  async (req, res) => {
+    const { role } = req.body as SessionSideInput;
+    const token = readRefreshCookie(req, role);
+    if (!token) throw unauthorized("Not signed in");
+    try {
+      sendSession(res, await authService.refresh(token, role));
+    } catch (error) {
+      clearRefreshCookie(res, role);
+      throw error;
+    }
+  },
+);
 
-authRouter.post("/refresh", validateBody(refreshSchema), async (req, res) => {
-  const { refreshToken } = req.body as RefreshInput;
-  const result = await authService.refresh(refreshToken);
-  res.json(result);
-});
-
-authRouter.post("/logout", validateBody(refreshSchema), async (req, res) => {
-  const { refreshToken } = req.body as RefreshInput;
-  await authService.logout(refreshToken);
-  res.status(204).end();
-});
+authRouter.post(
+  "/logout",
+  limitByIp(LIMITS.logout),
+  requireTrustedOrigin,
+  validateBody(sessionSideSchema),
+  async (req, res) => {
+    const { role } = req.body as SessionSideInput;
+    const token = readRefreshCookie(req, role);
+    if (token) await authService.logout(token);
+    clearRefreshCookie(res, role);
+    res.status(204).end();
+  },
+);
 
 /** Always 202 with no body: the response must not reveal whether the email has an account. */
-authRouter.post("/forgot-password", validateBody(forgotPasswordSchema), async (req, res) => {
-  const { email } = req.body as ForgotPasswordInput;
-  await authService.requestPasswordReset(email);
-  res.status(202).end();
-});
+authRouter.post(
+  "/forgot-password",
+  limitByIp(LIMITS.forgotPassword),
+  validateBody(forgotPasswordSchema),
+  async (req, res) => {
+    const { email } = req.body as ForgotPasswordInput;
+    // Answer first, then do the work: the response time must not reveal
+    // whether the email has an account.
+    res.status(202).end();
+    authService.requestPasswordReset(email).catch((err: unknown) => logger.error({ err }, "Password reset request failed"));
+  },
+);
 
-authRouter.post("/reset-password", validateBody(resetPasswordSchema), async (req, res) => {
-  await authService.resetPassword(req.body as ResetPasswordInput);
-  res.status(204).end();
-});
+authRouter.post(
+  "/reset-password",
+  limitByIp(LIMITS.resetPassword),
+  validateBody(resetPasswordSchema),
+  async (req, res) => {
+    await authService.resetPassword(req.body as ResetPasswordInput);
+    res.status(204).end();
+  },
+);
 
-authRouter.get("/me", requireAuth, async (req, res) => {
+authRouter.get("/me", limitByIp(LIMITS.me), requireAuth, async (req, res) => {
   if (!req.auth) {
     throw unauthorized();
   }

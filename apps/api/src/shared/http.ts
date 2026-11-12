@@ -42,6 +42,8 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   }
 
   if (err instanceof AppError) {
+    const retryAfter = (err.details as { retryAfterSeconds?: unknown } | undefined)?.retryAfterSeconds;
+    if (err.status === 429 && typeof retryAfter === "number") res.setHeader("Retry-After", String(retryAfter));
     res.status(err.status).json({
       error: { code: err.code, message: err.message, details: err.details },
     });
@@ -51,6 +53,15 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   // Malformed JSON body from express.json()
   if (err instanceof SyntaxError && "body" in err) {
     res.status(400).json({ error: { code: "bad_request", message: "Body is not valid JSON" } });
+    return;
+  }
+
+  // Other request-parsing errors (body too large, wrong charset, ...) carry a 4xx status.
+  const status = (err as { status?: unknown; statusCode?: unknown } | null)?.status ?? (err as { statusCode?: unknown } | null)?.statusCode;
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    const code = status === 413 ? "payload_too_large" : "bad_request";
+    const message = status === 413 ? "Request body is too large" : "Request is not valid";
+    res.status(status).json({ error: { code, message } });
     return;
   }
 

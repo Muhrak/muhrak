@@ -3,6 +3,7 @@ import { env } from "./config/env";
 import { pool } from "./db/client";
 import { logger } from "./shared/logger";
 import { closeQueues } from "./shared/queue";
+import { closeRedis } from "./shared/redis";
 
 const app = createApp();
 
@@ -14,7 +15,7 @@ const server = app.listen(env.PORT, () => {
 function shutdown(signal: string) {
   logger.info(`${signal} received, shutting down`);
   server.close(() => {
-    Promise.all([pool.end(), closeQueues()])
+    Promise.all([pool.end(), closeQueues(), closeRedis()])
       .catch((err: unknown) => logger.error({ err }, "Error closing database pool or queues"))
       .finally(() => process.exit(0));
   });

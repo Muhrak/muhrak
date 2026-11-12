@@ -26,8 +26,9 @@ export async function getMe(side: PortalSide): Promise<PublicUser> {
   return user;
 }
 
-export function logout(refreshToken: string): Promise<void> {
-  return apiRequestNoContent("/v1/auth/logout", { method: "POST", body: { refreshToken } });
+/** Revoke this side's refresh token on the server and clear its cookie. */
+export function logout(side: PortalSide): Promise<void> {
+  return apiRequestNoContent("/v1/auth/logout", { method: "POST", body: { role: side } });
 }
 
 export function forgotPassword(input: ForgotPasswordInput): Promise<void> {

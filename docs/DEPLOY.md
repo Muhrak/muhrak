@@ -102,7 +102,10 @@ variables above are what is actually used.
 1. Sign in at vercel.com with the **Muhrak** GitHub account.
 2. **Add New → Project → Import Muhrak/muhrak**.
 3. **Root Directory**: `apps/web`. Framework is detected as Next.js.
-4. **Environment Variables**: `NEXT_PUBLIC_API_URL` = the Railway API URL
+4. **Environment Variables**: `API_ORIGIN` = the Railway API URL (the older
+   name `NEXT_PUBLIC_API_URL` is still read). The browser never calls it
+   directly: `next.config.ts` proxies `/api/*` to it, so the session cookie
+   is first-party
    (no trailing slash).
 5. Deploy. Then **Settings → Git → Production Branch** = `develop` and
    redeploy, so the main Vercel URL always shows `develop`.
@@ -121,3 +124,19 @@ variables above are what is actually used.
 Production will use separate Railway services and a separate Vercel project
 deploying from `main`, with their own database and secrets. Never point
 staging and production at the same database.
+
+## Security settings (12 Nov 2026)
+
+- Sessions: refresh token in an httpOnly, Secure, SameSite=Strict cookie per
+  side (`muhrak_rt_buyer`, `muhrak_rt_seller`), path `/api/v1/auth`, set by
+  the API and passed through the web app's `/api` proxy. Access token in
+  memory only.
+- API variables: `CORS_ORIGINS` must list the web URL exactly (it is also the
+  CSRF origin check). `TRUST_PROXY_HOPS` = number of proxies adding to
+  X-Forwarded-For (measured on staging, see PROGRESS.md).
+- Rate limits are counted in Redis (Upstash); if Redis is down they fall back
+  to per-instance memory counters.
+- Web security headers (CSP, HSTS, frame-ancestors, nosniff,
+  Referrer-Policy, Permissions-Policy) are set in `apps/web/next.config.ts`.
+- Database backups: enable them on the Postgres volume in the Railway
+  dashboard (volume, Backups tab). Not available from the CLI.

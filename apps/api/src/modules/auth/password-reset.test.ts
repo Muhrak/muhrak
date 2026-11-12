@@ -23,6 +23,12 @@ vi.mock("./auth.repository", () => ({
   revokeAllRefreshTokensForUser: vi.fn(),
 }));
 vi.mock("../notification", () => ({ sendPasswordResetEmail: vi.fn() }));
+// No Redis in unit tests: the rate limiter falls back to its in-memory counters.
+vi.mock("../../shared/redis", () => ({
+  getRedis: () => {
+    throw new Error("no redis in tests");
+  },
+}));
 
 const repo = await import("./auth.repository");
 const { sendPasswordResetEmail } = await import("../notification");
@@ -104,6 +110,18 @@ describe("requestPasswordReset", () => {
 
     await expect(requestPasswordReset(seller.email, now)).rejects.toThrow("redis down");
     expect(repo.invalidatePasswordResetTokensForUser).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("requestPasswordReset: inbox flooding", () => {
+  it("sends at most 5 reset emails per address per hour, however the requests arrive", async () => {
+    const target = { ...seller, email: "flood-target@example.com" };
+    vi.mocked(repo.findUserByEmail).mockResolvedValue(target);
+    vi.mocked(repo.findLatestPasswordResetToken).mockResolvedValue(undefined);
+    for (let i = 0; i < 8; i += 1) {
+      await requestPasswordReset(target.email, now);
+    }
+    expect(sendPasswordResetEmail).toHaveBeenCalledTimes(5);
   });
 });
 

@@ -21,6 +21,18 @@ const envSchema = z.object({
     .default("http://localhost:3000")
     .transform((value) => value.replace(/\/+$/, "")),
   PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(30),
+  /**
+   * How many proxies sit in front of the API and add to X-Forwarded-For
+   * (Express `trust proxy`). Used to find the real client IP for rate
+   * limits. 0 locally. Too high a value lets clients fake their IP.
+   */
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
+  /**
+   * Path of the refresh-token cookie as the BROWSER sees it. The web app
+   * proxies /api/* to this API, so /v1/auth here is /api/v1/auth there.
+   */
+  AUTH_COOKIE_PATH: z.string().startsWith("/").default("/api/v1/auth"),
+  /** Origins allowed to call the API from a browser (CORS and the auth origin check). Comma separated. */
   CORS_ORIGINS: z
     .string()
     .default("http://localhost:3000")

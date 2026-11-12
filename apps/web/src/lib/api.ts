@@ -6,7 +6,12 @@ import type { ZodType } from "zod";
  * change on the API side shows up as a clear error here, not a broken page.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+/**
+ * Same-origin path. next.config.ts proxies /api/* to the API, so the
+ * browser talks only to this site: the session cookie is first-party,
+ * SameSite=Strict works, and the CSP can stay at connect-src 'self'.
+ */
+const API_URL = "/api";
 
 export interface ApiFieldError {
   path: string;
@@ -54,6 +59,8 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
   try {
     response = await fetch(`${API_URL}${path}`, {
       method: options.method ?? "GET",
+      credentials: "same-origin",
+      cache: "no-store",
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });

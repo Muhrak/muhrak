@@ -26,10 +26,15 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
-export const refreshSchema = z.object({
-  refreshToken: z.string().min(20),
+/**
+ * POST /v1/auth/refresh and /v1/auth/logout. The refresh token itself is in
+ * an httpOnly cookie for that side (scripts cannot read it); the body only
+ * says which side's session to use.
+ */
+export const sessionSideSchema = z.object({
+  role: roleSchema,
 });
-export type RefreshInput = z.infer<typeof refreshSchema>;
+export type SessionSideInput = z.infer<typeof sessionSideSchema>;
 
 /** What the API returns about a user. Never includes the password hash. */
 export const publicUserSchema = z.object({
@@ -41,10 +46,14 @@ export const publicUserSchema = z.object({
 });
 export type PublicUser = z.infer<typeof publicUserSchema>;
 
+/**
+ * Register, login and refresh. The short-lived access token is kept in
+ * memory by the client; the refresh token never appears in a body (it is
+ * set as an httpOnly cookie).
+ */
 export const authResponseSchema = z.object({
   user: publicUserSchema,
   accessToken: z.string(),
-  refreshToken: z.string(),
 });
 export type AuthResponse = z.infer<typeof authResponseSchema>;
 

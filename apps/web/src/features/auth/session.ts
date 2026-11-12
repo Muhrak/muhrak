@@ -1,32 +1,36 @@
-import { authResponseSchema, type AuthResponse, type PublicUser } from "@muhrak/schemas";
+import { publicUserSchema, type AuthResponse, type PublicUser } from "@muhrak/schemas";
+import { z } from "zod";
 import { useCallback, useSyncExternalStore } from "react";
 import type { PortalSide } from "./paths";
 
 /**
- * The signed-in sessions, kept in localStorage so they survive reloads and
- * are shared by every open tab. Tabs stay in sync through the `storage`
- * event: logging out (or refreshing tokens) in one tab updates the others.
+ * Sign-in state for each side, kept so that no script can steal a session:
+ *
+ * - The refresh token is in an httpOnly cookie set by the API (one per
+ *   side). JavaScript never sees it.
+ * - The short-lived access token (15 min) is kept in memory only, per tab.
+ *   A new tab gets its own by calling refresh (the cookie does the work).
+ * - localStorage holds only a "signed in as" note per side: the public user
+ *   (name, email, role). It lets pages render at once and keeps tabs in sync
+ *   (the `storage` event): logging out in one tab signs out the others.
+ *   It grants nothing; the API decides from the cookie and the token.
  *
  * STRICT RULE: buyer and seller are fully separate. Each side has its own
- * session under its own key, and a session is only ever stored on the side
- * matching its user's role. Nothing on the buyer side reads the seller
- * session, or the other way round; logging out on one side leaves the other
- * alone. Every function here takes the side explicitly.
- *
- * Tokens are readable by page scripts. That is acceptable for the market
- * test; the API is on another domain, so httpOnly cookies would need a
- * same-site API domain first.
+ * note, cookie and access token; every function takes the side.
  */
 
 const STORAGE_KEY: Record<PortalSide, string> = {
-  buyer: "muhrak.session.buyer",
-  seller: "muhrak.session.seller",
+  buyer: "muhrak.signedIn.buyer",
+  seller: "muhrak.signedIn.seller",
 };
 
-/** Before 12 Nov 2026 one session was shared by both sides. It is dropped (the user logs in again). */
-const LEGACY_KEY = "muhrak.session";
+/** Older keys held tokens in localStorage. Removed on first load. */
+const LEGACY_KEYS = ["muhrak.session", "muhrak.session.buyer", "muhrak.session.seller"];
 
-export type Session = AuthResponse;
+const storedSchema = z.object({ user: publicUserSchema });
+
+/** What a component sees: who is signed in on this side. */
+export type Session = { user: PublicUser };
 
 type Listener = () => void;
 
@@ -35,28 +39,34 @@ type SideState = {
   /** Parsed value of the last raw string we saw, so snapshots stay referentially stable. */
   cachedRaw: string | null | undefined;
   cachedSession: Session | null;
-  /** Used only when localStorage is blocked (private mode): the session lives in this tab's memory. */
+  /** Used only when localStorage is blocked (private mode). */
   memoryRaw: string | null;
+  /** The access token, in memory only. */
+  accessToken: string | null;
 };
 
-const state: Record<PortalSide, SideState> = {
-  buyer: { listeners: new Set(), cachedRaw: undefined, cachedSession: null, memoryRaw: null },
-  seller: { listeners: new Set(), cachedRaw: undefined, cachedSession: null, memoryRaw: null },
-};
+const newState = (): SideState => ({
+  listeners: new Set(),
+  cachedRaw: undefined,
+  cachedSession: null,
+  memoryRaw: null,
+  accessToken: null,
+});
+const state: Record<PortalSide, SideState> = { buyer: newState(), seller: newState() };
 
 let legacyDropped = false;
-function dropLegacySession() {
+function dropLegacyKeys() {
   if (legacyDropped) return;
   legacyDropped = true;
   try {
-    localStorage.removeItem(LEGACY_KEY);
+    for (const key of LEGACY_KEYS) localStorage.removeItem(key);
   } catch {
     // Storage blocked: nothing to drop.
   }
 }
 
 function readRaw(side: PortalSide): string | null {
-  dropLegacySession();
+  dropLegacyKeys();
   try {
     return localStorage.getItem(STORAGE_KEY[side]);
   } catch {
@@ -67,40 +77,55 @@ function readRaw(side: PortalSide): string | null {
 function parse(side: PortalSide, raw: string | null): Session | null {
   if (!raw) return null;
   try {
-    const result = authResponseSchema.safeParse(JSON.parse(raw));
-    // A session whose user belongs to the other side is never valid here.
-    return result.success && result.data.user.role === side ? result.data : null;
+    const result = storedSchema.safeParse(JSON.parse(raw));
+    // A user from the other side is never valid here.
+    return result.success && result.data.user.role === side ? { user: result.data.user } : null;
   } catch {
     return null;
   }
 }
 
-/** Current session for `side`, read from storage (another tab may have changed it). */
+/** Who is signed in on `side`, read from storage (another tab may have changed it). */
 export function getSession(side: PortalSide): Session | null {
   const s = state[side];
   const raw = readRaw(side);
   if (raw !== s.cachedRaw) {
+    const previous = s.cachedSession;
     s.cachedRaw = raw;
     s.cachedSession = parse(side, raw);
+    // Signed out, or a different user signed in from another tab: this tab's token is no longer theirs.
+    if (!s.cachedSession || (previous && previous.user.id !== s.cachedSession.user.id)) {
+      s.accessToken = null;
+    }
   }
   return s.cachedSession;
+}
+
+export function getAccessToken(side: PortalSide): string | null {
+  return getSession(side) ? state[side].accessToken : null;
 }
 
 function notify(side: PortalSide) {
   for (const listener of state[side].listeners) listener();
 }
 
-/** Store a session on `side`. Refuses a session whose user is not on that side. */
-export function saveSession(side: PortalSide, session: Session): void {
-  if (session.user.role !== side) {
-    throw new Error(`A ${session.user.role} session cannot be stored on the ${side} side.`);
-  }
-  const raw = JSON.stringify(session);
+function writeNote(side: PortalSide, user: PublicUser) {
+  const raw = JSON.stringify({ user });
   try {
     localStorage.setItem(STORAGE_KEY[side], raw);
   } catch {
     state[side].memoryRaw = raw;
   }
+}
+
+/** After login, sign-up or refresh on `side`. Refuses a user who is not on that side. */
+export function saveSession(side: PortalSide, response: AuthResponse): void {
+  if (response.user.role !== side) {
+    throw new Error(`A ${response.user.role} session cannot be stored on the ${side} side.`);
+  }
+  writeNote(side, response.user);
+  getSession(side); // Re-read the note first, so the user-change check above sees the new user...
+  state[side].accessToken = response.accessToken; // ...then keep the token.
   notify(side);
 }
 
@@ -111,19 +136,20 @@ export function clearSession(side: PortalSide): void {
     // Nothing stored.
   }
   state[side].memoryRaw = null;
+  state[side].accessToken = null;
   notify(side);
 }
 
-/** Keep the stored user up to date after GET /me, without touching the tokens. */
+/** Keep the stored user up to date after GET /me, without touching the token. */
 export function updateSessionUser(side: PortalSide, user: PublicUser): void {
   const current = getSession(side);
   if (!current || JSON.stringify(current.user) === JSON.stringify(user)) return;
-  if (user.role !== side) {
-    // The account no longer belongs on this side: sign this side out.
+  if (user.role !== side || user.id !== current.user.id) {
     clearSession(side);
     return;
   }
-  saveSession(side, { ...current, user });
+  writeNote(side, user);
+  notify(side);
 }
 
 function subscribe(side: PortalSide, listener: Listener): () => void {
@@ -139,9 +165,8 @@ function subscribe(side: PortalSide, listener: Listener): () => void {
 }
 
 /**
- * The session for `side` in a component. Only use inside a browser-only
- * subtree (`use(browser())`): on the server there is no storage, so it is
- * null there.
+ * Who is signed in on `side`, in a component. Only use inside a
+ * browser-only subtree (`use(browser())`): on the server it is null.
  */
 export function useSession(side: PortalSide): Session | null {
   const subscribeSide = useCallback((listener: Listener) => subscribe(side, listener), [side]);

@@ -38,7 +38,7 @@ export function RequestResetForm({ side }: { side: PortalSide }) {
   }
 
   return (
-    <form onSubmit={handleSubmit((values) => mutation.mutate(values))} noValidate className="flex flex-col">
+    <form method="post" onSubmit={handleSubmit((values) => mutation.mutate(values))} noValidate className="flex flex-col">
       <div className="flex flex-col gap-[18px]">
         <Field
           id="email"
@@ -87,7 +87,7 @@ export function ChooseNewPasswordForm({ side, token }: { side: PortalSide; token
 
   const linkProblem = mutation.error && errors.root?.server;
   return (
-    <form onSubmit={handleSubmit(({ password }) => mutation.mutate(password))} noValidate className="flex flex-col">
+    <form method="post" onSubmit={handleSubmit(({ password }) => mutation.mutate(password))} noValidate className="flex flex-col">
       <div className="flex flex-col gap-[18px]">
         <PasswordField
           id="password"
