@@ -3,8 +3,7 @@
 Read this first in every new session, then `CLAUDE.md`, `docs/PLAN.md` and
 `docs/ARCHITECTURE.md`. Update it whenever a piece of work is committed.
 
-Last updated: Wed 11 Nov 2026 (end of Day 2). Branch `develop`, last commit
-`92d08be`.
+Last updated: Thu 12 Nov 2026. Branch `develop`.
 
 ## Status
 
@@ -46,6 +45,12 @@ planned for later (P1) are done early. Next is Day 3.
   were sent to login from a protected page (then they go back there).
 - Seller hero email box opens seller sign-up with the email filled in.
 - Mobile has its own hero style (developer reference `refs/mobile view ref.jpg`).
+
+### Bug fixes (Thu 12 Nov)
+- Signed-in users no longer see the login or sign-up form (typed URL, link
+  or Back). `SignedOutOnly` in `features/auth/guards.tsx` keeps the form
+  invisible until the session is read; signed-in users see "You're signed
+  in. Taking you to your account…" and are redirected. Buyer and seller.
 
 ## Decisions and rules (the developer set these; do not change without asking)
 
@@ -108,6 +113,10 @@ Details in `docs/DEPLOY.md`.
 - `refs/` (design references) is kept locally and not committed.
 
 ## Next up: Day 3 (Thu 12 Nov), see `docs/PLAN.md`
+
+Waiting on the developer's storage choice (recommended: Cloudflare R2 via
+the S3 client). The developer also mentioned Day 4 and 5; parts of those
+that do not need storage could go first.
 
 - File upload module (direct to storage). Needs a storage provider choice.
 - Seller company profile: name, country, city, description, logo.

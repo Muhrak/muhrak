@@ -2,7 +2,7 @@
 
 import type { Role } from "@muhrak/schemas";
 import { useRouter } from "next/navigation";
-import { use, useEffect, type ReactNode } from "react";
+import { Suspense, use, useEffect, type ReactNode } from "react";
 import { browser } from "react-dom";
 import { afterLoginPath, HOME_PATH, LOGIN_PATH, type PortalSide } from "./paths";
 import { useSession } from "./session";
@@ -38,11 +38,22 @@ export function RequireRole({ role, children, fallback }: { role: PortalSide; ch
 }
 
 /**
- * On login and sign-up pages: a user who is already signed in goes straight
- * to where they belong. Renders nothing; place it next to the form inside
- * `<Suspense fallback={null}>` so the form itself still prerenders.
+ * Login and sign-up forms: shown only to signed-out users. A signed-in user
+ * (typed the URL, followed a link, pressed Back) never sees the form; they
+ * get a short "taking you to your account" line and go where they belong.
+ *
+ * The form is prerendered but invisible (keeping its height, so nothing
+ * jumps) until the browser has read the session.
  */
-export function RedirectIfSignedIn() {
+export function SignedOutOnly({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={<HiddenForm>{children}</HiddenForm>}>
+      <SignedOutGate>{children}</SignedOutGate>
+    </Suspense>
+  );
+}
+
+function SignedOutGate({ children }: { children: ReactNode }) {
   use(browser("The session is stored in localStorage."));
   const session = useSession();
   const router = useRouter();
@@ -54,5 +65,23 @@ export function RedirectIfSignedIn() {
     }
   }, [session, router]);
 
-  return null;
+  if (!session) return children;
+  const status = (
+    <p role="status" className="absolute inset-0 flex items-center justify-center text-center text-sm text-ink-tertiary">
+      You’re signed in. Taking you to your account…
+    </p>
+  );
+  return <HiddenForm overlay={status}>{children}</HiddenForm>;
+}
+
+function HiddenForm({ children, overlay }: { children: ReactNode; overlay?: ReactNode }) {
+  return (
+    <div className="relative">
+      {/* Inline style, not a class: hidden even before the stylesheet loads. */}
+      <div style={{ visibility: "hidden" }} inert aria-hidden>
+        {children}
+      </div>
+      {overlay}
+    </div>
+  );
 }

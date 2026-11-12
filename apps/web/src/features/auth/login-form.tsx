@@ -4,14 +4,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginInput } from "@muhrak/schemas";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
-import { Suspense, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { login } from "./api";
 import { OrDivider, primaryButtonClass, SocialButtons } from "./auth-shell";
 import { Field, FormError, FormNotice, PasswordField } from "./field";
 import { applyApiError } from "./form-errors";
-import { RedirectIfSignedIn } from "./guards";
+import { SignedOutOnly } from "./guards";
 import { RESET_PATH, SIGNUP_PATH, type PortalSide } from "./paths";
 import { saveSession } from "./session";
 
@@ -19,7 +19,7 @@ const FIELDS = ["email", "password"] as const;
 
 /**
  * Login for either side. Any account can log in on either page; after
- * login, RedirectIfSignedIn sends each role to its own dashboard.
+ * login, SignedOutOnly sends each role to its own dashboard.
  */
 export function LoginForm({ side }: { side: PortalSide }) {
   const [notice, setNotice] = useState<string>();
@@ -40,57 +40,56 @@ export function LoginForm({ side }: { side: PortalSide }) {
   });
 
   return (
-    <div className="flex flex-col">
-      <Suspense fallback={null}>
-        <RedirectIfSignedIn />
-      </Suspense>
-      <SocialButtons onUnavailable={(provider) => setNotice(`${provider} sign-in is coming soon. Use your email for now.`)} />
-      <div className="mt-5">
-        <OrDivider />
-      </div>
-
-      <form onSubmit={handleSubmit((values) => mutation.mutate(values))} noValidate className="mt-5 flex flex-col">
-        <div className="flex flex-col gap-[18px]">
-          <Field
-            id="email"
-            label="Email"
-            type="email"
-            autoComplete="email"
-            placeholder={side === "seller" ? "eg. ahmed@alnoorparts.om" : "eg. khalid@email.com"}
-            error={errors.email?.message}
-            {...register("email")}
-          />
-          <PasswordField
-            id="password"
-            label="Password"
-            autoComplete="current-password"
-            placeholder="Enter your password"
-            error={errors.password?.message}
-            footer={
-              <Link
-                href={RESET_PATH[side]}
-                className="justify-self-end rounded-sm text-[13px] leading-[normal] font-medium text-ink outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                Forgot password?
-              </Link>
-            }
-            {...register("password")}
-          />
-          <FormNotice message={notice} />
-          <FormError message={errors.root?.server?.message} />
+    <SignedOutOnly>
+      <div className="flex flex-col">
+        <SocialButtons onUnavailable={(provider) => setNotice(`${provider} sign-in is coming soon. Use your email for now.`)} />
+        <div className="mt-5">
+          <OrDivider />
         </div>
 
-        <Button type="submit" disabled={mutation.isPending || mutation.isSuccess} className={`mt-7 ${primaryButtonClass}`}>
-          {mutation.isPending || mutation.isSuccess ? "Logging in…" : "Log In"}
-        </Button>
-      </form>
+        <form onSubmit={handleSubmit((values) => mutation.mutate(values))} noValidate className="mt-5 flex flex-col">
+          <div className="flex flex-col gap-[18px]">
+            <Field
+              id="email"
+              label="Email"
+              type="email"
+              autoComplete="email"
+              placeholder={side === "seller" ? "eg. ahmed@alnoorparts.om" : "eg. khalid@email.com"}
+              error={errors.email?.message}
+              {...register("email")}
+            />
+            <PasswordField
+              id="password"
+              label="Password"
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              error={errors.password?.message}
+              footer={
+                <Link
+                  href={RESET_PATH[side]}
+                  className="justify-self-end rounded-sm text-[13px] leading-[normal] font-medium text-ink outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  Forgot password?
+                </Link>
+              }
+              {...register("password")}
+            />
+            <FormNotice message={notice} />
+            <FormError message={errors.root?.server?.message} />
+          </div>
 
-      <p className="mt-6 text-center text-sm leading-[normal] text-ink-tertiary">
-        {side === "seller" ? "New to selling on Muhrak?" : "Don’t have an account?"}{" "}
-        <Link href={SIGNUP_PATH[side]} className="font-medium text-ink hover:underline">
-          Sign up
-        </Link>
-      </p>
-    </div>
+          <Button type="submit" disabled={mutation.isPending || mutation.isSuccess} className={`mt-7 ${primaryButtonClass}`}>
+            {mutation.isPending || mutation.isSuccess ? "Logging in…" : "Log In"}
+          </Button>
+        </form>
+
+        <p className="mt-6 text-center text-sm leading-[normal] text-ink-tertiary">
+          {side === "seller" ? "New to selling on Muhrak?" : "Don’t have an account?"}{" "}
+          <Link href={SIGNUP_PATH[side]} className="font-medium text-ink hover:underline">
+            Sign up
+          </Link>
+        </p>
+      </div>
+    </SignedOutOnly>
   );
 }

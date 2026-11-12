@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterInput } from "@muhrak/schemas";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm, type FieldValues, type Path, type UseFormSetError } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { register as registerAccount } from "./api";
 import { OrDivider, primaryButtonClass, SocialButtons } from "./auth-shell";
 import { Field, FormError, FormNotice, PasswordField } from "./field";
 import { applyApiError } from "./form-errors";
-import { RedirectIfSignedIn } from "./guards";
+import { SignedOutOnly } from "./guards";
 import { LOGIN_PATH } from "./paths";
 import { saveSession } from "./session";
 
@@ -42,33 +42,32 @@ export function SignupForm(props: { side: "buyer"; accountType: AccountType } | 
   const [notice, setNotice] = useState<string>();
   const seller = props.side === "seller";
   return (
-    <div className="flex flex-col">
-      <Suspense fallback={null}>
-        <RedirectIfSignedIn />
-      </Suspense>
-      {props.side === "buyer" ? (
-        <div className="mb-5">
-          <AccountTypeTabs current={props.accountType} />
+    <SignedOutOnly>
+      <div className="flex flex-col">
+        {props.side === "buyer" ? (
+          <div className="mb-5">
+            <AccountTypeTabs current={props.accountType} />
+          </div>
+        ) : null}
+        <SocialButtons onUnavailable={(provider) => setNotice(`${provider} sign-up is coming soon. Use your email for now.`)} />
+        <div className="mt-5">
+          <OrDivider />
         </div>
-      ) : null}
-      <SocialButtons onUnavailable={(provider) => setNotice(`${provider} sign-up is coming soon. Use your email for now.`)} />
-      <div className="mt-5">
-        <OrDivider />
+        <div className="mt-5">
+          {props.side === "buyer" && props.accountType === "individual" ? (
+            <IndividualForm notice={notice} />
+          ) : (
+            <CompanyForm notice={notice} role={props.side} />
+          )}
+        </div>
+        <p className="mt-6 text-center text-sm leading-[normal] text-ink-tertiary">
+          {seller ? "Already selling on Muhrak?" : "Already have an account?"}{" "}
+          <Link href={LOGIN_PATH[props.side]} className="font-medium text-ink hover:underline">
+            Log in
+          </Link>
+        </p>
       </div>
-      <div className="mt-5">
-        {props.side === "buyer" && props.accountType === "individual" ? (
-          <IndividualForm notice={notice} />
-        ) : (
-          <CompanyForm notice={notice} role={props.side} />
-        )}
-      </div>
-      <p className="mt-6 text-center text-sm leading-[normal] text-ink-tertiary">
-        {seller ? "Already selling on Muhrak?" : "Already have an account?"}{" "}
-        <Link href={LOGIN_PATH[props.side]} className="font-medium text-ink hover:underline">
-          Log in
-        </Link>
-      </p>
-    </div>
+    </SignedOutOnly>
   );
 }
 
@@ -104,7 +103,7 @@ function AccountTypeTabs({ current }: { current: AccountType }) {
 function useRegister<T extends FieldValues>(setError: UseFormSetError<T>, nameField: Path<T>, fields: readonly Path<T>[]) {
   return useMutation({
     mutationFn: (input: RegisterInput) => registerAccount(input),
-    // RedirectIfSignedIn moves the new user to their dashboard.
+    // SignedOutOnly moves the new user to their dashboard.
     onSuccess: saveSession,
     // The API reports name problems on `fullName`; show them on the visible name field.
     onError: (error) => applyApiError(error, setError, fields, { fullName: nameField }),
