@@ -118,6 +118,8 @@ and products).
 - Shared sections in `apps/web/src/components/landing/sections.tsx`.
 - Nav: logged out shows Sign in; logged in shows a profile button that opens
   the dashboard. Full-screen hamburger menu below `lg`.
+- Buyer nav links: Manufacturers, Muhrak AI, Garage. "Distributors" was
+  removed on 13 Nov 2026 at the developer's request (it is still in the footer).
 - Buyers land on `/` after login or sign-up, sellers on `/sell`, unless they
   were sent to login from a protected page (then they go back there).
 - Seller hero email box opens seller sign-up with the email filled in.
