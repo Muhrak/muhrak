@@ -14,9 +14,21 @@ the folder structure and rules before making changes.
 
 ## Current goal
 
-A working website for a market test, built in 20 days starting Tue 10 Nov 2026.
-Web only. No mobile app. No online payment: buyer and seller settle payment
-outside the platform and the seller marks the order as paid.
+An MVP for a market test, built in 20 days starting Tue 10 Nov 2026:
+limited features, every one working properly (cut scope, never quality).
+Web only. No mobile app.
+
+**Payment is inside the platform (strict, set by the developer on 13 Nov
+2026; replaces "no online payment").** The buyer pays Muhrak through a
+payment gateway (not chosen yet; it sits behind a provider interface),
+the order is live only once the gateway's signed webhook confirms payment,
+and Muhrak pays the seller out after delivery. Follow the "Payment rules"
+in `docs/PLAN.md`: no card data on our servers, server-computed amounts,
+idempotent webhooks, one payment per order, append-only ledger, audited
+refunds and payouts, daily reconciliation.
+
+The architecture below stays as it is (confirmed by the developer on
+13 Nov 2026); do not propose merging the apps.
 
 ## Decisions already made (do not reopen without asking the developer)
 

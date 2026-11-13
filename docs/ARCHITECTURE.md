@@ -44,8 +44,11 @@ muhrak/
 │   │           ├── rfq/           Day 10
 │   │           ├── chat/          Day 11
 │   │           ├── quotation/     Day 12
-│   │           ├── order/         Day 13
-│   │           └── notification/  Day 14
+│   │           ├── order/         Day 12, 14
+│   │           ├── payment/       Day 12-13 (gateway behind providers/)
+│   │           ├── ledger/        Day 12, 15 (append-only money entries)
+│   │           ├── payout/        Day 15
+│   │           └── notification/  Day 2, ongoing
 │   ├── worker/
 │   │   └── src/
 │   │       ├── index.ts
@@ -104,9 +107,19 @@ folder: `ai`, `chat`, `upload`, `notification`.
 4. `chat` opens a Stream conversation and posts a card that carries only the
    RFQ id. The card renders from the API. Postgres is the source of truth.
 5. Seller sends a quotation (`quotation`); a quotation card is posted.
-6. Buyer confirms. `order` creates the order and tracks its status:
-   confirmed -> packed -> shipped -> delivered (or cancelled).
-7. `notification` listens to events and sends email and in-app notices.
+6. Buyer accepts the quotation. `order` creates the order in
+   `awaiting_payment` with the amounts copied from the quotation.
+7. `payment` sends the buyer to the gateway's hosted checkout. Only the
+   gateway's signed webhook (stored once, idempotent) marks the payment
+   succeeded; `ledger` then records the charge, platform fee and seller
+   credit in one transaction, and the order becomes `paid`.
+8. Seller fulfils: paid -> packed -> shipped -> delivered -> completed
+   (or cancelled / refunded). Buyer confirms delivery or it auto-confirms.
+9. After the hold period, with no open problem report, `payout` pays the
+   seller's available balance to their verified bank account (admin
+   action, audited). Refunds go back through the gateway and the ledger.
+10. A daily worker job reconciles the gateway's records with the ledger.
+11. `notification` listens to events and sends emails.
 
 ## Notifications
 

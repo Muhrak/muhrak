@@ -3,13 +3,24 @@
 Read this first in every new session, then `CLAUDE.md`, `docs/PLAN.md` and
 `docs/ARCHITECTURE.md`. Update it whenever a piece of work is committed.
 
-Last updated: Thu 12 Nov 2026. Branch `develop`.
+Last updated: Fri 13 Nov 2026. Branch `develop`.
 
 ## Status
 
-About 22% of the 20-day plan. Days 1 to 4 are done (Day 4 on Thu 12 Nov,
-a day early, because Fri 13 Nov is off), and the landing pages planned for
-later (P1) are done early. Next is Day 5 (categories and products).
+Days 1 to 4 are done (Day 4 on Thu 12 Nov, a day early, because Fri 13 Nov
+is off), and the landing pages are done early. Next is Day 5 (categories
+and products).
+
+**Replanned on Fri 13 Nov 2026 (developer decisions):**
+- MVP = limited features, each working properly. Scope and the "after
+  launch" list are in `docs/PLAN.md`.
+- **Payment inside the platform, strict.** Buyer pays Muhrak online, the
+  order goes live on the gateway's confirmed payment, Muhrak pays sellers
+  out after delivery. Days 12-16 are payment, orders, refunds, payouts
+  and admin. The gateway is not chosen; decisions 1-3 in `docs/PLAN.md`
+  are due Tue 17 Nov. Launch waits for a working live gateway.
+- Architecture stays as it is (no merge into one app); production stays
+  on Railway + Vercel.
 
 ## Done
 
@@ -265,6 +276,11 @@ Still open (Day 4 admin):
 - Categories table with starting data.
 - Products: name, part number, category, condition, price or "price on
   request", stock, description, photos, status.
-- Add product form (manual), product list, edit and delete. Only verified
-  sellers can publish.
+- Add product form (manual), product list, edit and archive (no hard
+  delete). Only verified sellers can publish. Strip photo metadata.
 - Aim: a verified seller publishes a product with photos.
+
+**Developer actions, payment (start now):** choose and apply to a payment
+gateway (merchant approval can take 1-2 weeks), and ask the gateway and a
+lawyer whether Muhrak may hold buyers' money until delivery. See
+"Decisions needed" in `docs/PLAN.md`.
