@@ -120,6 +120,8 @@ and products).
   the dashboard. Full-screen hamburger menu below `lg`.
 - Buyer nav links: Manufacturers, Muhrak AI, Garage. "Distributors" was
   removed on 13 Nov 2026 at the developer's request (it is still in the footer).
+- No light/dark theme toggle anywhere: the site is light only (developer
+  decision, 13 Nov 2026; the Figma moon button is left out).
 - Buyers land on `/` after login or sign-up, sellers on `/sell`, unless they
   were sent to login from a protected page (then they go back there).
 - Seller hero email box opens seller sign-up with the email filled in.

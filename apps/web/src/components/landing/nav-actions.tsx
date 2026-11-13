@@ -18,7 +18,8 @@ export type LandingSide = "buyer" | "seller";
 
 /**
  * Right side of the landing page nav.
- * - Desktop (lg+), signed out: theme toggle + "Sign in".
+ * - Desktop (lg+), signed out: "Sign in". No theme toggle: the site is
+ *   light only (developer decision, 13 Nov 2026).
  * - Desktop, signed in: the profile button from Figma
  *   "Buyer – Landing v2 (Signed in)" in light colours; it opens the dashboard.
  * - Below lg: a hamburger button opening a full-screen menu.
@@ -53,20 +54,6 @@ function Chevron({ className }: { className?: string }) {
   );
 }
 
-function ThemeToggle({ className }: { className?: string }) {
-  // Dark theme is not built yet (light first); the toggle is shown as designed.
-  return (
-    <button
-      type="button"
-      aria-label="Dark theme (coming soon)"
-      title="Dark theme coming soon"
-      className={cn("flex size-11 shrink-0 items-center justify-center rounded-full border border-black/22 bg-white/60 backdrop-blur-[15px] hover:bg-white/80", focus, className)}
-    >
-      <Image src="/landing/moon.svg" alt="" width={18} height={18} />
-    </button>
-  );
-}
-
 /** Desktop actions + mobile menu for a visitor (server render and signed-out state). */
 export function SignedOutActions({ side = "buyer" }: { side?: LandingSide }) {
   return <Actions user={null} side={side} />;
@@ -98,15 +85,12 @@ function Actions({ user, side }: { user: PublicUser | null; side: LandingSide })
             <Chevron />
           </Link>
         ) : (
-          <>
-            {side === "buyer" ? <ThemeToggle /> : null}
-            <Link
-              href={LOGIN_PATH[side]}
-              className={cn("rounded-full border border-black/22 bg-white/60 px-[22px] py-3 text-sm leading-[1.3] whitespace-nowrap text-ink backdrop-blur-[15px] hover:bg-white/80", focus)}
-            >
-              Sign in
-            </Link>
-          </>
+          <Link
+            href={LOGIN_PATH[side]}
+            className={cn("rounded-full border border-black/22 bg-white/60 px-[22px] py-3 text-sm leading-[1.3] whitespace-nowrap text-ink backdrop-blur-[15px] hover:bg-white/80", focus)}
+          >
+            Sign in
+          </Link>
         )}
       </div>
       <MobileMenu user={user} side={side} />
@@ -223,7 +207,6 @@ function MobileMenu({ user, side }: { user: PublicUser | null; side: LandingSide
             </nav>
 
             <div className="mt-auto flex items-center gap-2.5 pt-10">
-              {side === "buyer" ? <ThemeToggle className="size-[50px]" /> : null}
               {user ? (
                 <button
                   type="button"
