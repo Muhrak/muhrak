@@ -57,6 +57,13 @@
       "when": 1794649215507,
       "tag": "0007_fresh_spot",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794651344815,
+      "tag": "0008_freezing_stellaris",
+      "breakpoints": true
     }
   ]
 }

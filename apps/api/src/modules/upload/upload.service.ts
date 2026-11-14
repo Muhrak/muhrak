@@ -14,8 +14,17 @@ import type { UploadRow } from "../../db/schema";
 import { badRequest, forbidden, notFound } from "../../shared/errors";
 import { logger } from "../../shared/logger";
 import { hit, tooManyRequests, type Limit } from "../../shared/rate-limit";
+import { PhotoRejected, processProductPhoto } from "./photo";
 import * as repo from "./upload.repository";
 import { getStorage } from "./storage";
+
+/** Product photos never change once written (new photo = new key): cache them for a year. */
+const PUBLIC_PHOTO_CACHE = "public, max-age=31536000, immutable";
+
+/** Where a product photo's cleaned copies live. Random upload id only: nothing the user typed. */
+export function productPhotoKeys(uploadId: string): { large: string; thumb: string } {
+  return { large: `public/products/${uploadId}.webp`, thumb: `public/products/${uploadId}-thumb.webp` };
+}
 
 /**
  * Upload module: business rules for files.
@@ -29,12 +38,14 @@ import { getStorage } from "./storage";
 const PURPOSE_ROLES: Record<UploadPurpose, Role[]> = {
   seller_logo: ["seller"],
   seller_document: ["seller"],
+  product_photo: ["seller"],
 };
 
 const EXTENSION: Record<UploadContentType, string> = {
   "application/pdf": "pdf",
   "image/jpeg": "jpg",
   "image/png": "png",
+  "image/webp": "webp",
 };
 
 /** The signed PUT link works this long. */
@@ -89,7 +100,9 @@ export async function createUpload(
     purpose: input.purpose,
     contentType: input.contentType,
     sizeBytes: input.sizeBytes,
-    storageKey: `files/${input.purpose}/${id}.${EXTENSION[input.contentType]}`,
+    // Product photos are re-encoded into the public folder; everything else is copied as checked.
+    storageKey:
+      input.purpose === "product_photo" ? productPhotoKeys(id).large : `files/${input.purpose}/${id}.${EXTENSION[input.contentType]}`,
   });
   const link = await storage.createUploadUrl(
     pendingKey(row.id),
@@ -138,13 +151,26 @@ export async function completeUpload(userId: string, uploadId: string, now = new
   if (detected?.mime !== row.contentType) {
     throw await reject(
       `type ${detected?.mime ?? "unknown"} != ${row.contentType}`,
-      "This file is not a valid PDF, JPG or PNG. Please choose another file.",
+      "This file is not a valid PDF, JPG, PNG or WebP. Please choose another file.",
     );
   }
 
-  // Copy exactly the version we checked: if the file was replaced in the
-  // meantime, the copy fails instead of accepting unchecked content.
-  await storage.copy(source, row.storageKey, stored.etag, row.contentType);
+  if (row.purpose === "product_photo") {
+    // Re-encode exactly the version we checked: metadata gone, safe pixels only.
+    try {
+      const photo = await processProductPhoto(await storage.read(source, stored.etag));
+      const keys = productPhotoKeys(row.id);
+      await storage.put(keys.thumb, photo.thumb, { contentType: "image/webp", cacheControl: PUBLIC_PHOTO_CACHE });
+      await storage.put(keys.large, photo.large, { contentType: "image/webp", cacheControl: PUBLIC_PHOTO_CACHE });
+    } catch (error) {
+      if (error instanceof PhotoRejected) throw await reject(error.message, error.userMessage);
+      throw error;
+    }
+  } else {
+    // Copy exactly the version we checked: if the file was replaced in the
+    // meantime, the copy fails instead of accepting unchecked content.
+    await storage.copy(source, row.storageKey, stored.etag, row.contentType);
+  }
   const ready = (await repo.markReady(row.id)) ?? (await repo.findUpload(row.id));
   if (!ready || ready.status !== "ready") throw badRequest("This file was not accepted. Please upload it again.");
   return toUpload(ready);
@@ -158,6 +184,23 @@ export async function attachUpload(userId: string, uploadId: string, purpose: Up
   const row = await repo.attach(uploadId, userId, purpose);
   if (!row) throw badRequest("This file cannot be used. Please upload it again.");
   return toUpload(row);
+}
+
+/**
+ * For other modules: the public URLs of ready product photos (after they
+ * checked the product may be shown). Unknown or not-ready ids are left out.
+ */
+export async function getProductPhotoUrls(uploadIds: string[]): Promise<Map<string, { url: string; thumbUrl: string }>> {
+  const rows = await repo.findUploads(uploadIds);
+  const result = new Map<string, { url: string; thumbUrl: string }>();
+  if (rows.length === 0) return result;
+  const storage = getStorage();
+  for (const row of rows) {
+    if (row.purpose !== "product_photo" || row.status !== "ready") continue;
+    const keys = productPhotoKeys(row.id);
+    result.set(row.id, { url: storage.publicUrl(keys.large), thumbUrl: storage.publicUrl(keys.thumb) });
+  }
+  return result;
 }
 
 /** For other modules: facts about uploads they already reference. */

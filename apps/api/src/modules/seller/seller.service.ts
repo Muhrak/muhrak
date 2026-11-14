@@ -477,3 +477,12 @@ export async function reviewSeller(
   }
   return getSellerForAdmin(sellerUserId);
 }
+
+/**
+ * For other modules (catalog: only verified sellers can publish). True only
+ * while the company is approved; a change that sends it back to review makes
+ * this false again.
+ */
+export async function isSellerVerified(userId: string): Promise<boolean> {
+  return (await repo.findProfile(userId))?.verificationStatus === "approved";
+}

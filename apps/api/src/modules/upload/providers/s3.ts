@@ -13,8 +13,9 @@ import type { StorageProvider } from "../storage";
 /**
  * Amazon S3 implementation of StorageProvider.
  *
- * The bucket is private (Block Public Access on, ACLs off, HTTPS only) and the
- * IAM user can only PutObject and GetObject in it. Unchecked uploads land in
+ * The bucket is private (ACLs off, HTTPS only) except for one bucket policy
+ * statement that lets anyone read `public/*` (cleaned product photos). The
+ * IAM user can only PutObject and GetObject. Unchecked uploads land in
  * `pending/`, which a lifecycle rule empties after a day.
  */
 export function createS3Storage(config: {
@@ -70,6 +71,23 @@ export function createS3Storage(config: {
       );
       if (!object.Body) return new Uint8Array();
       return object.Body.transformToByteArray();
+    },
+
+    async read(key, etag) {
+      const object = await client.send(new GetObjectCommand({ Bucket, Key: key, IfMatch: etag }));
+      if (!object.Body) return new Uint8Array();
+      return object.Body.transformToByteArray();
+    },
+
+    async put(key, body, file) {
+      await client.send(
+        new PutObjectCommand({ Bucket, Key: key, Body: body, ContentType: file.contentType, CacheControl: file.cacheControl }),
+      );
+    },
+
+    publicUrl(key) {
+      if (!key.startsWith("public/")) throw new Error("Only keys under public/ have a public URL");
+      return `https://${Bucket}.s3.${config.region}.amazonaws.com/${key.split("/").map(encodeURIComponent).join("/")}`;
     },
 
     async copy(fromKey, toKey, etag, contentType) {

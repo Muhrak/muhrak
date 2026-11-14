@@ -5,3 +5,4 @@ export * from "./money-schema";
 export * from "./seller";
 export * from "./upload";
 export * from "./admin";
+export * from "./catalog";

@@ -7,9 +7,8 @@ Last updated: Sat 14 Nov 2026. Branch `develop`.
 
 ## Status
 
-Days 1 to 4 are done (Day 4 on Thu 12 Nov, a day early, because Fri 13 Nov
-is off), and the landing pages are done early. Next is Day 5 (categories
-and products).
+Days 1 to 5 are done (Day 5 on Sat 14 Nov, after the restructuring of the
+same day), and the landing pages are done early. Next is Day 6 (AI module).
 
 **Replanned on Fri 13 Nov 2026 (developer decisions):**
 - MVP = limited features, each working properly. Scope and the "after
@@ -120,6 +119,51 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   Same fix on the seller Verification page.
 - Tests: 7 review tests (abuse cases), 27-check API run (wrong side, wrong
   role, tampered cursor, stale review, race), browser run of the console.
+
+### Day 5: categories and products (Sat 14 Nov)
+- Fields shaped by real buyer requests (developer's WhatsApp examples):
+  buyers ask by machine ("Kobelco 380", "Doosan 300") and by part number
+  ("6020/F4", "AL2528SEG"), in many units ("5 carton", "4 set"), and care
+  about lead time. So a product has: name, category, part numbers (main +
+  alternatives, matched ignoring punctuation), brand, genuine/aftermarket,
+  condition (new/used/refurbished), price in OMR or "price on request",
+  unit, stock, availability (in stock / on order + days), description,
+  machines it fits (make + model), up to 6 photos (first = cover).
+- 17 starting categories (migration `0008`), incl. Bearings, Belts & Hoses,
+  Fasteners, Welding & Cutting, Workshop Tools & Safety.
+- API `catalog` module: `GET /v1/catalog/categories` (public),
+  `/v1/seller/products` list (tabs All/Live/Draft/Out of stock/Archived,
+  search by name or part number, keyset pages), create, get, update,
+  `POST /:id/status` (publish/unpublish/archive/restore). Rules: own
+  products only (another seller's = 404); drafts for every seller, publish
+  only when verified and with at least one photo; status transitions in
+  one table (`STATUS_TRANSITIONS`); never deleted, archived; edits carry
+  the version they started from (stale edit = 409); price typed as text
+  and converted to integer baisa on the server (OMR only); category and
+  photos checked; 5,000 products per seller cap; per-user rate limits.
+- Photos: new upload purpose `product_photo` (JPG/PNG/WebP, 10 MB). On
+  upload check the API re-encodes the pixels with `sharp` 0.35.5 (new
+  dependency, approved; patched version, audit clean): EXIF/GPS/camera
+  data dropped, rotation applied, 1600 px + 480 px WebP, 50 MP limit
+  against decompression bombs, too-small and broken files refused. Only
+  these copies are written to `public/products/` in the bucket.
+- Web: `/seller/products` (Figma "Seller – Products", dark, converted to
+  light; no Import CSV, theme toggle or Views column),
+  `/seller/products/new` and `/seller/products/[id]` (Figma "Seller – Add
+  product (Light)" card exactly, plus a "Details buyers search by" card in
+  the same style). Unverified sellers can save drafts; Publish is
+  disabled with a link to verification.
+- Tested: 33 new API tests (abuse cases: other seller, unverified, no
+  photo, illegal transitions, stale edit and race, double click, tampered
+  price/category/photo, cursor) plus 6 photo tests on real images (GPS
+  removed, rotation, resize, not-an-image, tiny, truncated); browser + API
+  run with 29 checks (upload → publish → list; every abuse case); the
+  stored public copy verified free of metadata.
+- **Developer action:** allow public reads of `public/*` only (steps in
+  `docs/DEPLOY.md`, "Public product photos"). Until then photos upload and
+  save fine, but their URLs answer 403 (broken thumbnails).
+- Not built yet (later days): buyer-side product pages and search (Day 8),
+  AI fill from a photo (Day 7), product views count, CSV import.
 
 ### Bug fix: login stuck after logout (Sat 14 Nov)
 - After logging out (buyer, seller or admin), the login page showed
@@ -390,9 +434,9 @@ Still open (Day 3 files):
   without it the CSP blocks uploads on the website.
 - Replaced logos and documents stay in the bucket (the API has no
   delete permission, on purpose). Fine for now; a cleanup job can come later.
-- Images are not re-encoded, so photo metadata (e.g. GPS in an ID photo)
-  stays in the file. Documents are private; strip metadata before any image
-  becomes public (store pages, Day 5 product photos).
+- Seller logos and documents are not re-encoded, so their metadata stays
+  (they are private). Product photos ARE re-encoded (Day 5). Re-encode
+  logos too before store pages become public.
 - No virus scanning of uploads. Only PDF, JPG and PNG are accepted (checked
   by content), and files are served from the S3 domain, never ours.
 
@@ -425,14 +469,14 @@ Still open (Day 4 admin):
   PutObject + GetObject only). The plan for a separate read-only key for
   the worker no longer applies.
 
-## Next up: Day 5 (Sat 14 Nov), see `docs/PLAN.md`
+## Next up: Day 6 (Sun 15 Nov), see `docs/PLAN.md`
 
-- Categories table with starting data.
-- Products: name, part number, category, condition, price or "price on
-  request", stock, description, photos, status.
-- Add product form (manual), product list, edit and archive (no hard
-  delete). Only verified sellers can publish. Strip photo metadata.
-- Aim: a verified seller publishes a product with photos.
+- AI module: queue job, vision model behind an interface, fixed output
+  fields with a confidence level each, Zod-validated.
+- Safety: image checks, per-user daily limit, monthly budget cap, on/off
+  switch, every job logged.
+- Aim: sending a photo to the API returns the part's name, category, part
+  number and fitment (the Day 5 fields).
 
 **Developer actions, payment (start now):** choose and apply to a payment
 gateway (merchant approval can take 1-2 weeks), and ask the gateway and a

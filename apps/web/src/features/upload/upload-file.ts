@@ -25,6 +25,7 @@ const TYPE_NAMES: Record<UploadContentType, string> = {
   "application/pdf": "PDF",
   "image/jpeg": "JPG",
   "image/png": "PNG",
+  "image/webp": "WebP",
 };
 
 export function describeRules(purpose: UploadPurpose): string {
@@ -48,6 +49,7 @@ function contentTypeOf(file: File): UploadContentType | null {
   if (extension === "pdf") return "application/pdf";
   if (extension === "png") return "image/png";
   if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
+  if (extension === "webp") return "image/webp";
   return null;
 }
 

@@ -6,6 +6,7 @@ export {
   getDocumentLinkForAdmin,
   getSellerForAdmin,
   getSellerStatsForAdmin,
+  isSellerVerified,
   listSellersForAdmin,
   reviewSeller,
 } from "./seller.service";

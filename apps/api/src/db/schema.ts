@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 /**
  * Database tables. Every module's tables are declared in this one file so
@@ -132,7 +132,7 @@ export const jobs = pgTable(
  * 12 Nov 2026). It stays in the database enum because removing an enum
  * value means rebuilding the type; nothing can create one any more.
  */
-export const uploadPurpose = pgEnum("upload_purpose", ["seller_logo", "seller_cover", "seller_document"]);
+export const uploadPurpose = pgEnum("upload_purpose", ["seller_logo", "seller_cover", "seller_document", "product_photo"]);
 export const uploadStatus = pgEnum("upload_status", ["pending", "ready", "rejected"]);
 
 /**
@@ -286,6 +286,132 @@ export const auditLog = pgTable(
     index("audit_log_actor_idx").on(table.actorUserId, table.createdAt),
   ],
 );
+
+// ---------------------------------------------------------------- catalog
+
+/** Product categories. Starting list in migration 0008; edited by admins later. */
+export const categories = pgTable("categories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const productStatus = pgEnum("product_status", ["draft", "published", "archived"]);
+export const productCondition = pgEnum("product_condition", ["new", "used", "refurbished"]);
+export const productPartSource = pgEnum("product_part_source", ["genuine", "aftermarket"]);
+export const productUnit = pgEnum("product_unit", ["piece", "pair", "set", "kit", "box", "carton", "metre", "litre"]);
+export const productAvailability = pgEnum("product_availability", ["in_stock", "on_order"]);
+
+/**
+ * A seller's product. Never deleted: archived instead (business record).
+ * Price: whole minor units with currency (money rules), or both null for
+ * "price on request". Status changes only through the transitions in
+ * catalog.service.ts; `version` guards against two tabs overwriting each
+ * other (an edit must name the version it started from).
+ */
+export const products = pgTable(
+  "products",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sellerUserId: uuid("seller_user_id")
+      .notNull()
+      .references(() => users.id),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id),
+    name: text("name").notNull(),
+    brand: text("brand"),
+    partSource: productPartSource("part_source"),
+    condition: productCondition("condition").notNull().default("new"),
+    priceAmount: bigint("price_amount", { mode: "number" }),
+    priceCurrency: text("price_currency"),
+    unit: productUnit("unit").notNull().default("piece"),
+    stockQuantity: integer("stock_quantity"),
+    availability: productAvailability("availability").notNull().default("in_stock"),
+    leadTimeDays: integer("lead_time_days"),
+    description: text("description"),
+    status: productStatus("status").notNull().default("draft"),
+    version: integer("version").notNull().default(1),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // The seller's list: their products by status, newest change first (keyset cursor on updated_at, id).
+    index("products_seller_status_updated_idx").on(table.sellerUserId, table.status, table.updatedAt, table.id),
+    index("products_category_status_idx").on(table.categoryId, table.status),
+    check("products_price_pair", sql`(${table.priceAmount} IS NULL) = (${table.priceCurrency} IS NULL)`),
+    check("products_price_positive", sql`${table.priceAmount} IS NULL OR ${table.priceAmount} > 0`),
+    check("products_price_currency", sql`${table.priceCurrency} IS NULL OR ${table.priceCurrency} IN ('OMR','KWD','BHD','SAR','AED','QAR')`),
+    check("products_stock", sql`${table.stockQuantity} IS NULL OR ${table.stockQuantity} >= 0`),
+    check("products_lead_time", sql`${table.leadTimeDays} IS NULL OR ${table.leadTimeDays} BETWEEN 1 AND 365`),
+  ],
+);
+
+/** Part numbers of a product: the main one first, then alternatives / cross references. */
+export const productPartNumbers = pgTable(
+  "product_part_numbers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    value: text("value").notNull(),
+    /** Upper case, letters and digits only ("6020/F4" -> "6020F4"): what search matches on. */
+    normalized: text("normalized").notNull(),
+    position: integer("position").notNull(),
+  },
+  (table) => [
+    index("product_part_numbers_normalized_idx").on(table.normalized),
+    uniqueIndex("product_part_numbers_product_value_idx").on(table.productId, table.normalized),
+  ],
+);
+
+/** Machines a product fits, e.g. make "Kobelco", model "SK380". */
+export const productFitments = pgTable(
+  "product_fitments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    make: text("make").notNull(),
+    model: text("model").notNull(),
+    /** Lower case make + model, letters and digits only: what search matches on. */
+    normalized: text("normalized").notNull(),
+    position: integer("position").notNull(),
+  },
+  (table) => [
+    index("product_fitments_normalized_idx").on(table.normalized),
+    index("product_fitments_product_idx").on(table.productId),
+  ],
+);
+
+/** Photos of a product, in order (position 0 is the cover). Each upload belongs to one product. */
+export const productPhotos = pgTable(
+  "product_photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    uploadId: uuid("upload_id")
+      .notNull()
+      .unique()
+      .references(() => uploads.id),
+    position: integer("position").notNull(),
+  },
+  (table) => [index("product_photos_product_idx").on(table.productId, table.position)],
+);
+
+export type CategoryRow = typeof categories.$inferSelect;
+export type ProductRow = typeof products.$inferSelect;
+export type ProductPartNumberRow = typeof productPartNumbers.$inferSelect;
+export type ProductFitmentRow = typeof productFitments.$inferSelect;
+export type ProductPhotoRow = typeof productPhotos.$inferSelect;
 
 export type UploadRow = typeof uploads.$inferSelect;
 export type SellerProfileRow = typeof sellerProfiles.$inferSelect;

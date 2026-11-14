@@ -136,6 +136,35 @@ staging and production at the same database.
 - Database backups: enable them on the Postgres volume in the Railway
   dashboard (volume, Backups tab). Not available from the CLI.
 
+## Public product photos (Day 5, 14 Nov 2026)
+
+Product photos are public. The API never publishes an uploaded file: it
+re-encodes each photo with `sharp` (metadata such as GPS removed, max
+1600 px, WebP) and writes the copy to `public/products/` in the same
+bucket. Everything else stays private. Two bucket settings make exactly
+that folder readable (AWS console, bucket `muhrak-staging-private-om7k`):
+
+1. **Permissions → Block public access → Edit**: turn OFF only "Block public
+   access to buckets and objects granted through new public bucket
+   policies" and "... through any public bucket policies". Keep both ACL
+   options ON (ACLs stay disabled).
+2. **Permissions → Bucket policy → Edit**, add this statement (merge it
+   into the existing policy's `Statement` list if there is one):
+
+   ```json
+   {
+     "Sid": "PublicReadProductPhotosOnly",
+     "Effect": "Allow",
+     "Principal": "*",
+     "Action": "s3:GetObject",
+     "Resource": "arn:aws:s3:::muhrak-staging-private-om7k/public/*"
+   }
+   ```
+
+Check: a product photo URL (`https://<bucket>.s3.eu-north-1.amazonaws.com/public/products/<id>.webp`)
+opens in the browser, while `files/...` and `pending/...` still answer 403.
+The web CSP already allows this origin (`STORAGE_ORIGIN`).
+
 ## File storage: Amazon S3 (12 Nov 2026)
 
 Private bucket `muhrak-staging-private-om7k`, region `eu-north-1`

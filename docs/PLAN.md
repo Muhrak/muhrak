@@ -106,6 +106,7 @@ approved in time, launch moves; payment is not skipped.
 - **Day 2, Wed 11 Nov:** sessions, password reset, dashboards shells, staging.
 - **Day 3, Thu 12 Nov:** uploads, seller company profile, verification.
 - **Day 4, Thu 12 Nov (a day early):** admin console, seller review, audit log.
+- **Day 5, Sat 14 Nov:** categories and products (seller side), photo cleaning.
 - **Early:** buyer and seller landing pages.
 
 Details in `docs/PROGRESS.md`.

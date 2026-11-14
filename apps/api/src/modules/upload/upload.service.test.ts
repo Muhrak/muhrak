@@ -32,6 +32,9 @@ const storage = {
   createUploadUrl: vi.fn(async () => ({ url: "https://bucket.example/pending/x?sig", headers: { "Content-Type": "application/pdf" } })),
   stat: vi.fn(),
   readStart: vi.fn(),
+  read: vi.fn(),
+  put: vi.fn(),
+  publicUrl: vi.fn((key: string) => `https://bucket.example/${key}`),
   copy: vi.fn(),
   createDownloadUrl: vi.fn(),
 };

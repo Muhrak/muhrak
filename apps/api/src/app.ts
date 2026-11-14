@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { env } from "./config/env";
 import { adminRouter } from "./modules/admin";
 import { authRouter } from "./modules/auth";
+import { catalogRouter, sellerProductsRouter } from "./modules/catalog";
 import { healthRouter } from "./modules/health/health.routes";
 import { sellerRouter } from "./modules/seller";
 import { uploadRouter } from "./modules/upload";
@@ -30,6 +31,9 @@ export function createApp() {
   v1.use(limitByIp({ name: "api:ip", max: 600, windowMs: 60_000 }));
   v1.use("/auth", authRouter);
   v1.use("/uploads", uploadRouter);
+  v1.use("/catalog", catalogRouter);
+  // Before /seller: the products sub-router has its own auth and limits.
+  v1.use("/seller/products", sellerProductsRouter);
   v1.use("/seller", sellerRouter);
   v1.use("/admin", adminRouter);
   app.use("/v1", v1);
