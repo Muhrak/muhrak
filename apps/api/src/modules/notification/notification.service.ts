@@ -35,19 +35,19 @@ export async function sendPasswordResetEmail(input: {
   );
 }
 
-/** The link that activates a new account. `dedupeKey`: unique per link. */
+/** The 6-digit code that activates a new account. `dedupeKey`: unique per code. */
 export async function sendVerifyEmail(input: {
   to: string;
   fullName: string;
-  verifyUrl: string;
-  expiresInHours: number;
+  code: string;
+  expiresInMinutes: number;
   dedupeKey: string;
 }): Promise<void> {
   await enqueueEmail(
     {
       template: "verify-email",
       to: input.to,
-      data: { fullName: input.fullName, verifyUrl: input.verifyUrl, expiresInHours: input.expiresInHours },
+      data: { fullName: input.fullName, code: input.code, expiresInMinutes: input.expiresInMinutes },
     },
     `verify-email-${input.dedupeKey}`,
   );

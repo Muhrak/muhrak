@@ -111,8 +111,9 @@ the web app for the start). Do not propose further merges or splits.
   Rate-limit counters are in memory (one API copy); move them to a shared
   store before running several copies.
 - **Email verification (14 Nov 2026):** buyers and sellers cannot sign in
-  until they open the link in the verification email. Sign-up answers the
-  same for new and existing emails (no enumeration).
+  until they enter the 6-digit code from the verification email (a right
+  code signs them in). Sign-up answers the same for new and existing emails
+  (no enumeration).
 
 ## Security standard (STRICT, set by the developer on 12 Nov 2026)
 

@@ -156,34 +156,41 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   (Root Directory `apps/web`); its first build after the push should be
   checked.
 
-### Email verification (Sat 14 Nov)
-- Developer decision: buyers and sellers cannot sign in until they open
-  the link in the verification email (strict; admins are created verified
-  from the command line).
+### Email verification by code (Sat 14 Nov)
+- Developer decision: buyers and sellers cannot sign in until they enter
+  the 6-digit code from the verification email (strict; admins are created
+  verified from the command line). A first version sent a link; the
+  developer switched to a code the same day.
 - Sign-up answers `202` with no body, the same for a new or an existing
   email, before doing the work (no enumeration, also by timing). New email:
-  unverified account + link. Existing email: nothing changes; the owner
+  unverified account + code. Existing email: nothing changes; the owner
   gets "You already have a Muhrak account" (log in / reset links).
-- Links: random, stored as SHA-256 hashes, single use (conditional update),
-  24 h (`EMAIL_VERIFICATION_TTL_HOURS`), only the newest works. Opening a
-  link takes one click on `/buyer|seller/verify-email` (not automatic, so
-  mail scanners cannot use it up) and does NOT sign in.
-- Login: the "verify first" answer (403 `email_not_verified`) comes only
-  after the right password, so it tells a stranger nothing; the form then
-  offers "send a new link". Refresh also refuses an unverified account.
-- Resend (`POST /v1/auth/resend-verification`): always 202; 1 a minute and
-  5 sign-up emails an hour per address, 5 per 15 min per IP.
+- After sign-up the same page asks for the code. A right code verifies the
+  email and signs in on that side (buyer/seller isolation kept: the code
+  works only with the account's own side). Logging in before verifying
+  (right password) switches the login form to the code step and sends a
+  fresh code (none if one went out under a minute ago).
+- Codes: `crypto.randomInt`, 10 minutes (`EMAIL_CODE_TTL_MINUTES`), stored
+  only as an HMAC (server key derived from JWT_SECRET) bound to the user,
+  single use, only the newest works, 5 wrong guesses kill it. Limits: 15
+  code checks per address per 15 min, 1 new code a minute and 5 sign-up
+  emails an hour per address, plus per-IP limits. Every failure (wrong,
+  expired, used, unknown email, other side, already verified) gets the
+  same answer.
 - A completed password reset also verifies the email (the link proves the
   inbox). This is how a real owner recovers an email that someone else
   signed up with first (that account could never sign in).
-- Migration `0005`: `users.email_verified_at`, table
-  `email_verification_tokens`; existing accounts marked verified (staging
-  test accounts and admins; no real users yet).
-- Tested: 21 new service tests (enumeration, races, expired/used links,
-  flooding, admin never emailed, reset verifies); browser run (seller
-  sign-up → check inbox → login refused with resend → link → verified →
-  reused link refused → login works; sign-up again with that email shows
-  the same screen and sends "account exists").
+- Migrations: `0005` (`users.email_verified_at`, table
+  `email_verification_tokens`; existing accounts marked verified) and
+  `0007` (codes: `attempts`, hash no longer unique).
+- Tested: 29 service tests (enumeration, guessing, wrong side, expired and
+  used codes, double submit, per-address limits, flooding, admin never
+  emailed, reset verifies); browser run: seller sign-up → code step → wrong
+  code refused → right code signs in; buyer sign-up, later login → code
+  step → signed in; used code refused.
+- Staging note: until a Resend domain is verified, codes only reach
+  `teammuhrak@gmail.com`, which is the staging ADMIN's email (an admin is
+  never emailed from sign-up), so no new sign-up can be completed there.
 
 ### Redis removed; job queue in PostgreSQL (Sat 14 Nov)
 - The free Upstash plan ran out (500,000 requests a month): the always-on
@@ -393,8 +400,8 @@ Other:
 
 - Resend has no verified domain, so emails only reach the Resend account
   owner. Needs a domain (for example `muhrak.om`) before real users. With
-  email verification this now BLOCKS sign-up for every other address on
-  staging: only `teammuhrak@gmail.com` can complete a new account.
+  email verification this now BLOCKS every new sign-up on staging (the
+  owner address is the admin's).
 - Placeholder numbers to replace before launch: buyer "2,481+ verified"
   manufacturers, seller "12,940 members" and "185 requests".
 - FAQ answers 2 to 5 on both landing pages were written by Claude; the

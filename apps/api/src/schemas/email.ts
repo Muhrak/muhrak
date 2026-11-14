@@ -22,8 +22,8 @@ export const emailJobSchema = z.discriminatedUnion("template", [
     to: z.string().email(),
     data: z.object({
       fullName: z.string(),
-      verifyUrl: z.string().url(),
-      expiresInHours: z.number().int().positive(),
+      code: z.string().regex(/^\d{6}$/),
+      expiresInMinutes: z.number().int().positive(),
     }),
   }),
   z.object({

@@ -15,7 +15,7 @@ import { applyApiError } from "./form-errors";
 import { SignedOutOnly } from "./guards";
 import { RESET_PATH, SIGNUP_PATH, type PortalSide } from "./paths";
 import { saveSession } from "./session";
-import { ResendVerificationButton } from "./verify-email";
+import { VerifyCodeStep } from "./verify-email";
 
 const FIELDS = ["email", "password"] as const;
 
@@ -59,9 +59,10 @@ function LoginFormBody({ side }: { side: PortalSide }) {
     onSuccess: (session) => saveSession(side, session),
     onError: (error) => applyApiError(error, setError, FIELDS),
   });
-  // Right password, email not verified yet: offer a new link for that address.
+  // Right password, email not verified yet: switch to the code step (a fresh code is sent).
   const unverifiedEmail =
     mutation.error instanceof ApiError && mutation.error.code === EMAIL_NOT_VERIFIED ? mutation.variables?.email : undefined;
+  if (unverifiedEmail) return <VerifyCodeStep email={unverifiedEmail} side={side} sendOnOpen />;
 
   return (
     <div className="flex flex-col">
@@ -99,7 +100,6 @@ function LoginFormBody({ side }: { side: PortalSide }) {
           />
           <FormNotice message={notice} />
           <FormError message={errors.root?.server?.message} />
-          {unverifiedEmail ? <ResendVerificationButton email={unverifiedEmail} /> : null}
         </div>
 
         <Button type="submit" disabled={mutation.isPending || mutation.isSuccess} className={`mt-7 ${primaryButtonClass}`}>

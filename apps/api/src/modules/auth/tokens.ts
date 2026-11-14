@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import type { Role } from "../../schemas";
 import { env } from "../../config/env";
@@ -58,6 +58,30 @@ export function generateOneTimeToken(): string {
 
 export function hashOneTimeToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
+}
+
+/** A 6-digit email verification code, from the crypto random generator. */
+export function generateEmailCode(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, "0");
+}
+
+/**
+ * Codes are short, so a plain hash could be reversed by trying all million.
+ * Stored instead as an HMAC with a server-side key (derived from
+ * JWT_SECRET), bound to the user: a leaked database row is useless without
+ * the key, and a code works only for its own account.
+ */
+const emailCodeKey = createHash("sha256").update(`muhrak-email-code:${env.JWT_SECRET}`).digest();
+
+export function hashEmailCode(userId: string, code: string): string {
+  return createHmac("sha256", emailCodeKey).update(`${userId}:${code}`).digest("hex");
+}
+
+/** Constant-time comparison of two hex hashes. */
+export function sameHash(a: string, b: string): boolean {
+  const left = Buffer.from(a, "hex");
+  const right = Buffer.from(b, "hex");
+  return left.length === right.length && timingSafeEqual(left, right);
 }
 
 export function refreshTokenExpiry(now = new Date()): Date {

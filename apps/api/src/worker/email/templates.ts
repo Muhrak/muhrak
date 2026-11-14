@@ -69,31 +69,30 @@ export function renderEmail(job: EmailJob): RenderedEmail {
     }
 
     case "verify-email": {
-      const { fullName, verifyUrl, expiresInHours } = job.data;
-      const url = escapeHtml(verifyUrl);
+      const { fullName, code, expiresInMinutes } = job.data;
       return {
-        subject: "Verify your email for Muhrak",
+        subject: `${code} is your Muhrak verification code`,
         text: [
           `Hi ${fullName},`,
           "",
-          "Welcome to Muhrak. Open this link to verify your email and activate your account",
-          `(it works once and expires in ${expiresInHours} hours):`,
-          verifyUrl,
+          "Welcome to Muhrak. Enter this code to verify your email and activate your account:",
+          "",
+          code,
+          "",
+          `It works once and expires in ${expiresInMinutes} minutes. Never share it: Muhrak will never ask you for it.`,
           "",
           "If you did not create a Muhrak account, ignore this email. Nothing will be activated.",
         ].join("\n"),
         html: layout(
           "Verify your email",
-          `<tr><td style="font-size:15px;line-height:1.5;color:#3a3a40;padding-bottom:24px;">
-            Hi ${escapeHtml(fullName)}, welcome to Muhrak. Verify your email to activate your account.
-            The link works once and expires in ${expiresInHours} hours.
+          `<tr><td style="font-size:15px;line-height:1.5;color:#3a3a40;padding-bottom:20px;">
+            Hi ${escapeHtml(fullName)}, welcome to Muhrak. Enter this code to verify your email and activate your account.
           </td></tr>
-          <tr><td style="padding-bottom:24px;">
-            <a href="${url}" style="display:inline-block;background:#0a0b12;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold;padding:14px 28px;border-radius:999px;">Verify my email</a>
+          <tr><td style="padding-bottom:20px;">
+            <div style="display:inline-block;background:#f5f5f7;border-radius:16px;padding:16px 24px;font-size:32px;font-weight:bold;letter-spacing:10px;color:#0a0b12;font-family:'Courier New',Courier,monospace;">${escapeHtml(code)}</div>
           </td></tr>
           <tr><td style="font-size:13px;line-height:1.5;color:#6b6b73;">
-            If the button does not work, copy this link into your browser:<br>
-            <a href="${url}" style="color:#0a0a0a;word-break:break-all;">${url}</a><br><br>
+            The code works once and expires in ${expiresInMinutes} minutes. Never share it: Muhrak will never ask you for it.<br><br>
             If you did not create a Muhrak account, ignore this email. Nothing will be activated.
           </td></tr>`,
         ),

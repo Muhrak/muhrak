@@ -16,7 +16,7 @@ export const registerSchema = z.object({
 export type RegisterInput = z.infer<typeof registerSchema>;
 // POST /v1/auth/register answers 202 with no body, whether or not the email
 // already has an account (no enumeration). The new account cannot sign in
-// until its email is verified.
+// until the 6-digit code from the verification email is entered.
 
 /**
  * `role` is the side the user is logging in on. Buyer and seller are fully
@@ -73,19 +73,25 @@ export const resetPasswordSchema = z.object({
 });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
-/** POST /v1/auth/verify-email. The token comes from the link in the verification email. */
-export const verifyEmailSchema = z.object({
-  token: z.string().min(20).max(200),
-});
-export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
+/** The 6-digit code from the verification email. */
+export const emailCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, "Enter the 6-digit code from the email");
 
-/** The verified account's side, so the page can send the user to the right login. */
-export const verifyEmailResponseSchema = z.object({
-  role: roleSchema,
+/**
+ * POST /v1/auth/verify-email. A correct code verifies the email and signs
+ * the user in on `role`'s side (answers like login: user + access token,
+ * refresh token in the cookie).
+ */
+export const verifyEmailCodeSchema = z.object({
+  email: emailSchema,
+  code: emailCodeSchema,
+  role: z.enum(["buyer", "seller"]),
 });
-export type VerifyEmailResponse = z.infer<typeof verifyEmailResponseSchema>;
+export type VerifyEmailCodeInput = z.infer<typeof verifyEmailCodeSchema>;
 
-/** POST /v1/auth/resend-verification. Always answers 202, whether or not the email has an account. */
+/** POST /v1/auth/resend-verification: a new code. Always answers 202, whether or not the email has an account. */
 export const resendVerificationSchema = z.object({
   email: emailSchema,
 });

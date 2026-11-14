@@ -1,4 +1,4 @@
-import type { LoginInput, PublicUser, RegisterInput, ResetPasswordInput, Role, VerifyEmailResponse } from "../../schemas";
+import type { LoginInput, PublicUser, RegisterInput, ResetPasswordInput, Role, VerifyEmailCodeInput } from "../../schemas";
 import { env } from "../../config/env";
 import type { UserRow } from "../../db/schema";
 import { badRequest, conflict, emailNotVerified, forbidden, notFound, unauthorized } from "../../shared/errors";
@@ -8,11 +8,14 @@ import { sendAccountExistsEmail, sendPasswordResetEmail, sendVerifyEmail } from 
 import * as repo from "./auth.repository";
 import { hashPassword, verifyPassword } from "./password";
 import {
+  generateEmailCode,
   generateOneTimeToken,
   generateRefreshToken,
+  hashEmailCode,
   hashOneTimeToken,
   hashRefreshToken,
   refreshTokenExpiry,
+  sameHash,
   signAccessToken,
 } from "./tokens";
 
@@ -57,19 +60,22 @@ async function issueTokens(user: UserRow): Promise<IssuedSession> {
 
 // ---------------------------------------------------------------- sign-up and email verification
 
-/** Where the verification link opens, per side. Admins never get one (created verified). */
-const VERIFY_PAGE_BY_ROLE: Record<Role, string> = {
-  buyer: "/buyer/verify-email",
-  seller: "/seller/verify-email",
-  admin: "/buyer/verify-email",
-};
 const LOGIN_PAGE_BY_ROLE: Record<Role, string> = { buyer: "/buyer/login", seller: "/seller/login", admin: "/admin/login" };
 
-/** A new verification email is not sent if the previous one went out less than this long ago. */
+/** A new code is not sent if the previous one went out less than this long ago. */
 export const VERIFY_REQUEST_COOLDOWN_MS = 60_000;
 
+/** Wrong guesses allowed per code; then it is dead and a new one must be requested. */
+export const EMAIL_CODE_MAX_ATTEMPTS = 5;
+
 /**
- * At most this many sign-up related emails (verification links and "you
+ * Code checks per address (any IP) per 15 minutes, on top of the per-code
+ * limit, so guessing across many fresh codes stays hopeless.
+ */
+export const VERIFY_CODE_EMAIL_LIMIT: Limit = { name: "verify-code:email", max: 15, windowMs: 15 * 60_000 };
+
+/**
+ * At most this many sign-up related emails (verification codes and "you
  * already have an account") per address per hour, however many IPs ask, so
  * nobody can flood a stranger's inbox through the sign-up form.
  */
@@ -77,8 +83,8 @@ export const SIGNUP_EMAIL_LIMIT: Limit = { name: "signup:email", max: 5, windowM
 
 /**
  * Sign up. The account is created UNVERIFIED and cannot sign in until the
- * link in the verification email is opened (developer decision, 14 Nov
- * 2026). The caller gets the same answer whether or not the email already
+ * 6-digit code from the verification email is entered (developer decision,
+ * 14 Nov 2026; a code replaced the first version's link the same day). The caller gets the same answer whether or not the email already
  * has an account, so sign-up cannot be used to find out who is registered:
  * - new email: create the account and send the verification link;
  * - existing email: change nothing, and tell the owner by email that
@@ -116,7 +122,7 @@ export async function register(input: RegisterInput, now = new Date()): Promise<
     if (isUniqueViolation(err)) return;
     throw err;
   }
-  await sendVerificationLink(user, now);
+  await sendVerificationCode(user, now);
 }
 
 function isUniqueViolation(err: unknown): boolean {
@@ -124,26 +130,26 @@ function isUniqueViolation(err: unknown): boolean {
   return e?.code === "23505" || e?.cause?.code === "23505";
 }
 
-/** Cancel older links, store a new one (hashed) and queue the email. */
-async function sendVerificationLink(user: UserRow, now: Date): Promise<void> {
+/** Cancel older codes, store a new one (HMAC only) and queue the email. */
+async function sendVerificationCode(user: UserRow, now: Date): Promise<void> {
   await repo.invalidateEmailVerificationTokensForUser(user.id);
-  const token = generateOneTimeToken();
-  const tokenHash = hashOneTimeToken(token);
+  const code = generateEmailCode();
+  const tokenHash = hashEmailCode(user.id, code);
   await repo.insertEmailVerificationToken({
     userId: user.id,
     tokenHash,
-    expiresAt: new Date(now.getTime() + env.EMAIL_VERIFICATION_TTL_HOURS * 3_600_000),
+    expiresAt: new Date(now.getTime() + env.EMAIL_CODE_TTL_MINUTES * 60_000),
   });
   try {
     await sendVerifyEmail({
       to: user.email,
       fullName: user.fullName,
-      verifyUrl: `${env.WEB_APP_URL}${VERIFY_PAGE_BY_ROLE[user.role]}?token=${encodeURIComponent(token)}`,
-      expiresInHours: env.EMAIL_VERIFICATION_TTL_HOURS,
+      code,
+      expiresInMinutes: env.EMAIL_CODE_TTL_MINUTES,
       dedupeKey: tokenHash.slice(0, 32),
     });
   } catch (err) {
-    // The queue is down. Cancel the link nobody will receive; the user can ask for a new one.
+    // The queue is down. Cancel the code nobody will receive; the user can ask for a new one.
     await repo.invalidateEmailVerificationTokensForUser(user.id);
     logger.error({ err }, "Could not queue verification email");
     throw err;
@@ -151,9 +157,9 @@ async function sendVerificationLink(user: UserRow, now: Date): Promise<void> {
 }
 
 /**
- * "Send me a new link". Same answer for every email (no enumeration). Only
- * an unverified buyer or seller gets a link, at most one a minute and five
- * an hour per address.
+ * "Send me a new code". Same answer for every email (no enumeration). Only
+ * an unverified buyer or seller gets one, at most one a minute and five an
+ * hour per address.
  */
 export async function resendVerificationEmail(email: string, now = new Date()): Promise<void> {
   if (!(await hit(SIGNUP_EMAIL_LIMIT, subjectHash(email))).allowed) return;
@@ -161,23 +167,42 @@ export async function resendVerificationEmail(email: string, now = new Date()): 
   if (!user || user.role === "admin" || user.emailVerifiedAt) return;
   const latest = await repo.findLatestEmailVerificationToken(user.id);
   if (latest && !latest.usedAt && now.getTime() - latest.createdAt.getTime() < VERIFY_REQUEST_COOLDOWN_MS) return;
-  await sendVerificationLink(user, now);
+  await sendVerificationCode(user, now);
 }
 
 /**
- * Open a verification link. Works once, before it expires. Does NOT sign
- * the user in: they log in with their password afterwards, so a leaked
- * link alone never gives access to an account.
+ * Check a 6-digit code. Right: the email is verified and the user is signed
+ * in on their side (the code proves the inbox; the password was set a
+ * moment ago in the same sign-up). Wrong, expired, used, unknown email or
+ * the other side: one and the same answer, so nothing leaks. Five wrong
+ * guesses kill the code; the address is limited across codes too.
  */
-export async function verifyEmail(token: string, now = new Date()): Promise<VerifyEmailResponse> {
-  const invalid = badRequest("This link is not valid or has expired. Request a new one.");
-  const stored = await repo.findEmailVerificationTokenByHash(hashOneTimeToken(token));
-  if (!stored || stored.usedAt || stored.expiresAt.getTime() <= now.getTime()) throw invalid;
-  if (!(await repo.markEmailVerificationTokenUsed(stored.id))) throw invalid;
-  const user = await repo.findUserById(stored.userId);
-  if (!user) throw invalid;
+export async function verifyEmailCode(input: VerifyEmailCodeInput, now = new Date()): Promise<IssuedSession> {
+  const invalid = badRequest("That code is not right or has expired. Check the newest email, or send a new code.");
+  const emailKey = subjectHash(input.email);
+  const limited = await peek(VERIFY_CODE_EMAIL_LIMIT, emailKey);
+  if (!limited.allowed) throw tooManyRequests(limited.retryAfterMs, "Too many tries. Wait a few minutes, then send a new code.");
+  await hit(VERIFY_CODE_EMAIL_LIMIT, emailKey);
+
+  const user = await repo.findUserByEmail(input.email);
+  if (!user || user.role !== input.role || user.emailVerifiedAt) throw invalid;
+  const latest = await repo.findLatestEmailVerificationToken(user.id);
+  if (!latest || latest.usedAt || latest.expiresAt.getTime() <= now.getTime() || latest.attempts >= EMAIL_CODE_MAX_ATTEMPTS) {
+    throw invalid;
+  }
+
+  if (!sameHash(latest.tokenHash, hashEmailCode(user.id, input.code))) {
+    const attempts = await repo.addEmailVerificationAttempt(latest.id);
+    if (attempts !== null && attempts >= EMAIL_CODE_MAX_ATTEMPTS) {
+      await repo.markEmailVerificationTokenUsed(latest.id);
+    }
+    throw invalid;
+  }
+
+  // Right code: use it exactly once (a double submit cannot sign in twice).
+  if (!(await repo.markEmailVerificationTokenUsed(latest.id))) throw invalid;
   await repo.markUserEmailVerified(user.id, now);
-  return { role: user.role };
+  return issueTokens({ ...user, emailVerifiedAt: now });
 }
 
 /**
@@ -223,7 +248,7 @@ export async function login(input: LoginInput, clientIp: string): Promise<Issued
   }
   // Checked only after the password is right, so it tells a stranger nothing.
   if (!user.emailVerifiedAt) {
-    throw emailNotVerified("Verify your email first. Open the link we sent you, or ask for a new one.");
+    throw emailNotVerified("Verify your email first. Enter the code we sent you, or ask for a new one.");
   }
   return issueTokens(user);
 }

@@ -69,9 +69,11 @@ export const passwordResetTokens = pgTable(
 );
 
 /**
- * Email verification links, stored as SHA-256 hashes. Single use; only the
- * newest link of a user works (older ones are marked used when a new one is
- * sent).
+ * Email verification codes (6 digits, sent by email at sign-up). Stored only
+ * as an HMAC bound to the user, never in plain text. Single use; only the
+ * newest code of a user works (older ones are marked used when a new one is
+ * sent); `attempts` counts wrong guesses and the code dies after five.
+ * (The table name stays from the first version, which sent links.)
  */
 export const emailVerificationTokens = pgTable(
   "email_verification_tokens",
@@ -80,7 +82,9 @@ export const emailVerificationTokens = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    tokenHash: text("token_hash").notNull().unique(),
+    /** HMAC of "<userId>:<code>". Not unique: a 6-digit code can repeat for one user over time. */
+    tokenHash: text("token_hash").notNull(),
+    attempts: integer("attempts").notNull().default(0),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     usedAt: timestamp("used_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -6,7 +6,7 @@ import {
   resendVerificationSchema,
   resetPasswordSchema,
   sessionSideSchema,
-  verifyEmailSchema,
+  verifyEmailCodeSchema,
   type AuthResponse,
   type ForgotPasswordInput,
   type LoginInput,
@@ -14,7 +14,7 @@ import {
   type ResendVerificationInput,
   type ResetPasswordInput,
   type SessionSideInput,
-  type VerifyEmailInput,
+  type VerifyEmailCodeInput,
 } from "../../schemas";
 import { unauthorized } from "../../shared/errors";
 import { validateBody } from "../../shared/http";
@@ -71,10 +71,19 @@ authRouter.post(
   },
 );
 
-/** Open the link from the verification email. Does not sign in; the user logs in afterwards. */
-authRouter.post("/verify-email", limitByIp(LIMITS.verifyEmail), validateBody(verifyEmailSchema), async (req, res) => {
-  res.json(await authService.verifyEmail((req.body as VerifyEmailInput).token));
-});
+/**
+ * Enter the 6-digit code from the verification email. A right code verifies
+ * the email and signs in (sets the session cookie, so: our origins only).
+ */
+authRouter.post(
+  "/verify-email",
+  limitByIp(LIMITS.verifyEmail),
+  requireTrustedOrigin,
+  validateBody(verifyEmailCodeSchema),
+  async (req, res) => {
+    sendSession(res, await authService.verifyEmailCode(req.body as VerifyEmailCodeInput));
+  },
+);
 
 /** Always 202 with no body: the response must not reveal whether the email has an account. */
 authRouter.post(

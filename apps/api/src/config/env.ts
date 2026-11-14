@@ -20,8 +20,8 @@ const envSchema = z.object({
     .default("http://localhost:3000")
     .transform((value) => value.replace(/\/+$/, "")),
   PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(30),
-  /** How long an email verification link works. */
-  EMAIL_VERIFICATION_TTL_HOURS: z.coerce.number().int().positive().max(72).default(24),
+  /** How long an email verification code works. */
+  EMAIL_CODE_TTL_MINUTES: z.coerce.number().int().positive().max(60).default(10),
   /**
    * How many proxies sit in front of the API and add to X-Forwarded-For
    * (Express `trust proxy`). Used to find the real client IP for rate

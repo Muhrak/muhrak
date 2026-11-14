@@ -7,7 +7,7 @@ vi.hoisted(() => {
     DATABASE_URL: "postgres://test:test@localhost:5432/test",
     JWT_SECRET: "test-secret-that-is-at-least-32-characters-long",
     WEB_APP_URL: "https://muhrak.test",
-    EMAIL_VERIFICATION_TTL_HOURS: "24",
+    EMAIL_CODE_TTL_MINUTES: "10",
   });
 });
 
@@ -22,7 +22,7 @@ vi.mock("./auth.repository", () => ({
   markUserEmailVerified: vi.fn(),
   insertEmailVerificationToken: vi.fn(),
   findLatestEmailVerificationToken: vi.fn(),
-  findEmailVerificationTokenByHash: vi.fn(),
+  addEmailVerificationAttempt: vi.fn(),
   markEmailVerificationTokenUsed: vi.fn(),
   invalidateEmailVerificationTokensForUser: vi.fn(),
 }));
@@ -36,8 +36,10 @@ vi.mock("../notification", () => ({
 const repo = await import("./auth.repository");
 const { verifyPassword, hashPassword } = await import("./password");
 const { sendVerifyEmail, sendAccountExistsEmail } = await import("../notification");
-const { register, login, refresh, verifyEmail, resendVerificationEmail, VERIFY_REQUEST_COOLDOWN_MS } = await import("./auth.service");
-const { hashOneTimeToken, hashRefreshToken } = await import("./tokens");
+const { register, login, refresh, verifyEmailCode, resendVerificationEmail, VERIFY_REQUEST_COOLDOWN_MS, EMAIL_CODE_MAX_ATTEMPTS } = await import(
+  "./auth.service"
+);
+const { hashEmailCode, hashRefreshToken } = await import("./tokens");
 
 const now = new Date("2026-11-14T10:00:00Z");
 let n = 0;
@@ -63,8 +65,9 @@ function linkRow(overrides: Partial<EmailVerificationTokenRow> = {}): EmailVerif
     id: "44444444-4444-4444-8444-444444444444",
     userId: user().id,
     tokenHash: "hash",
-    expiresAt: new Date(now.getTime() + 24 * 3_600_000),
+    expiresAt: new Date(now.getTime() + 10 * 60_000),
     usedAt: null,
+    attempts: 0,
     createdAt: new Date(now.getTime() - 10 * 60_000),
     ...overrides,
   };
@@ -79,7 +82,7 @@ beforeEach(() => {
 describe("register", () => {
   const input = (email = freshEmail()) => ({ email, password: "a long password 1", fullName: "Khalid Al Amri", role: "seller" as const });
 
-  it("creates an unverified account, stores only a hash of the link and emails it", async () => {
+  it("creates an unverified account, stores only an HMAC of the code and emails the code", async () => {
     const data = input();
     vi.mocked(repo.findUserByEmail).mockResolvedValue(undefined);
     vi.mocked(repo.insertUser).mockResolvedValue(user({ email: data.email }));
@@ -90,15 +93,12 @@ describe("register", () => {
     expect(inserted).toMatchObject({ email: data.email, role: "seller", passwordHash: "scrypt$hash" });
     expect(inserted).not.toHaveProperty("emailVerifiedAt");
     const stored = vi.mocked(repo.insertEmailVerificationToken).mock.calls[0]?.[0];
-    expect(stored?.expiresAt).toEqual(new Date(now.getTime() + 24 * 3_600_000));
+    expect(stored?.expiresAt).toEqual(new Date(now.getTime() + 10 * 60_000));
     const email = vi.mocked(sendVerifyEmail).mock.calls[0]?.[0];
     expect(email?.to).toBe(data.email);
-    const url = new URL(email?.verifyUrl ?? "");
-    expect(url.origin + url.pathname).toBe("https://muhrak.test/seller/verify-email");
-    const token = url.searchParams.get("token") ?? "";
-    expect(token.length).toBeGreaterThanOrEqual(20);
-    expect(stored?.tokenHash).toBe(hashOneTimeToken(token));
-    expect(stored?.tokenHash).not.toBe(token);
+    expect(email?.code).toMatch(/^\d{6}$/);
+    expect(stored?.tokenHash).toBe(hashEmailCode(user().id, email?.code ?? ""));
+    expect(stored?.tokenHash).not.toContain(email?.code ?? "x");
   });
 
   it("does not sign the new user in (no session is created)", async () => {
@@ -197,36 +197,92 @@ describe("login before verification", () => {
   });
 });
 
-describe("verifyEmail", () => {
-  const token = "a-valid-looking-verification-token";
+describe("verifyEmailCode", () => {
+  const CODE = "482913";
+  const row = (overrides: Partial<EmailVerificationTokenRow> = {}) => linkRow({ tokenHash: hashEmailCode(user().id, CODE), ...overrides });
+  const attempt = (code = CODE, role: "buyer" | "seller" = "seller", email = freshEmail()) => verifyEmailCode({ email, code, role }, now);
 
-  it("verifies the account, uses the link once and returns the side, without signing in", async () => {
-    vi.mocked(repo.findEmailVerificationTokenByHash).mockResolvedValue(linkRow());
-    vi.mocked(repo.findUserById).mockResolvedValue(user());
+  it("a right code verifies the email, uses the code once and signs in on that side", async () => {
+    vi.mocked(repo.findUserByEmail).mockResolvedValue(user());
+    vi.mocked(repo.findLatestEmailVerificationToken).mockResolvedValue(row());
 
-    await expect(verifyEmail(token, now)).resolves.toEqual({ role: "seller" });
+    const session = await attempt();
 
-    expect(repo.findEmailVerificationTokenByHash).toHaveBeenCalledWith(hashOneTimeToken(token));
+    expect(session.user.role).toBe("seller");
     expect(repo.markEmailVerificationTokenUsed).toHaveBeenCalledWith(linkRow().id);
     expect(repo.markUserEmailVerified).toHaveBeenCalledWith(user().id, now);
+    expect(repo.insertRefreshToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("a wrong code counts an attempt and signs nobody in", async () => {
+    vi.mocked(repo.findUserByEmail).mockResolvedValue(user());
+    vi.mocked(repo.findLatestEmailVerificationToken).mockResolvedValue(row());
+    vi.mocked(repo.addEmailVerificationAttempt).mockResolvedValue(1);
+    await expect(attempt("000000")).rejects.toMatchObject({ status: 400 });
+    expect(repo.addEmailVerificationAttempt).toHaveBeenCalledWith(linkRow().id);
+    expect(repo.markUserEmailVerified).not.toHaveBeenCalled();
+    expect(repo.insertRefreshToken).not.toHaveBeenCalled();
+  });
+
+  it(`kills the code after ${EMAIL_CODE_MAX_ATTEMPTS} wrong guesses, and then even the right code fails`, async () => {
+    vi.mocked(repo.findUserByEmail).mockResolvedValue(user());
+    vi.mocked(repo.findLatestEmailVerificationToken).mockResolvedValue(row({ attempts: 4 }));
+    vi.mocked(repo.addEmailVerificationAttempt).mockResolvedValue(5);
+    await expect(attempt("111111")).rejects.toMatchObject({ status: 400 });
+    expect(repo.markEmailVerificationTokenUsed).toHaveBeenCalledWith(linkRow().id);
+
+    vi.clearAllMocks();
+    vi.mocked(repo.findUserByEmail).mockResolvedValue(user());
+    vi.mocked(repo.findLatestEmailVerificationToken).mockResolvedValue(row({ attempts: 5 }));
+    await expect(attempt(CODE)).rejects.toMatchObject({ status: 400 });
     expect(repo.insertRefreshToken).not.toHaveBeenCalled();
   });
 
   it.each([
-    ["unknown", undefined],
-    ["already used", linkRow({ usedAt: now })],
-    ["expired", linkRow({ expiresAt: new Date(now.getTime() - 1) })],
-  ])("rejects an %s link", async (_label, row) => {
-    vi.mocked(repo.findEmailVerificationTokenByHash).mockResolvedValue(row);
-    await expect(verifyEmail(token, now)).rejects.toMatchObject({ status: 400 });
+    ["an unknown email", undefined, row()],
+    ["an already verified account", user({ emailVerifiedAt: now }), row()],
+    ["an admin", user({ role: "admin" }), row()],
+    ["no code sent", user(), undefined],
+    ["a used code", user(), row({ usedAt: now })],
+    ["an expired code", user(), row({ expiresAt: new Date(now.getTime() - 1) })],
+  ])("gives the same answer for %s", async (_label, account, token) => {
+    vi.mocked(repo.findUserByEmail).mockResolvedValue(account);
+    vi.mocked(repo.findLatestEmailVerificationToken).mockResolvedValue(token);
+    await expect(attempt()).rejects.toMatchObject({ status: 400, message: expect.stringContaining("not right or has expired") });
+    expect(repo.insertRefreshToken).not.toHaveBeenCalled();
+  });
+
+  it("refuses the right code on the other side (buyer/seller isolation)", async () => {
+    vi.mocked(repo.findUserByEmail).mockResolvedValue(user());
+    vi.mocked(repo.findLatestEmailVerificationToken).mockResolvedValue(row());
+    await expect(attempt(CODE, "buyer")).rejects.toMatchObject({ status: 400 });
     expect(repo.markUserEmailVerified).not.toHaveBeenCalled();
   });
 
-  it("rejects a link used by a parallel request (double click)", async () => {
-    vi.mocked(repo.findEmailVerificationTokenByHash).mockResolvedValue(linkRow());
+  it("a code only works for its own account (the HMAC is bound to the user)", async () => {
+    const other = user({ id: "66666666-6666-4666-8666-666666666666" });
+    vi.mocked(repo.findUserByEmail).mockResolvedValue(other);
+    // A row holding the code hashed for a DIFFERENT user.
+    vi.mocked(repo.findLatestEmailVerificationToken).mockResolvedValue(row());
+    vi.mocked(repo.addEmailVerificationAttempt).mockResolvedValue(1);
+    await expect(attempt(CODE)).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("a double submit signs in only once", async () => {
+    vi.mocked(repo.findUserByEmail).mockResolvedValue(user());
+    vi.mocked(repo.findLatestEmailVerificationToken).mockResolvedValue(row());
     vi.mocked(repo.markEmailVerificationTokenUsed).mockResolvedValue(false);
-    await expect(verifyEmail(token, now)).rejects.toMatchObject({ status: 400 });
-    expect(repo.markUserEmailVerified).not.toHaveBeenCalled();
+    await expect(attempt()).rejects.toMatchObject({ status: 400 });
+    expect(repo.insertRefreshToken).not.toHaveBeenCalled();
+  });
+
+  it("limits code checks per address across codes (429)", async () => {
+    const email = freshEmail();
+    vi.mocked(repo.findUserByEmail).mockResolvedValue(user());
+    vi.mocked(repo.findLatestEmailVerificationToken).mockResolvedValue(row());
+    vi.mocked(repo.addEmailVerificationAttempt).mockResolvedValue(1);
+    for (let i = 0; i < 15; i++) await expect(attempt("000000", "seller", email)).rejects.toMatchObject({ status: 400 });
+    await expect(attempt(CODE, "seller", email)).rejects.toMatchObject({ status: 429 });
   });
 });
 

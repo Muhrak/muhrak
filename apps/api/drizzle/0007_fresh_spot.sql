@@ -1,0 +1,2 @@
+ALTER TABLE "email_verification_tokens" DROP CONSTRAINT "email_verification_tokens_token_hash_unique";--> statement-breakpoint
+ALTER TABLE "email_verification_tokens" ADD COLUMN "attempts" integer DEFAULT 0 NOT NULL;

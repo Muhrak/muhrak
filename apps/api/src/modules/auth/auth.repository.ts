@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../../db/client";
 import {
   emailVerificationTokens,
@@ -156,12 +156,20 @@ export async function findLatestEmailVerificationToken(userId: string): Promise<
   return rows[0];
 }
 
-export async function findEmailVerificationTokenByHash(tokenHash: string): Promise<EmailVerificationTokenRow | undefined> {
-  const rows = await db.select().from(emailVerificationTokens).where(eq(emailVerificationTokens.tokenHash, tokenHash)).limit(1);
-  return rows[0];
+/**
+ * Count one wrong guess, only while the code is unused. Returns the new count,
+ * or null if the code was already used (or used up) by another request.
+ */
+export async function addEmailVerificationAttempt(id: string): Promise<number | null> {
+  const rows = await db
+    .update(emailVerificationTokens)
+    .set({ attempts: sql`${emailVerificationTokens.attempts} + 1` })
+    .where(and(eq(emailVerificationTokens.id, id), isNull(emailVerificationTokens.usedAt)))
+    .returning({ attempts: emailVerificationTokens.attempts });
+  return rows[0]?.attempts ?? null;
 }
 
-/** Mark one link as used. Returns true only if THIS call used it, so a link cannot be used twice. */
+/** Mark one code as used. Returns true only if THIS call used it, so a code cannot be used twice. */
 export async function markEmailVerificationTokenUsed(id: string): Promise<boolean> {
   const rows = await db
     .update(emailVerificationTokens)
@@ -171,7 +179,7 @@ export async function markEmailVerificationTokenUsed(id: string): Promise<boolea
   return rows.length === 1;
 }
 
-/** Cancel every unused link for a user, so only the newest email works. */
+/** Cancel every unused code for a user, so only the newest email works. */
 export async function invalidateEmailVerificationTokensForUser(userId: string): Promise<void> {
   await db
     .update(emailVerificationTokens)
