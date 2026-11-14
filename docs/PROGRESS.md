@@ -121,6 +121,20 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
 - Tests: 7 review tests (abuse cases), 27-check API run (wrong side, wrong
   role, tampered cursor, stale review, race), browser run of the console.
 
+### Bug fix: login stuck after logout (Sat 14 Nov)
+- After logging out (buyer, seller or admin), the login page showed
+  "Logging in…" forever, with the email and password still filled in.
+  Cause: Next.js (`cacheComponents`) keeps visited pages alive, and the
+  login form's state sat above `SignedOutOnly`, so it survived sign-out.
+- Fix: the form and its state now live inside `SignedOutOnly`
+  (`LoginFormBody` in `features/auth/login-form.tsx` and
+  `features/admin/login-form.tsx`); each sign-in or sign-out remounts an
+  empty form. Sign-up forms already worked this way.
+- Tested in the browser on all three sides: log in → move around without
+  reloading → log out → empty form, working button → log in again.
+- Rule for new forms: keep state that must not outlive a session inside
+  the auth gate, not above it.
+
 ### Two standalone apps (Sat 14 Nov)
 - Removed `packages/schemas`, `pnpm-workspace.yaml`, `turbo.json`, the root
   `package.json` and lockfile, `tsconfig.base.json` and `docker-compose.yml`.

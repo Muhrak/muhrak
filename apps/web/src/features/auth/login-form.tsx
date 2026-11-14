@@ -26,6 +26,21 @@ const formSchema = loginSchema.omit({ role: true });
  * on this side. After login, SignedOutOnly sends the user on.
  */
 export function LoginForm({ side }: { side: PortalSide }) {
+  return (
+    <SignedOutOnly side={side}>
+      <LoginFormBody side={side} />
+    </SignedOutOnly>
+  );
+}
+
+/**
+ * The form and its state live INSIDE SignedOutOnly on purpose: Next.js keeps
+ * visited pages alive in the background, so state held above the gate
+ * survived sign-out (button stuck on "Logging in…", email and password
+ * still filled in). Inside, every sign-in or sign-out remounts a fresh,
+ * empty form.
+ */
+function LoginFormBody({ side }: { side: PortalSide }) {
   const [notice, setNotice] = useState<string>();
   const {
     register,
@@ -44,56 +59,54 @@ export function LoginForm({ side }: { side: PortalSide }) {
   });
 
   return (
-    <SignedOutOnly side={side}>
-      <div className="flex flex-col">
-        <SocialButtons onUnavailable={(provider) => setNotice(`${provider} sign-in is coming soon. Use your email for now.`)} />
-        <div className="mt-5">
-          <OrDivider />
+    <div className="flex flex-col">
+      <SocialButtons onUnavailable={(provider) => setNotice(`${provider} sign-in is coming soon. Use your email for now.`)} />
+      <div className="mt-5">
+        <OrDivider />
+      </div>
+
+      <form method="post" onSubmit={handleSubmit((values) => mutation.mutate(values))} noValidate className="mt-5 flex flex-col">
+        <div className="flex flex-col gap-[18px]">
+          <Field
+            id="email"
+            label="Email"
+            type="email"
+            autoComplete="email"
+            placeholder={side === "seller" ? "eg. ahmed@alnoorparts.om" : "eg. khalid@email.com"}
+            error={errors.email?.message}
+            {...register("email")}
+          />
+          <PasswordField
+            id="password"
+            label="Password"
+            autoComplete="current-password"
+            placeholder="Enter your password"
+            error={errors.password?.message}
+            footer={
+              <Link
+                href={RESET_PATH[side]}
+                className="justify-self-end rounded-sm text-[13px] leading-[normal] font-medium text-ink outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                Forgot password?
+              </Link>
+            }
+            {...register("password")}
+          />
+          <FormNotice message={notice} />
+          <FormError message={errors.root?.server?.message} />
         </div>
 
-        <form method="post" onSubmit={handleSubmit((values) => mutation.mutate(values))} noValidate className="mt-5 flex flex-col">
-          <div className="flex flex-col gap-[18px]">
-            <Field
-              id="email"
-              label="Email"
-              type="email"
-              autoComplete="email"
-              placeholder={side === "seller" ? "eg. ahmed@alnoorparts.om" : "eg. khalid@email.com"}
-              error={errors.email?.message}
-              {...register("email")}
-            />
-            <PasswordField
-              id="password"
-              label="Password"
-              autoComplete="current-password"
-              placeholder="Enter your password"
-              error={errors.password?.message}
-              footer={
-                <Link
-                  href={RESET_PATH[side]}
-                  className="justify-self-end rounded-sm text-[13px] leading-[normal] font-medium text-ink outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  Forgot password?
-                </Link>
-              }
-              {...register("password")}
-            />
-            <FormNotice message={notice} />
-            <FormError message={errors.root?.server?.message} />
-          </div>
+        <Button type="submit" disabled={mutation.isPending || mutation.isSuccess} className={`mt-7 ${primaryButtonClass}`}>
+          {mutation.isPending || mutation.isSuccess ? "Logging in…" : "Log In"}
+        </Button>
+      </form>
 
-          <Button type="submit" disabled={mutation.isPending || mutation.isSuccess} className={`mt-7 ${primaryButtonClass}`}>
-            {mutation.isPending || mutation.isSuccess ? "Logging in…" : "Log In"}
-          </Button>
-        </form>
-
-        <p className="mt-6 text-center text-sm leading-[normal] text-ink-tertiary">
-          {side === "seller" ? "New to selling on Muhrak?" : "Don’t have an account?"}{" "}
-          <Link href={SIGNUP_PATH[side]} className="font-medium text-ink hover:underline">
-            Sign up
-          </Link>
-        </p>
-      </div>
-    </SignedOutOnly>
+      <p className="mt-6 text-center text-sm leading-[normal] text-ink-tertiary">
+        {side === "seller" ? "New to selling on Muhrak?" : "Don’t have an account?"}{" "}
+        <Link href={SIGNUP_PATH[side]} className="font-medium text-ink hover:underline">
+          Sign up
+        </Link>
+      </p>
+    </div>
   );
 }
