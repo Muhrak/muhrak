@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import type { FaqItem } from "./faq-accordion";
 import { MobileGlow } from "./mobile-glow";
 import { AiFeature, Benefits, Cta, Faq, Footer, heroUnit, onCanvas, SiteNav, StatsStrip } from "./sections";
-import { SellerEmailCapture } from "./seller-email-capture";
+import { SellerHeroAction } from "./seller-email-capture";
 
 /**
  * Seller landing page: Figma "Seller – Landing" (node 285:12), converted
@@ -173,7 +173,7 @@ function Hero() {
           Workshops, fleets and contractors search Muhrak for parts every day.
           <br className="hidden sm:block" /> One seller account puts your store in front of them.
         </p>
-        <SellerEmailCapture className="mx-auto mt-8 lg:mt-[min(37px,calc(37*var(--hv)))]" />
+        <SellerHeroAction className="mx-auto mt-8 lg:mt-[min(37px,calc(37*var(--hv)))]" />
         <p className="mt-5 text-[13px] leading-[1.3] text-ink-tertiary lg:mt-[min(20px,calc(20*var(--hv)))]">No listing fees · Free seller dashboard · Live in 24 hours</p>
 
         {/* Desktop: wordmarks at their Figma positions. */}

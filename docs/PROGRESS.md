@@ -212,6 +212,9 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
 - Buyers land on `/` after login or sign-up, sellers on `/sell`, unless they
   were sent to login from a protected page (then they go back there).
 - Seller hero email box opens seller sign-up with the email filled in.
+  A signed-in seller sees "Signed in as <name>" and "Go to Seller Centre"
+  in the same pill instead (14 Nov 2026; phone shows just the name). A
+  signed-in buyer still sees the email box (visitor on the seller side).
 - Mobile has its own hero style (developer reference `refs/mobile view ref.jpg`).
 
 ### Bug fixes (Thu 12 Nov)
