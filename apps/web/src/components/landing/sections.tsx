@@ -49,7 +49,8 @@ export const solidPill = cn(
 
 // ---------------------------------------------------------------- nav
 
-export function SiteNav({ side }: { side: LandingSide }) {
+/** `current`: the nav label of the page being shown (bold, as in Figma). */
+export function SiteNav({ side, current }: { side: LandingSide; current?: string }) {
   const links = side === "seller" ? SELLER_NAV_LINKS : NAV_LINKS;
   return (
     <header className="relative z-20 flex items-center px-4 py-5 sm:px-12">
@@ -60,7 +61,12 @@ export function SiteNav({ side }: { side: LandingSide }) {
       <nav aria-label="Main" className="hidden gap-10 text-sm leading-[1.3] text-[rgba(10,11,18,0.78)] lg:flex">
         {links.map((link) =>
           link.href ? (
-            <a key={link.label} href={link.href} className="hover:text-ink">
+            <a
+              key={link.label}
+              href={link.href}
+              aria-current={link.label === current ? "page" : undefined}
+              className={cn("hover:text-ink", link.label === current && "font-medium text-ink")}
+            >
               {link.label}
             </a>
           ) : (
@@ -338,8 +344,7 @@ const FOOTER_COLUMNS: { title: string; links: FooterLink[] }[] = [
   {
     title: "Buy",
     links: [
-      { label: "Manufacturers", href: "/#how-it-works" },
-      { label: "Distributors", href: "/#how-it-works" },
+      { label: "Sellers", href: "/sellers" },
       { label: "Muhrak AI", href: "/#muhrak-ai" },
       { label: "Garage" },
     ],

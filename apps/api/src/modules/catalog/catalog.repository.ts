@@ -220,3 +220,87 @@ export async function countSellerProducts(sellerUserId: string): Promise<Record<
     .where(eq(products.sellerUserId, sellerUserId));
   return rows[0] ?? { all: 0, published: 0, draft: 0, archived: 0, out_of_stock: 0 };
 }
+
+// ---------------------------------------------------------------- public storefront (published products only)
+
+const published = eq(products.status, "published");
+
+/** Live products per seller, and per seller and category (for the card's main category). */
+export async function countPublishedBySellerAndCategory(sellerIds: string[]): Promise<{ sellerUserId: string; categoryId: string; count: number }[]> {
+  if (sellerIds.length === 0) return [];
+  return db
+    .select({ sellerUserId: products.sellerUserId, categoryId: products.categoryId, count: sql<number>`count(*)::int` })
+    .from(products)
+    .where(and(published, inArray(products.sellerUserId, sellerIds)))
+    .groupBy(products.sellerUserId, products.categoryId);
+}
+
+/** The newest live product of each seller (its first photo is the directory card image). */
+export async function findNewestPublishedPerSeller(sellerIds: string[]): Promise<{ sellerUserId: string; productId: string }[]> {
+  if (sellerIds.length === 0) return [];
+  const rows = await db.execute<{ seller_user_id: string; id: string }>(sql`
+    select distinct on (${products.sellerUserId}) ${products.sellerUserId} as seller_user_id, ${products.id} as id
+    from ${products}
+    where ${products.status} = 'published' and ${inArray(products.sellerUserId, sellerIds)}
+      and exists (select 1 from ${productPhotos} where ${productPhotos.productId} = ${products.id})
+    order by ${products.sellerUserId}, ${products.publishedAt} desc
+  `);
+  return rows.rows.map((row) => ({ sellerUserId: row.seller_user_id, productId: row.id }));
+}
+
+/** Sellers (among `sellerIds`) with at least one live product in the category. */
+export async function findSellersPublishingInCategory(categoryId: string, sellerIds: string[]): Promise<string[]> {
+  if (sellerIds.length === 0) return [];
+  const rows = await db
+    .selectDistinct({ sellerUserId: products.sellerUserId })
+    .from(products)
+    .where(and(published, eq(products.categoryId, categoryId), inArray(products.sellerUserId, sellerIds)));
+  return rows.map((row) => row.sellerUserId);
+}
+
+/** Sellers (among `sellerIds`) with a live product matching a part number, a machine or a part brand. */
+export async function findSellersByProductText(
+  input: { partNumber: string; fitment: string; brandPattern: string },
+  sellerIds: string[],
+): Promise<string[]> {
+  if (sellerIds.length === 0) return [];
+  const rows = await db
+    .selectDistinct({ sellerUserId: products.sellerUserId })
+    .from(products)
+    .where(
+      and(
+        published,
+        inArray(products.sellerUserId, sellerIds),
+        or(
+          ilike(products.brand, input.brandPattern),
+          input.partNumber
+            ? sql`exists (select 1 from ${productPartNumbers} where ${productPartNumbers.productId} = ${products.id} and ${productPartNumbers.normalized} like ${`${input.partNumber}%`})`
+            : undefined,
+          input.fitment
+            ? sql`exists (select 1 from ${productFitments} where ${productFitments.productId} = ${products.id} and ${productFitments.normalized} like ${`%${input.fitment}%`})`
+            : undefined,
+        ),
+      ),
+    );
+  return rows.map((row) => row.sellerUserId);
+}
+
+/** One page of a seller's live products, newest first. */
+export async function listPublishedForSeller(input: {
+  sellerUserId: string;
+  categoryId: string | null;
+  offset: number;
+  limit: number;
+}): Promise<{ rows: ProductRow[]; total: number }> {
+  const where = and(
+    published,
+    eq(products.sellerUserId, input.sellerUserId),
+    input.categoryId ? eq(products.categoryId, input.categoryId) : undefined,
+  );
+  const [rows, counted] = await Promise.all([
+    db.select().from(products).where(where).orderBy(desc(products.publishedAt), desc(products.id)).offset(input.offset).limit(input.limit),
+    db.select({ count: sql<number>`count(*)::int` }).from(products).where(where),
+  ]);
+  return { rows, total: counted[0]?.count ?? 0 };
+}
+

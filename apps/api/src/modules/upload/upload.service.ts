@@ -14,12 +14,17 @@ import type { UploadRow } from "../../db/schema";
 import { badRequest, forbidden, notFound } from "../../shared/errors";
 import { logger } from "../../shared/logger";
 import { hit, tooManyRequests, type Limit } from "../../shared/rate-limit";
-import { PhotoRejected, processProductPhoto } from "./photo";
+import { PhotoRejected, processLogo, processProductPhoto } from "./photo";
 import * as repo from "./upload.repository";
 import { getStorage } from "./storage";
 
 /** Product photos never change once written (new photo = new key): cache them for a year. */
 const PUBLIC_PHOTO_CACHE = "public, max-age=31536000, immutable";
+
+/** Where a logo's cleaned copy lives (public: store pages show it). */
+export function logoKey(uploadId: string): string {
+  return `public/logos/${uploadId}.webp`;
+}
 
 /** Where a product photo's cleaned copies live. Random upload id only: nothing the user typed. */
 export function productPhotoKeys(uploadId: string): { large: string; thumb: string } {
@@ -102,7 +107,11 @@ export async function createUpload(
     sizeBytes: input.sizeBytes,
     // Product photos are re-encoded into the public folder; everything else is copied as checked.
     storageKey:
-      input.purpose === "product_photo" ? productPhotoKeys(id).large : `files/${input.purpose}/${id}.${EXTENSION[input.contentType]}`,
+      input.purpose === "product_photo"
+        ? productPhotoKeys(id).large
+        : input.purpose === "seller_logo"
+          ? logoKey(id)
+          : `files/${input.purpose}/${id}.${EXTENSION[input.contentType]}`,
   });
   const link = await storage.createUploadUrl(
     pendingKey(row.id),
@@ -155,7 +164,16 @@ export async function completeUpload(userId: string, uploadId: string, now = new
     );
   }
 
-  if (row.purpose === "product_photo") {
+  if (row.purpose === "seller_logo") {
+    // Logos are public on store pages: re-encode, never publish the uploaded bytes.
+    try {
+      const logo = await processLogo(await storage.read(source, stored.etag));
+      await storage.put(logoKey(row.id), logo, { contentType: "image/webp", cacheControl: PUBLIC_PHOTO_CACHE });
+    } catch (error) {
+      if (error instanceof PhotoRejected) throw await reject(error.message, error.userMessage);
+      throw error;
+    }
+  } else if (row.purpose === "product_photo") {
     // Re-encode exactly the version we checked: metadata gone, safe pixels only.
     try {
       const photo = await processProductPhoto(await storage.read(source, stored.etag));
@@ -203,6 +221,37 @@ export async function getProductPhotoUrls(uploadIds: string[]): Promise<Map<stri
   return result;
 }
 
+/**
+ * For other modules (public store pages): public URLs of ready seller logos.
+ * Logos uploaded before 14 Nov 2026 were stored privately and never
+ * re-encoded; the first time one is needed it is cleaned and moved to the
+ * public folder (once; safe if two requests do it at the same time). A logo
+ * that cannot be processed is simply left out (the page shows initials).
+ */
+export async function getPublicLogoUrls(uploadIds: string[]): Promise<Map<string, string>> {
+  const rows = await repo.findUploads(uploadIds);
+  const result = new Map<string, string>();
+  if (rows.length === 0) return result;
+  const storage = getStorage();
+  for (const row of rows) {
+    if (row.purpose !== "seller_logo" || row.status !== "ready") continue;
+    if (!row.storageKey.startsWith("public/")) {
+      try {
+        const stored = await storage.stat(row.storageKey);
+        if (!stored) continue;
+        const logo = await processLogo(await storage.read(row.storageKey, stored.etag));
+        await storage.put(logoKey(row.id), logo, { contentType: "image/webp", cacheControl: PUBLIC_PHOTO_CACHE });
+        await repo.updateStorageKey(row.id, logoKey(row.id));
+      } catch (error) {
+        logger.warn({ uploadId: row.id, err: { message: (error as Error).message } }, "Could not publish an older logo");
+        continue;
+      }
+    }
+    result.set(row.id, storage.publicUrl(logoKey(row.id)));
+  }
+  return result;
+}
+
 /** For other modules: facts about uploads they already reference. */
 export async function getUploads(uploadIds: string[]): Promise<Upload[]> {
   return (await repo.findUploads(uploadIds)).map(toUpload);
@@ -217,7 +266,8 @@ export async function getDownloadLink(uploadId: string, expiresInSeconds: number
   if (!row || row.status !== "ready") throw notFound("File not found");
   const url = await getStorage().createDownloadUrl(
     row.storageKey,
-    { contentType: row.contentType, fileName: row.storageKey.split("/").pop() ?? "file" },
+    // Re-encoded images are WebP whatever was uploaded.
+    { contentType: row.storageKey.endsWith(".webp") ? "image/webp" : row.contentType, fileName: row.storageKey.split("/").pop() ?? "file" },
     expiresInSeconds,
   );
   return { url, expiresAt: new Date(now.getTime() + expiresInSeconds * 1000).toISOString() };

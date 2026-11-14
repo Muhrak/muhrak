@@ -5,6 +5,7 @@ import {
   type AdminSellerListQuery,
   type AdminSellerStats,
   type DocumentType,
+  type GccCountry,
   type ReviewSellerData,
   type SellerAccount,
   type SellerDocument,
@@ -486,3 +487,63 @@ export async function reviewSeller(
 export async function isSellerVerified(userId: string): Promise<boolean> {
   return (await repo.findProfile(userId))?.verificationStatus === "approved";
 }
+
+// ---------------------------------------------------------------- public directory (for the storefront module)
+
+/** What a public page may show about a verified seller. Never email, phone, website, CR or VAT. */
+export interface PublicSellerProfile {
+  userId: string;
+  companyName: string;
+  about: string;
+  city: string;
+  country: GccCountry;
+  brands: string[];
+  logoUploadId: string | null;
+  verifiedAt: Date | null;
+  createdAt: Date;
+}
+
+function toPublicProfile(row: SellerProfileRow): PublicSellerProfile {
+  return {
+    userId: row.userId,
+    companyName: row.companyName,
+    about: row.about,
+    city: row.city,
+    country: row.country as GccCountry,
+    brands: row.brands,
+    logoUploadId: row.logoUploadId,
+    verifiedAt: row.reviewedAt,
+    createdAt: row.createdAt,
+  };
+}
+
+export async function listVerifiedSellerIds(): Promise<string[]> {
+  return repo.findVerifiedSellerIds();
+}
+
+/** A verified seller's public profile, or undefined (not a seller, not verified, or no longer verified). */
+export async function getVerifiedSellerProfile(userId: string): Promise<PublicSellerProfile | undefined> {
+  const row = await repo.findVerifiedProfile(userId);
+  return row ? toPublicProfile(row) : undefined;
+}
+
+export async function listVerifiedSellersPage(input: {
+  ids: string[] | null;
+  q: string | null;
+  alsoMatchingIds: string[];
+  sort: "name" | "newest";
+  offset: number;
+  limit: number;
+}): Promise<{ rows: PublicSellerProfile[]; total: number }> {
+  const filter: repo.VerifiedProfileFilter = {
+    ids: input.ids,
+    // Escape LIKE wildcards so a search for "50%" means the text "50%".
+    q: input.q ? { pattern: `%${input.q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`, alsoIds: input.alsoMatchingIds } : null,
+  };
+  const [rows, total] = await Promise.all([
+    repo.listVerifiedProfiles({ ...filter, sort: input.sort, offset: input.offset, limit: input.limit }),
+    repo.countVerifiedProfiles(filter),
+  ]);
+  return { rows: rows.map(toPublicProfile), total };
+}
+

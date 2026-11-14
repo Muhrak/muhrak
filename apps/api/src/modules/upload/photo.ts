@@ -61,3 +61,34 @@ export async function processProductPhoto(input: Uint8Array): Promise<{ large: U
     throw new PhotoRejected(`encode failed: ${(error as Error).message.slice(0, 120)}`, "This photo could not be processed. Please choose another one.");
   }
 }
+
+const LOGO_PX = 512;
+
+/**
+ * A seller logo shown on public store pages: decoded and re-encoded like
+ * product photos (metadata dropped, rotation applied), max 512 px, WebP
+ * with transparency kept.
+ */
+export async function processLogo(input: Uint8Array): Promise<Uint8Array> {
+  let image: Sharp;
+  let meta: Metadata;
+  try {
+    image = sharp(input, { limitInputPixels: MAX_INPUT_PIXELS, failOn: "error", animated: false });
+    meta = await image.metadata();
+  } catch (error) {
+    throw new PhotoRejected(`decode failed: ${(error as Error).message.slice(0, 120)}`, "This logo could not be read. Please choose another file.");
+  }
+  if (!meta.width || !meta.height || meta.width < 32 || meta.height < 32) {
+    throw new PhotoRejected(`too small ${meta.width}x${meta.height}`, "This logo is too small. Use one at least 32 × 32 pixels.");
+  }
+  try {
+    const out = await image
+      .rotate()
+      .resize({ width: LOGO_PX, height: LOGO_PX, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 90, alphaQuality: 100 })
+      .toBuffer();
+    return new Uint8Array(out);
+  } catch (error) {
+    throw new PhotoRejected(`encode failed: ${(error as Error).message.slice(0, 120)}`, "This logo could not be processed. Please choose another file.");
+  }
+}

@@ -205,6 +205,8 @@ export const sellerProfiles = pgTable(
     // Admin lists: one status, most recently changed first; and all sellers, newest first.
     index("seller_profiles_status_updated_idx").on(table.verificationStatus, table.updatedAt),
     index("seller_profiles_created_idx").on(table.createdAt),
+    // Public Sellers directory: verified sellers by name.
+    index("seller_profiles_status_name_idx").on(table.verificationStatus, table.companyName),
   ],
 );
 

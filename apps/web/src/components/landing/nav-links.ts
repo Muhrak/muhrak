@@ -1,7 +1,11 @@
-/** Landing page nav links (Figma "Buyer – Landing v2" › Nav › Links). Garage has no page yet, so it is plain text. */
+/**
+ * Buyer nav links (Figma "Buyer – Landing v2" › Nav › Links). "Manufacturers"
+ * was renamed "Sellers" (developer decision, 14 Nov 2026: one seller type).
+ * Garage has no page yet, so it is plain text.
+ */
 export const NAV_LINKS: { label: string; href?: string }[] = [
-  { label: "Manufacturers", href: "#how-it-works" },
-  { label: "Muhrak AI", href: "#muhrak-ai" },
+  { label: "Sellers", href: "/sellers" },
+  { label: "Muhrak AI", href: "/#muhrak-ai" },
   { label: "Garage" },
 ];
 

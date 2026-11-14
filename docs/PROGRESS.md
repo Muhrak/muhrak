@@ -120,6 +120,36 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
 - Tests: 7 review tests (abuse cases), 27-check API run (wrong side, wrong
   role, tampered cursor, stale review, race), browser run of the console.
 
+### Public Sellers directory and seller profile (Sat 14 Nov, early)
+- Developer decisions: "Manufacturers" renamed "Sellers" (nav -> `/sellers`,
+  page title, footer: one "Sellers" link replaces Manufacturers and
+  Distributors). Figma "Buyer – Manufacturers v2" (244:6812) and "Buyer –
+  Manufacturer Profile v2" (245:6812) are dark only: built LIGHT with the
+  buyer palette (landing aurora and dome, ink text, white cards), layout
+  and sizes from the frames. Profile shows only Overview and Products tabs;
+  no "Established" / "Replies within" lines, no Send inquiry / How to order
+  (they come with quote requests); only a "New" label (verified or
+  published in the last 30 days), no "Top supplier" yet.
+- API `storefront` module (public, no sign-in, 300 requests / 5 min per
+  IP): `GET /v1/sellers` (search by company, brand, machine model or part
+  number; category tabs with seller counts; sort A–Z or newest; 8 per
+  page, numbered pages), `GET /v1/sellers/:id`, `GET /v1/sellers/:id/products`.
+  It owns no tables: verified sellers come from the seller module, live
+  products from the catalog. Only VERIFIED sellers and PUBLISHED products;
+  an unverified or unknown seller is a 404, products included; never
+  email, phone, website, CR or VAT (buyers deal through Muhrak).
+- Seller logos are now public too, so they are re-encoded like product
+  photos (metadata dropped, 512 px WebP, transparency kept) into
+  `public/logos/`. Logos uploaded before today are converted the first time
+  a public page needs them.
+- Index `seller_profiles_status_name_idx` (migration `0009`).
+- Company profile "Preview store" now opens the seller's public page.
+- Tested: 7 storefront service tests (404 for unverified, no private
+  fields, filters only among verified sellers, New label) and a browser run
+  with 12 checks (nav/footer rename, directory, search by part number,
+  category tab, profile, overview, 404s, no private data), desktop and
+  phone. The bucket's `public/` folder answers publicly now (photos load).
+
 ### Day 5: categories and products (Sat 14 Nov)
 - Fields shaped by real buyer requests (developer's WhatsApp examples):
   buyers ask by machine ("Kobelco 380", "Doosan 300") and by part number

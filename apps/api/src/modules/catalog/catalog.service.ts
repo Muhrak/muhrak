@@ -11,6 +11,7 @@ import {
   type ProductStatus,
   type ProductStatusAction,
   type ProductSummary,
+  type PublicProductCard,
 } from "../../schemas";
 import type { CategoryRow, ProductRow } from "../../db/schema";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/errors";
@@ -296,4 +297,100 @@ export async function listProducts(sellerUserId: string, query: ProductListQuery
   }));
   const last = page.at(-1);
   return { items, nextCursor: rows.length > query.limit && last ? encodeCursor(last) : null, counts };
+}
+
+// ---------------------------------------------------------------- public storefront (for the storefront module)
+// Callers pass only VERIFIED seller ids; everything here is published products only.
+
+export interface SellerCatalogStats {
+  productCount: number;
+  mainCategory: string | null;
+  coverPhotoUrl: string | null;
+  /** Live products per category. */
+  categories: { id: string; name: string; count: number }[];
+}
+
+export async function getSellerCatalogStats(sellerIds: string[]): Promise<Map<string, SellerCatalogStats>> {
+  const [counts, newest] = await Promise.all([repo.countPublishedBySellerAndCategory(sellerIds), repo.findNewestPublishedPerSeller(sellerIds)]);
+  const categoryRows = await repo.findCategories([...new Set(counts.map((row) => row.categoryId))]);
+  const categoryName = new Map(categoryRows.map((row) => [row.id, row.name]));
+  const covers = await repo.findChildren(newest.map((row) => row.productId));
+  const coverUpload = new Map(newest.map((row) => [row.sellerUserId, covers.photos.find((photo) => photo.productId === row.productId)?.uploadId]));
+  const urls = await getProductPhotoUrls([...coverUpload.values()].filter((id): id is string => Boolean(id)));
+
+  const result = new Map<string, SellerCatalogStats>();
+  for (const sellerId of sellerIds) {
+    const rows = counts.filter((row) => row.sellerUserId === sellerId).sort((a, b) => b.count - a.count);
+    const cover = coverUpload.get(sellerId);
+    result.set(sellerId, {
+      productCount: rows.reduce((sum, row) => sum + row.count, 0),
+      mainCategory: rows[0] ? (categoryName.get(rows[0].categoryId) ?? null) : null,
+      coverPhotoUrl: cover ? (urls.get(cover)?.url ?? null) : null,
+      categories: rows.map((row) => ({ id: row.categoryId, name: categoryName.get(row.categoryId) ?? "", count: row.count })),
+    });
+  }
+  return result;
+}
+
+/** Directory tabs: for each category, how many of these sellers have live products in it. */
+export async function countSellersPerCategory(sellerIds: string[]): Promise<{ id: string; name: string; count: number }[]> {
+  const counts = await repo.countPublishedBySellerAndCategory(sellerIds);
+  const sellersPerCategory = new Map<string, Set<string>>();
+  for (const row of counts) {
+    const set = sellersPerCategory.get(row.categoryId) ?? new Set<string>();
+    set.add(row.sellerUserId);
+    sellersPerCategory.set(row.categoryId, set);
+  }
+  const categories = await repo.listCategories();
+  return categories.flatMap((category) => {
+    const count = sellersPerCategory.get(category.id)?.size ?? 0;
+    return count > 0 ? [{ id: category.id, name: category.name, count }] : [];
+  });
+}
+
+export function sellersPublishingInCategory(categoryId: string, sellerIds: string[]): Promise<string[]> {
+  return repo.findSellersPublishingInCategory(categoryId, sellerIds);
+}
+
+/** Sellers whose live products match a search by part number, machine (make/model) or part brand. */
+export function sellersMatchingProductText(text: string, sellerIds: string[]): Promise<string[]> {
+  const brandPattern = `%${text.replace(/[\%_]/g, (char) => `\${char}`)}%`;
+  return repo.findSellersByProductText(
+    { partNumber: normalizePartNumber(text), fitment: text.toLowerCase().replace(/[^a-z0-9]/g, ""), brandPattern },
+    sellerIds,
+  );
+}
+
+const NEW_PRODUCT_DAYS = 30;
+
+/** One page of a (verified) seller's live products, for their public profile. */
+export async function listPublishedProducts(input: {
+  sellerUserId: string;
+  categoryId: string | null;
+  page: number;
+  pageSize: number;
+  now?: Date;
+}): Promise<{ items: PublicProductCard[]; total: number }> {
+  const { rows, total } = await repo.listPublishedForSeller({
+    sellerUserId: input.sellerUserId,
+    categoryId: input.categoryId,
+    offset: (input.page - 1) * input.pageSize,
+    limit: input.pageSize,
+  });
+  const products = await toProducts(rows);
+  const now = (input.now ?? new Date()).getTime();
+  return {
+    total,
+    items: products.map((product) => ({
+      id: product.id,
+      name: product.name,
+      partNumber: product.partNumbers[0] ?? null,
+      categoryName: product.category.name,
+      condition: product.condition,
+      price: product.price,
+      unit: product.unit,
+      photoUrl: product.photos[0]?.url ?? null,
+      isNew: product.publishedAt !== null && now - new Date(product.publishedAt).getTime() < NEW_PRODUCT_DAYS * 86_400_000,
+    })),
+  };
 }

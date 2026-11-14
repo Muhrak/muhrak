@@ -31,6 +31,11 @@ export async function markReady(id: string): Promise<UploadRow | undefined> {
   return rows[0];
 }
 
+/** The file now lives at `storageKey` (e.g. a logo moved to the public folder after re-encoding). */
+export async function updateStorageKey(id: string, storageKey: string): Promise<void> {
+  await db.update(uploads).set({ storageKey }).where(eq(uploads.id, id));
+}
+
 export async function markRejected(id: string, reason: string): Promise<void> {
   await db
     .update(uploads)

@@ -70,10 +70,10 @@ export function CompanyProfile() {
   if (account.isError || !user) {
     return <FormError message="Could not load your company profile. Reload the page to try again." />;
   }
-  return <ProfileEditor account={account.data} fallbackName={user.fullName} />;
+  return <ProfileEditor account={account.data} fallbackName={user.fullName} userId={user.id} />;
 }
 
-function ProfileEditor({ account, fallbackName }: { account: SellerAccount; fallbackName: string }) {
+function ProfileEditor({ account, fallbackName, userId }: { account: SellerAccount; fallbackName: string; userId: string }) {
   const save = useSaveProfile();
   const [saved, setSaved] = useState(false);
   const [brands, setBrands] = useState<string[]>(account.profile?.brands ?? []);
@@ -143,7 +143,10 @@ function ProfileEditor({ account, fallbackName }: { account: SellerAccount; fall
             </p>
           ) : null}
           <Link
-            href="/seller/store"
+            // The public store page (only shown to buyers once the company is verified).
+            href={`/sellers/${userId}`}
+            target="_blank"
+            rel="noopener"
             className={cn(
               "flex h-[52px] items-center justify-center rounded-full border-[1.5px] border-text-strong px-7 text-base font-semibold whitespace-nowrap text-text-strong hover:bg-black/4",
               focusRing,

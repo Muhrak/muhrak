@@ -1,0 +1,1 @@
+CREATE INDEX "seller_profiles_status_name_idx" ON "seller_profiles" USING btree ("verification_status","company_name");

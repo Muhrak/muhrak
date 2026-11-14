@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "../../db/client";
 import {
   sellerDocuments,
@@ -200,4 +200,67 @@ export async function reviewDocument(
     )
     .returning({ id: sellerDocuments.id });
   return rows.length === 1;
+}
+
+// ---------------------------------------------------------------- public directory
+
+/** User ids of every verified (approved) seller. */
+export async function findVerifiedSellerIds(): Promise<string[]> {
+  const rows = await db
+    .select({ userId: sellerProfiles.userId })
+    .from(sellerProfiles)
+    .where(eq(sellerProfiles.verificationStatus, "approved"));
+  return rows.map((row) => row.userId);
+}
+
+export async function findVerifiedProfile(userId: string): Promise<SellerProfileRow | undefined> {
+  const rows = await db
+    .select()
+    .from(sellerProfiles)
+    .where(and(eq(sellerProfiles.userId, userId), eq(sellerProfiles.verificationStatus, "approved")))
+    .limit(1);
+  return rows[0];
+}
+
+export interface VerifiedProfileFilter {
+  /** Only these sellers (e.g. those with products in a category); null = all. */
+  ids: string[] | null;
+  /** Text search on company name and brands, OR any of `alsoIds` (product matches). */
+  q: { pattern: string; alsoIds: string[] } | null;
+}
+
+function verifiedWhere(filter: VerifiedProfileFilter) {
+  return and(
+    eq(sellerProfiles.verificationStatus, "approved"),
+    filter.ids ? (filter.ids.length > 0 ? inArray(sellerProfiles.userId, filter.ids) : sql`false`) : undefined,
+    filter.q
+      ? or(
+          ilike(sellerProfiles.companyName, filter.q.pattern),
+          sql`exists (select 1 from unnest(${sellerProfiles.brands}) as brand where brand ilike ${filter.q.pattern})`,
+          filter.q.alsoIds.length > 0 ? inArray(sellerProfiles.userId, filter.q.alsoIds) : undefined,
+        )
+      : undefined,
+  );
+}
+
+/** One page of verified sellers (numbered pages, as in the Figma directory). */
+export async function listVerifiedProfiles(
+  filter: VerifiedProfileFilter & { sort: "name" | "newest"; offset: number; limit: number },
+): Promise<SellerProfileRow[]> {
+  return db
+    .select()
+    .from(sellerProfiles)
+    .where(verifiedWhere(filter))
+    .orderBy(
+      ...(filter.sort === "newest"
+        ? [desc(sellerProfiles.reviewedAt), asc(sellerProfiles.userId)]
+        : [asc(sellerProfiles.companyName), asc(sellerProfiles.userId)]),
+    )
+    .offset(filter.offset)
+    .limit(filter.limit);
+}
+
+export async function countVerifiedProfiles(filter: VerifiedProfileFilter): Promise<number> {
+  const rows = await db.select({ count: sql<number>`count(*)::int` }).from(sellerProfiles).where(verifiedWhere(filter));
+  return rows[0]?.count ?? 0;
 }
