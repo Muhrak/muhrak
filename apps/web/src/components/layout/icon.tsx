@@ -3,8 +3,10 @@ import { cn } from "@/lib/utils";
 
 /** Single-colour icons exported from Figma into /public/portal. */
 export type IconName =
+  | "alert-circle"
   | "arrow-right"
   | "bar-chart"
+  | "bell"
   | "box"
   | "building"
   | "check-circle"
@@ -17,18 +19,25 @@ export type IconName =
   | "empty-message"
   | "file"
   | "folder"
+  | "globe"
   | "grid"
   | "help-circle"
+  | "image"
   | "layers"
+  | "list"
   | "log-out"
   | "mail"
   | "message"
+  | "muhrak-ai"
   | "plus"
   | "refresh"
+  | "search"
+  | "shield"
   | "tag"
   | "truck"
   | "upload"
-  | "users";
+  | "users"
+  | "wrench";
 
 /**
  * Draws the Figma SVG as a mask filled with the current text colour, so one

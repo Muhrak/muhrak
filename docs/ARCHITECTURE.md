@@ -3,9 +3,8 @@
 ## Overview
 
 ```
-Next.js web app (public, buyer, seller)      Next.js admin app
-                \                               /
-                 \                             /
+        Next.js web app (public, buyer, seller, admin under /admin)
+                              |
                   Express API  /v1  (modular monolith)
                  /        |         \          \
           Workers     PostgreSQL    Redis     File storage + CDN
@@ -62,6 +61,10 @@ muhrak/
 │   │       │   │   │              reset-password  → /buyer/login, /buyer/signup
 │   │       │   │   └── (portal)/  dashboard, find-part, requests, messages,
 │   │       │   │                  orders, settings  (layout.tsx = buyer guard)
+│   │       │   ├── admin/     ADMIN console (own side, own session):
+│   │       │   │   ├── login/     → /admin/login (no sign-up, no reset)
+│   │       │   │   └── (console)/ sellers, sellers/[id], soon/[slug]
+│   │       │   │                  (layout.tsx = admin guard)
 │   │       │   └── seller/
 │   │       │       ├── (auth)/    SELLER auth: login, signup, reset-password
 │   │       │       │              → /seller/login, /seller/signup
@@ -71,12 +74,6 @@ muhrak/
 │   │       ├── features/      one folder per API module name
 │   │       ├── components/    ui/, layout/
 │   │       └── lib/
-│   └── admin/
-│       └── src/
-│           ├── app/(auth)/    login
-│           ├── app/(portal)/  dashboard, sellers, users, products, rfqs,
-│           │                  orders, ai  (layout.tsx = admin guard)
-│           ├── features/, components/ (ui, layout), lib/
 └── packages/
     ├── schemas/               Zod schemas and types, one file per module
     ├── api-client/            typed functions for every /v1 endpoint

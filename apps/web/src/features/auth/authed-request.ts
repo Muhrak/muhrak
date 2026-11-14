@@ -1,12 +1,12 @@
 import { authResponseSchema } from "@muhrak/schemas";
 import type { ZodType } from "zod";
 import { ApiError, apiRequest, apiRequestNoContent, type RequestOptions } from "@/lib/api";
-import type { PortalSide } from "./paths";
+import type { AuthSide } from "./paths";
 import { clearSession, getAccessToken, getSession, saveSession } from "./session";
 
 /**
- * Requests made as the signed-in user of one side (buyer or seller; the
- * two are separate and never mixed). Every feature that calls a protected
+ * Requests made as the signed-in user of one side (buyer, seller or admin;
+ * the sides are separate and never mixed). Every feature that calls a protected
  * endpoint goes through `authedRequest(side, ...)`, which:
  *
  * 1. uses this tab's in-memory access token, getting a new one from the
@@ -23,12 +23,13 @@ import { clearSession, getAccessToken, getSession, saveSession } from "./session
 
 /** Refresh when the access token has less than this long left. */
 const EXPIRY_MARGIN_MS = 30_000;
-const LOCK_NAME: Record<PortalSide, string> = {
+const LOCK_NAME: Record<AuthSide, string> = {
   buyer: "muhrak-auth-refresh-buyer",
   seller: "muhrak-auth-refresh-seller",
+  admin: "muhrak-auth-refresh-admin",
 };
 
-const inFlight: Record<PortalSide, Promise<string | null> | null> = { buyer: null, seller: null };
+const inFlight: Record<AuthSide, Promise<string | null> | null> = { buyer: null, seller: null, admin: null };
 
 /** Expiry time of a JWT in ms, or 0 if it cannot be read (treated as expired). */
 export function accessTokenExpiresAt(token: string): number {
@@ -46,7 +47,7 @@ function isFresh(token: string | null, now = Date.now()): token is string {
   return token !== null && accessTokenExpiresAt(token) - now >= EXPIRY_MARGIN_MS;
 }
 
-async function withRefreshLock<T>(side: PortalSide, task: () => Promise<T>): Promise<T> {
+async function withRefreshLock<T>(side: AuthSide, task: () => Promise<T>): Promise<T> {
   if (typeof navigator !== "undefined" && navigator.locks) {
     return navigator.locks.request(LOCK_NAME[side], task);
   }
@@ -58,7 +59,7 @@ async function withRefreshLock<T>(side: PortalSide, task: () => Promise<T>): Pro
  * (and clears the side's sign-in) if the cookie is missing or no longer
  * valid. `force` skips the "token still fresh" shortcut (after a 401).
  */
-export function refreshAccessToken(side: PortalSide, force = false): Promise<string | null> {
+export function refreshAccessToken(side: AuthSide, force = false): Promise<string | null> {
   const pending = inFlight[side];
   if (pending) return pending;
   const started = withRefreshLock(side, async () => {
@@ -91,7 +92,7 @@ function signedOutError(): ApiError {
   return new ApiError(401, "unauthorized", "Your session has ended. Please log in again.");
 }
 
-async function currentAccessToken(side: PortalSide): Promise<string> {
+async function currentAccessToken(side: AuthSide): Promise<string> {
   if (!getSession(side)) throw signedOutError();
   const token = getAccessToken(side);
   if (isFresh(token)) return token;
@@ -100,7 +101,7 @@ async function currentAccessToken(side: PortalSide): Promise<string> {
   return renewed;
 }
 
-async function withAuth<T>(side: PortalSide, call: (accessToken: string) => Promise<T>): Promise<T> {
+async function withAuth<T>(side: AuthSide, call: (accessToken: string) => Promise<T>): Promise<T> {
   const token = await currentAccessToken(side);
   try {
     return await call(token);
@@ -113,7 +114,7 @@ async function withAuth<T>(side: PortalSide, call: (accessToken: string) => Prom
 }
 
 export function authedRequest<T>(
-  side: PortalSide,
+  side: AuthSide,
   path: string,
   schema: ZodType<T>,
   options: Omit<RequestOptions, "accessToken"> = {},
@@ -122,7 +123,7 @@ export function authedRequest<T>(
 }
 
 export function authedRequestNoContent(
-  side: PortalSide,
+  side: AuthSide,
   path: string,
   options: Omit<RequestOptions, "accessToken"> = {},
 ): Promise<void> {

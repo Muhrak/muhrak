@@ -10,7 +10,7 @@ import {
 } from "@muhrak/schemas";
 import { apiRequest, apiRequestNoContent } from "@/lib/api";
 import { authedRequest } from "./authed-request";
-import type { PortalSide } from "./paths";
+import type { AuthSide } from "./paths";
 
 export function register(input: RegisterInput): Promise<AuthResponse> {
   return apiRequest("/v1/auth/register", authResponseSchema, { method: "POST", body: input });
@@ -21,13 +21,13 @@ export function login(input: LoginInput): Promise<AuthResponse> {
 }
 
 /** The signed-in user of `side`, fresh from the API (refreshes the token if needed). */
-export async function getMe(side: PortalSide): Promise<PublicUser> {
+export async function getMe(side: AuthSide): Promise<PublicUser> {
   const { user } = await authedRequest(side, "/v1/auth/me", meResponseSchema);
   return user;
 }
 
 /** Revoke this side's refresh token on the server and clear its cookie. */
-export function logout(side: PortalSide): Promise<void> {
+export function logout(side: AuthSide): Promise<void> {
   return apiRequestNoContent("/v1/auth/logout", { method: "POST", body: { role: side } });
 }
 

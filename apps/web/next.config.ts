@@ -11,7 +11,8 @@ const API_ORIGIN = (process.env.API_ORIGIN ?? process.env.NEXT_PUBLIC_API_URL ??
 
 /**
  * The private S3 bucket. Browsers upload files straight to it with signed
- * links, and show logos from it, so the CSP allows exactly this one origin.
+ * links, and show logos from it (admins also open seller documents from
+ * it), so the CSP allows exactly this one origin.
  * Only an https S3 origin is accepted; anything else is ignored.
  */
 const STORAGE_ORIGIN = (() => {
@@ -89,11 +90,19 @@ const nextConfig: NextConfig = {
     // Integrity hashes on every script tag: a tampered or swapped file will not run.
     sri: { algorithm: "sha256" },
   },
+  async redirects() {
+    return [{ source: "/admin", destination: "/admin/sellers", permanent: false }];
+  },
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${API_ORIGIN}/:path*` }];
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // The admin console must never appear in search results.
+      { source: "/admin", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
+      { source: "/admin/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
+    ];
   },
   turbopack: {
     rules: {

@@ -28,7 +28,8 @@ idempotent webhooks, one payment per order, append-only ledger, audited
 refunds and payouts, daily reconciliation.
 
 The architecture below stays as it is (confirmed by the developer on
-13 Nov 2026); do not propose merging the apps.
+13 Nov 2026; on 14 Nov 2026 the developer moved the admin console into
+the web app for the start). Do not propose further merges or splits.
 
 ## Decisions already made (do not reopen without asking the developer)
 
@@ -41,7 +42,10 @@ The architecture below stays as it is (confirmed by the developer on
   `ai` module and a queue job.
 - Roles: `buyer`, `seller`, `admin`. There is ONE seller type. Manufacturers,
   distributors and suppliers are all `seller`. Do not add seller sub-types.
-- Admin is a separate Next.js app (`apps/admin`).
+- Admin is part of the web app (`apps/web`, pages under `/admin`), not a
+  separate app (developer decision, 14 Nov 2026; replaces the separate
+  `apps/admin` of 12 Nov). It is a third, fully isolated side: own login,
+  own session note, own refresh cookie (`muhrak_rt_admin`), no sign-up.
 - Design source: Figma file "Muhrak" (Buyer Side, Seller Side, Platform Admin).
   Light theme and English first (changed from dark on 11 Nov 2026 by the
   developer). Use the Figma "(Light)" frames; where a screen exists only in
@@ -78,7 +82,8 @@ The architecture below stays as it is (confirmed by the developer on
 - **Buyer and seller are fully isolated (strict rule, set by the developer
   on 12 Nov 2026).** They never share a session or affect each other. The
   web app keeps a separate session per side (`muhrak.session.buyer`,
-  `muhrak.session.seller`); every auth helper takes the side explicitly;
+  `muhrak.session.seller`, and `admin` for the console under `/admin`);
+  every auth helper takes the side explicitly;
   a buyer signed in counts as a visitor on the seller side and the other
   way round; logging out of one side leaves the other alone. Login sends
   the side and the API refuses an account from another side (403). Any
@@ -170,5 +175,5 @@ pnpm --filter @muhrak/worker dev
 The initial scaffold was written without running `pnpm install`. Dependency
 versions in the `package.json` files are unverified. First task: run
 `pnpm install`, `pnpm typecheck` and `pnpm test`, fix whatever fails, and
-commit the lockfile. (Done: `apps/web` and `apps/admin` both exist now;
-the admin app was set up on 12 Nov 2026 from the web app's configuration.)
+commit the lockfile. (Done. The separate `apps/admin` of 12 Nov 2026 was
+moved into `apps/web` under `/admin` on 14 Nov 2026.)

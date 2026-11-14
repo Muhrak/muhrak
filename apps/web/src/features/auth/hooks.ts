@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 import { getMe, logout } from "./api";
-import { LOGIN_PATH, type PortalSide } from "./paths";
+import { LOGIN_PATH, type AuthSide } from "./paths";
 import { clearSession, updateSessionUser, useSession } from "./session";
 
 /**
@@ -12,7 +12,7 @@ import { clearSession, updateSessionUser, useSession } from "./session";
  * renders at once, then checks with the API (which also catches revoked
  * sessions).
  */
-export function useCurrentUser(side: PortalSide) {
+export function useCurrentUser(side: AuthSide) {
   const session = useSession(side);
   const query = useQuery({
     queryKey: ["auth", "me", side, session?.user.id],
@@ -31,7 +31,7 @@ export function useCurrentUser(side: PortalSide) {
  * Log out of `side` here and in every other open tab, then go to that
  * side's login page. The other side's session is left alone.
  */
-export function useSignOut(side: PortalSide) {
+export function useSignOut(side: AuthSide) {
   const router = useRouter();
   const queryClient = useQueryClient();
   return useCallback(

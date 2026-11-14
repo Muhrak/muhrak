@@ -182,23 +182,18 @@ variable not listed under `tasks.build.env` in `turbo.json` (except
 there, or the build will not see it. The build log prints
 `[muhrak] STORAGE_ORIGIN: allowed …` when the bucket is in the CSP.
 
-## Admin console (`apps/admin`, 12 Nov 2026)
+## Admin console (`/admin` in the web app, since 14 Nov 2026)
 
-A second Vercel project for the admin app:
+The admin console is part of the web app: `https://muhrak.vercel.app/admin`
+(login at `/admin/login`). Nothing extra to deploy; it uses the web
+project's variables and the web origin already in `CORS_ORIGINS`.
 
-1. Vercel → **Add New → Project → Import Muhrak/muhrak** again.
-2. **Project Name**: `muhrak-admin`. **Root Directory**: `apps/admin`.
-3. **Environment Variables** (Production and Preview):
-   - `API_ORIGIN` = the Railway API URL (same as the web project).
-   - `STORAGE_ORIGIN` = the S3 bucket origin (same as the web project).
-   - `API_PROXY_SECRET` = the same value as on Railway and the web project,
-     once that secret is set.
-4. Deploy, then **Settings → Git → Production Branch** = `develop`, and
-   redeploy.
-5. Railway, service `muhrak`: add the admin URL to `CORS_ORIGINS`
-   (comma separated), e.g.
-   `https://muhrak.vercel.app,https://muhrak-admin.vercel.app`. Without it,
-   admin login is refused (the origin check).
+Until 14 Nov 2026 it was a separate app (`apps/admin`, Vercel project
+`muhrak-admin`). Clean-up after the move:
+1. Vercel: delete the `muhrak-admin` project (or disconnect its Git
+   repository). Its root folder no longer exists, so its builds fail.
+2. Railway, service `muhrak`: remove `https://muhrak-admin.vercel.app`
+   from `CORS_ORIGINS`, leaving `https://muhrak.vercel.app`.
 
 First admin on staging (the password is typed into a hidden prompt, never
 into chat or a file):

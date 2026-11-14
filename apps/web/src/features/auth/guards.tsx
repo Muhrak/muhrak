@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Suspense, use, useEffect, type ReactNode } from "react";
 import { browser } from "react-dom";
-import { afterLoginPath, LOGIN_PATH, type PortalSide } from "./paths";
+import { afterLoginPath, LOGIN_PATH, type AuthSide } from "./paths";
 import { useSession } from "./session";
 
 /**
@@ -12,16 +12,16 @@ import { useSession } from "./session";
  * fallback. The API still checks every request; these only decide which
  * page the user sees.
  *
- * STRICT RULE: buyer and seller are fully separate. Each guard looks only at
- * its own side's session; being signed in on the other side counts for
- * nothing here.
+ * STRICT RULE: buyer, seller and admin are fully separate. Each guard looks
+ * only at its own side's session; being signed in on another side counts
+ * for nothing here.
  */
 
 /**
  * Show `children` only to a user signed in on `role`'s side. Otherwise go to
  * this side's login page, then come back here.
  */
-export function RequireRole({ role, children, fallback }: { role: PortalSide; children: ReactNode; fallback: ReactNode }) {
+export function RequireRole({ role, children, fallback }: { role: AuthSide; children: ReactNode; fallback: ReactNode }) {
   use(browser("The session is stored in localStorage."));
   const session = useSession(role);
   const router = useRouter();
@@ -46,7 +46,7 @@ export function RequireRole({ role, children, fallback }: { role: PortalSide; ch
  * The form is prerendered but invisible (keeping its height, so nothing
  * jumps) until the browser has read the session.
  */
-export function SignedOutOnly({ side, children }: { side: PortalSide; children: ReactNode }) {
+export function SignedOutOnly({ side, children }: { side: AuthSide; children: ReactNode }) {
   return (
     <Suspense fallback={<HiddenForm>{children}</HiddenForm>}>
       <SignedOutGate side={side}>{children}</SignedOutGate>
@@ -54,7 +54,7 @@ export function SignedOutOnly({ side, children }: { side: PortalSide; children: 
   );
 }
 
-function SignedOutGate({ side, children }: { side: PortalSide; children: ReactNode }) {
+function SignedOutGate({ side, children }: { side: AuthSide; children: ReactNode }) {
   use(browser("The session is stored in localStorage."));
   const session = useSession(side);
   const router = useRouter();

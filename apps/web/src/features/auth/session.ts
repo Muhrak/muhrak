@@ -1,7 +1,7 @@
 import { publicUserSchema, type AuthResponse, type PublicUser } from "@muhrak/schemas";
 import { z } from "zod";
 import { useCallback, useSyncExternalStore } from "react";
-import type { PortalSide } from "./paths";
+import type { AuthSide } from "./paths";
 
 /**
  * Sign-in state for each side, kept so that no script can steal a session:
@@ -15,13 +15,15 @@ import type { PortalSide } from "./paths";
  *   (the `storage` event): logging out in one tab signs out the others.
  *   It grants nothing; the API decides from the cookie and the token.
  *
- * STRICT RULE: buyer and seller are fully separate. Each side has its own
- * note, cookie and access token; every function takes the side.
+ * STRICT RULE: buyer, seller and admin are fully separate. Each side has its
+ * own note, cookie (`muhrak_rt_<side>`) and access token; every function
+ * takes the side, and a user whose role is not that side is never accepted.
  */
 
-const STORAGE_KEY: Record<PortalSide, string> = {
+const STORAGE_KEY: Record<AuthSide, string> = {
   buyer: "muhrak.signedIn.buyer",
   seller: "muhrak.signedIn.seller",
+  admin: "muhrak.signedIn.admin",
 };
 
 /** Older keys held tokens in localStorage. Removed on first load. */
@@ -52,7 +54,7 @@ const newState = (): SideState => ({
   memoryRaw: null,
   accessToken: null,
 });
-const state: Record<PortalSide, SideState> = { buyer: newState(), seller: newState() };
+const state: Record<AuthSide, SideState> = { buyer: newState(), seller: newState(), admin: newState() };
 
 let legacyDropped = false;
 function dropLegacyKeys() {
@@ -65,7 +67,7 @@ function dropLegacyKeys() {
   }
 }
 
-function readRaw(side: PortalSide): string | null {
+function readRaw(side: AuthSide): string | null {
   dropLegacyKeys();
   try {
     return localStorage.getItem(STORAGE_KEY[side]);
@@ -74,7 +76,7 @@ function readRaw(side: PortalSide): string | null {
   }
 }
 
-function parse(side: PortalSide, raw: string | null): Session | null {
+function parse(side: AuthSide, raw: string | null): Session | null {
   if (!raw) return null;
   try {
     const result = storedSchema.safeParse(JSON.parse(raw));
@@ -86,7 +88,7 @@ function parse(side: PortalSide, raw: string | null): Session | null {
 }
 
 /** Who is signed in on `side`, read from storage (another tab may have changed it). */
-export function getSession(side: PortalSide): Session | null {
+export function getSession(side: AuthSide): Session | null {
   const s = state[side];
   const raw = readRaw(side);
   if (raw !== s.cachedRaw) {
@@ -101,15 +103,15 @@ export function getSession(side: PortalSide): Session | null {
   return s.cachedSession;
 }
 
-export function getAccessToken(side: PortalSide): string | null {
+export function getAccessToken(side: AuthSide): string | null {
   return getSession(side) ? state[side].accessToken : null;
 }
 
-function notify(side: PortalSide) {
+function notify(side: AuthSide) {
   for (const listener of state[side].listeners) listener();
 }
 
-function writeNote(side: PortalSide, user: PublicUser) {
+function writeNote(side: AuthSide, user: PublicUser) {
   const raw = JSON.stringify({ user });
   try {
     localStorage.setItem(STORAGE_KEY[side], raw);
@@ -119,7 +121,7 @@ function writeNote(side: PortalSide, user: PublicUser) {
 }
 
 /** After login, sign-up or refresh on `side`. Refuses a user who is not on that side. */
-export function saveSession(side: PortalSide, response: AuthResponse): void {
+export function saveSession(side: AuthSide, response: AuthResponse): void {
   if (response.user.role !== side) {
     throw new Error(`A ${response.user.role} session cannot be stored on the ${side} side.`);
   }
@@ -129,7 +131,7 @@ export function saveSession(side: PortalSide, response: AuthResponse): void {
   notify(side);
 }
 
-export function clearSession(side: PortalSide): void {
+export function clearSession(side: AuthSide): void {
   try {
     localStorage.removeItem(STORAGE_KEY[side]);
   } catch {
@@ -141,7 +143,7 @@ export function clearSession(side: PortalSide): void {
 }
 
 /** Keep the stored user up to date after GET /me, without touching the token. */
-export function updateSessionUser(side: PortalSide, user: PublicUser): void {
+export function updateSessionUser(side: AuthSide, user: PublicUser): void {
   const current = getSession(side);
   if (!current || JSON.stringify(current.user) === JSON.stringify(user)) return;
   if (user.role !== side || user.id !== current.user.id) {
@@ -152,7 +154,7 @@ export function updateSessionUser(side: PortalSide, user: PublicUser): void {
   notify(side);
 }
 
-function subscribe(side: PortalSide, listener: Listener): () => void {
+function subscribe(side: AuthSide, listener: Listener): () => void {
   state[side].listeners.add(listener);
   const onStorage = (event: StorageEvent) => {
     if (event.key === STORAGE_KEY[side] || event.key === null) listener();
@@ -168,7 +170,7 @@ function subscribe(side: PortalSide, listener: Listener): () => void {
  * Who is signed in on `side`, in a component. Only use inside a
  * browser-only subtree (`use(browser())`): on the server it is null.
  */
-export function useSession(side: PortalSide): Session | null {
+export function useSession(side: AuthSide): Session | null {
   const subscribeSide = useCallback((listener: Listener) => subscribe(side, listener), [side]);
   const getSide = useCallback(() => getSession(side), [side]);
   return useSyncExternalStore(subscribeSide, getSide, () => null);

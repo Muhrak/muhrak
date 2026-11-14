@@ -3,7 +3,7 @@
 Read this first in every new session, then `CLAUDE.md`, `docs/PLAN.md` and
 `docs/ARCHITECTURE.md`. Update it whenever a piece of work is committed.
 
-Last updated: Fri 13 Nov 2026. Branch `develop`.
+Last updated: Sat 14 Nov 2026. Branch `develop`.
 
 ## Status
 
@@ -21,6 +21,10 @@ and products).
   are due Tue 17 Nov. Launch waits for a working live gateway.
 - Architecture stays as it is (no merge into one app); production stays
   on Railway + Vercel.
+
+**Sat 14 Nov 2026 (developer decision):** the admin console is no longer a
+separate app. It moved from `apps/admin` into the web app under `/admin`
+(see "Admin console moved into the web app" below).
 
 ## Done
 
@@ -80,9 +84,9 @@ and products).
   escaping; Muhrak never passed user input there, fixed anyway).
 
 ### Day 4: admin console and seller review (Thu 12 Nov, a day early)
-- `apps/admin`: separate Next.js app (port 3002), same security headers as
-  the web app plus `X-Robots-Tag: noindex`, its own `/api` proxy, so the
-  admin session cookie (`muhrak_rt_admin`) lives on the admin domain only.
+- Built as a separate app `apps/admin` (port 3002); moved into the web app
+  under `/admin` on 14 Nov 2026 (see below). Admin session cookie
+  `muhrak_rt_admin`, `X-Robots-Tag: noindex`.
   Pages: `/login`, `/sellers` (Figma "Admin – Sellers" 405:1892, light),
   `/sellers/[id]` (review page, no Figma frame; same style). Other Figma
   sidebar items open "Coming soon".
@@ -111,6 +115,29 @@ and products).
   Same fix on the seller Verification page.
 - Tests: 7 review tests (abuse cases), 27-check API run (wrong side, wrong
   role, tampered cursor, stale review, race), browser run of the console.
+
+### Admin console moved into the web app (Sat 14 Nov)
+- `apps/admin` is gone. Pages: `/admin/login`, `/admin/sellers`,
+  `/admin/sellers/[id]`, `/admin/soon/[slug]`; `/admin` redirects to
+  `/admin/sellers`. Same look as before (screenshots compared, desktop and
+  390 px). Code in `apps/web/src/features/admin/`.
+- Admin is a third side in the web auth layer (`AuthSide` in
+  `features/auth/paths.ts`): own note `muhrak.signedIn.admin`, own cookie
+  `muhrak_rt_admin`, own refresh lock, admin role only. Buyer and seller
+  are unchanged. Buyer, seller and admin can be signed in at once in one
+  browser; logging out of one leaves the others.
+- `/admin` pages send `X-Robots-Tag: noindex, nofollow` and robots meta.
+- Tested in the browser: signed-out and buyer-signed-in visits go to
+  `/admin/login`; a seller account is refused (403); `next=https://evil…`
+  is ignored; list, review, document link (S3), approve, reject (reasons
+  required), logout; buyer session survives admin logout; no console or
+  CSP errors. Typecheck, lint, build and all 78 tests pass.
+- Risk to know: the console now shares an origin with the public site, so
+  an XSS bug anywhere on the site could reach an admin's session in that
+  browser (before, the separate domain isolated it). Mitigations stay
+  (React escaping, lint ban on raw HTML, CSP connect-src 'self'). Before
+  launch, consider serving `/admin` from its own subdomain, shorter admin
+  sessions and two-factor login.
 
 ### Landing pages (P1, done early)
 - Buyer landing `/` from Figma "Buyer – Landing v2 (Light)" (423:1138).
@@ -263,9 +290,10 @@ Other:
 - `refs/` (design references) is kept locally and not committed.
 
 Still open (Day 4 admin):
-- **Developer action:** deploy the admin app as a second Vercel project and
-  add its URL to `CORS_ORIGINS` on Railway; create the first admin on
-  staging with the script (steps in `docs/DEPLOY.md`, "Admin console").
+- **Developer action (14 Nov):** the admin console is now
+  `https://muhrak.vercel.app/admin`. Delete the `muhrak-admin` Vercel
+  project (its builds fail now) and remove its URL from `CORS_ORIGINS` on
+  Railway (steps in `docs/DEPLOY.md`, "Admin console").
 - There is one admin level (no "super admin" or roles yet). Every admin can
   approve and reject. The Figma "Admin Users & Roles" page is for later.
 - Admin sessions use the same 30-day refresh cookie as buyers and sellers.
