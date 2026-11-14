@@ -79,6 +79,10 @@ export async function revokeAllRefreshTokensForUser(userId: string): Promise<voi
     .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
 }
 
+export async function updateUserEmail(userId: string, email: string): Promise<void> {
+  await db.update(users).set({ email, updatedAt: new Date() }).where(eq(users.id, userId));
+}
+
 export async function updateUserPassword(userId: string, passwordHash: string): Promise<void> {
   await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, userId));
 }

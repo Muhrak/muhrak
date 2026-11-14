@@ -1,7 +1,8 @@
 /**
  * Create an admin account, or set a new password for an existing admin.
  *
- *   pnpm --filter @muhrak/api admin
+ *   pnpm admin                 (in apps/api)
+ *   pnpm admin change-email    move an existing admin to another email
  *
  * Asks for the email, name and password (the password is not shown while
  * typed and never printed or logged). There is no admin sign-up endpoint,
@@ -15,7 +16,7 @@ import { createInterface } from "node:readline";
 import { Writable } from "node:stream";
 import { z } from "zod";
 import { pool } from "../db/client";
-import { upsertAdminAccount } from "../modules/auth";
+import { changeAdminEmail, upsertAdminAccount } from "../modules/auth";
 
 const MIN_PASSWORD = 14;
 
@@ -41,9 +42,24 @@ async function ask(question: string, hidden = false): Promise<string> {
   return String(next.value).trim();
 }
 
+const emailSchema = z.string().trim().toLowerCase().email();
+
+/** Same account, password and audit history; only the email changes. Signs that admin out everywhere. */
+async function changeEmail() {
+  console.log("Muhrak: move an existing admin to another email.\n");
+  const currentEmail = emailSchema.parse(await ask("Current admin email: "));
+  const newEmail = emailSchema.parse(await ask("New email: "));
+  if ((await ask(`Type the new email again to confirm: `)).trim().toLowerCase() !== newEmail) {
+    throw new Error("The emails do not match. Nothing was changed.");
+  }
+  await changeAdminEmail({ currentEmail, newEmail });
+  console.log(`\nAdmin moved from ${currentEmail} to ${newEmail}. Every session of this admin was signed out.`);
+}
+
 async function main() {
+  if (process.argv[2] === "change-email") return changeEmail();
   console.log("Muhrak: create an admin, or set a new password for an existing admin.\n");
-  const email = z.string().trim().toLowerCase().email().parse(await ask("Admin email: "));
+  const email = emailSchema.parse(await ask("Admin email: "));
   const fullName = z.string().trim().min(2).max(120).parse(await ask("Full name: "));
   const password = await ask(`Password (at least ${MIN_PASSWORD} characters, hidden): `, true);
   if (password.length < MIN_PASSWORD || password.length > 200) {

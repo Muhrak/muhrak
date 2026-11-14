@@ -211,3 +211,7 @@ the script runs on your own computer and changes only the LOCAL database.
 
 The same command sets a new password for an existing admin and signs that
 admin out everywhere.
+
+To move an admin to another email (same account, password and audit
+history; signs them out everywhere), run the script with `change-email`:
+`./node_modules/.bin/tsx src/scripts/admin.ts change-email`.

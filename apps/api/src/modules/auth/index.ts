@@ -7,4 +7,4 @@
  */
 export { authRouter } from "./auth.routes";
 export { requireAuth, requireRole } from "./auth.middleware";
-export { getCurrentUser, getUsersByIds, upsertAdminAccount } from "./auth.service";
+export { changeAdminEmail, getCurrentUser, getUsersByIds, upsertAdminAccount } from "./auth.service";

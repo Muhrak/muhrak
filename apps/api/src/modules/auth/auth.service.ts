@@ -322,6 +322,28 @@ export async function upsertAdminAccount(input: { email: string; fullName: strin
   return "created";
 }
 
+/**
+ * Move an admin to another email, from the command line only
+ * (scripts/admin.ts change-email). Same account, password and audit history;
+ * every session of that admin is signed out. Only for admin accounts, and
+ * never onto an email that another account uses.
+ */
+export async function changeAdminEmail(input: { currentEmail: string; newEmail: string }): Promise<void> {
+  const admin = await repo.findUserByEmail(input.currentEmail);
+  if (!admin || admin.role !== "admin") {
+    throw notFound("No admin account has this email. Nothing was changed.");
+  }
+  if (input.newEmail === input.currentEmail) {
+    throw badRequest("The new email is the same as the current one. Nothing was changed.");
+  }
+  if (await repo.findUserByEmail(input.newEmail)) {
+    throw conflict("Another account already uses the new email. Nothing was changed.");
+  }
+  await repo.updateUserEmail(admin.id, input.newEmail);
+  await repo.markUserEmailVerified(admin.id);
+  await repo.revokeAllRefreshTokensForUser(admin.id);
+}
+
 export async function getCurrentUser(userId: string): Promise<PublicUser> {
   const user = await repo.findUserById(userId);
   if (!user) {
