@@ -4,8 +4,8 @@ import { defaultJobOptions, getQueue } from "../../shared/queue";
 
 /**
  * Notification module: decides WHAT to send and puts it on the queue.
- * The worker renders the template and calls the email provider, so a slow or
- * failing provider never slows down an API request.
+ * The background worker (src/worker) renders the template and calls the
+ * email provider, so a slow or failing provider never slows down a request.
  */
 
 /**

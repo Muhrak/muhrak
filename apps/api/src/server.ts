@@ -4,18 +4,21 @@ import { pool } from "./db/client";
 import { logger } from "./shared/logger";
 import { closeQueues } from "./shared/queue";
 import { closeRedis } from "./shared/redis";
+import { closeWorkers, startWorkers } from "./worker";
 
 const app = createApp();
 
 const server = app.listen(env.PORT, () => {
   logger.info(`Muhrak API listening on http://localhost:${env.PORT}`);
+  startWorkers();
 });
 
-/** Finish in-flight requests and close the database pool before exiting. */
+/** Finish in-flight requests and running jobs, then close the database pool and Redis. */
 function shutdown(signal: string) {
   logger.info(`${signal} received, shutting down`);
   server.close(() => {
-    Promise.all([pool.end(), closeQueues(), closeRedis()])
+    closeWorkers()
+      .then(() => Promise.all([pool.end(), closeQueues(), closeRedis()]))
       .catch((err: unknown) => logger.error({ err }, "Error closing database pool or queues"))
       .finally(() => process.exit(0));
   });

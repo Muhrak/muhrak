@@ -158,31 +158,6 @@ importers:
         specifier: ^5
         version: 5.9.3
 
-  apps/worker:
-    dependencies:
-      '@muhrak/schemas':
-        specifier: workspace:*
-        version: link:../../packages/schemas
-      bullmq:
-        specifier: ^5.30.0
-        version: 5.81.5
-      dotenv:
-        specifier: ^16.4.0
-        version: 16.6.1
-      ioredis:
-        specifier: ^5.4.0
-        version: 5.11.1
-    devDependencies:
-      '@types/node':
-        specifier: ^22.10.0
-        version: 22.20.5
-      tsx:
-        specifier: ^4.19.0
-        version: 4.23.15
-      typescript:
-        specifier: ^5.8.0
-        version: 5.9.3
-
   packages/schemas:
     dependencies:
       zod:

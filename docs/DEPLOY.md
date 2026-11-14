@@ -6,7 +6,7 @@ from the `develop` branch of `github.com/Muhrak/muhrak`.
 | Piece | Host | Config |
 |---|---|---|
 | API (`apps/api`) | Railway | `apps/api/railway.json` |
-| Worker (`apps/worker`) | Railway | `apps/worker/railway.json` |
+| Background jobs | inside the API | `apps/api/src/worker` |
 | PostgreSQL | Railway | Railway's Postgres template |
 | Redis | Upstash | `REDIS_URL` (`rediss://...`) |
 | Web (`apps/web`) | Vercel | Root directory `apps/web` |
@@ -21,12 +21,11 @@ Each Railway service picks its app with the `RAILPACK_START_CMD` variable:
 | Service | `RAILPACK_START_CMD` |
 |---|---|
 | API (`muhrak`) | `pnpm --filter @muhrak/api db:migrate && pnpm --filter @muhrak/api start` |
-| `worker` | `pnpm --filter @muhrak/worker start` |
 
 Database migrations run at API start. If a migration fails, the API does not
 start and Railway keeps the previous version running.
 
-`apps/api/railway.json` and `apps/worker/railway.json` hold the same settings
+`apps/api/railway.json` holds the same settings
 plus a health check and watch patterns. They only apply if the service's
 **Settings → Config-as-code → Railway Config File** is set and the staged
 change is deployed; on 2026-11-11 that setting did not take effect, so the
@@ -35,7 +34,7 @@ variables above are what is actually used.
 ### Live staging (as of 2026-11-11)
 
 - Railway project `charismatic-inspiration`, environment `production`
-  (this is our staging): services `muhrak` (API), `worker`, `Postgres`.
+  (this is our staging): services `muhrak` (API with background workers), `Postgres` (the `worker` service is obsolete since 14 Nov 2026).
 - Web: https://muhrak.vercel.app (Vercel, root directory `apps/web`).
 - API: https://muhrak-production.up.railway.app (`/health/ready` checks the database).
   `CORS_ORIGINS=https://muhrak.vercel.app`.
@@ -77,25 +76,22 @@ variables above are what is actually used.
    example `https://api-production-xxxx.up.railway.app`.
 5. Check `<API URL>/health/ready` returns `{"status":"ok","database":"ok"}`.
 
-## 3. Railway: worker service
+## 3. Railway: worker service (removed 14 Nov 2026)
 
-1. **Create → GitHub Repo → Muhrak/muhrak** again.
-2. **Settings**: name `worker`, branch `develop`, root directory empty.
-   Do **not** generate a domain.
-3. **Variables** (the `${{muhrak.X}}` references reuse the API's values):
+There is no separate worker service any more. The background workers
+(emails now; AI and RFQ expiry later) run inside the API process
+(`apps/api/src/worker`, started by `server.ts`), so the `muhrak` service
+needs `RESEND_API_KEY` (and optionally `EMAIL_FROM`).
 
-   ```
-   RAILPACK_START_CMD=pnpm --filter @muhrak/worker start
-   NODE_ENV=production
-   REDIS_URL=${{muhrak.REDIS_URL}}
-   DATABASE_URL=${{Postgres.DATABASE_URL}}
-   RESEND_API_KEY=${{muhrak.RESEND_API_KEY}}
-   ```
+Queue namespace: `QUEUE_PREFIX` (default `bull` in production, `muhrak-dev`
+locally). Local development and staging use the same Upstash Redis, so they
+MUST keep different prefixes, or one environment takes the other's jobs.
+Never set `QUEUE_PREFIX=bull` on a developer machine.
 
-   Or from the CLI: `railway add --service worker --repo Muhrak/muhrak
-   --branch develop --variables "..."` with one `--variables` per line above.
-
-4. Logs should show `Muhrak worker started`.
+Clean-up after the move: delete the Railway `worker` service (its start
+command `pnpm --filter @muhrak/worker start` no longer exists, so it only
+fails and restarts). Do it after the API with the workers is deployed, so
+the email queue is never without a worker.
 
 ## 4. Vercel: web
 
@@ -160,7 +156,7 @@ list or delete, on purpose: the API never deletes files, and without
 `s3:ListBucket` S3 answers 403 for a missing file (the code handles that).
 
 Variables:
-- Railway `muhrak` and `worker`: `AWS_REGION`, `AWS_ACCESS_KEY_ID`,
+- Railway `muhrak`: `AWS_REGION`, `AWS_ACCESS_KEY_ID`,
   `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET_PRIVATE`. Without them the upload
   endpoints answer 503 and the rest of the API works.
 - Vercel: `STORAGE_ORIGIN=https://<bucket>.s3.<region>.amazonaws.com`. The

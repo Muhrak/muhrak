@@ -3,8 +3,8 @@ import { Redis } from "ioredis";
 import { env } from "../config/env";
 
 /**
- * Producer side of the BullMQ queues. The API only ADDS jobs; the worker
- * (apps/worker) runs them. Queues are created on first use, so code paths
+ * Producer side of the BullMQ queues. Requests only ADD jobs; the workers
+ * in src/worker (started by server.ts) run them. Queues are created on first use, so code paths
  * that never enqueue (and unit tests) never open a Redis connection.
  */
 
@@ -19,7 +19,7 @@ function getConnection(): Redis {
 export function getQueue(name: string): Queue {
   let queue = queues.get(name);
   if (!queue) {
-    queue = new Queue(name, { connection: getConnection() });
+    queue = new Queue(name, { connection: getConnection(), prefix: env.queuePrefix });
     queues.set(name, queue);
   }
   return queue;

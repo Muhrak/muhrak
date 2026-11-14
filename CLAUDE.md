@@ -40,6 +40,8 @@ the web app for the start). Do not propose further merges or splits.
   React Hook Form + Zod.
 - Chat: Stream Chat. Email: Resend. AI: Claude API (vision), always through the
   `ai` module and a queue job.
+- Background jobs run inside the API process (`apps/api/src/worker`), not a
+  separate worker app (developer decision, 14 Nov 2026).
 - Roles: `buyer`, `seller`, `admin`. There is ONE seller type. Manufacturers,
   distributors and suppliers are all `seller`. Do not add seller sub-types.
 - Admin is part of the web app (`apps/web`, pages under `/admin`), not a
@@ -64,8 +66,11 @@ the web app for the start). Do not propose further merges or splits.
 4. Request and response shapes are Zod schemas in `packages/schemas`.
 5. Outside services (AI, chat, storage, email) sit behind a small interface
    with implementations in a `providers/` folder.
-6. Slow or retryable work (AI calls, emails, RFQ expiry) is a BullMQ job in
-   `apps/worker`, never inline in a request.
+6. Slow or retryable work (AI calls, emails, RFQ expiry) is a BullMQ job,
+   never inline in a request. The workers run inside the API process
+   (`apps/api/src/worker`, started by `server.ts`; developer decision,
+   14 Nov 2026, replacing the separate `apps/worker`). Each environment
+   sharing a Redis server needs its own `QUEUE_PREFIX`.
 7. Every list endpoint is paginated. Every query used in a list has an index.
 8. Orders and RFQs are state machines; allowed transitions are defined in one
    place in the service.
@@ -166,8 +171,7 @@ pnpm db:generate      # create a migration from schema changes
 pnpm db:migrate       # apply migrations
 pnpm test
 pnpm typecheck
-pnpm --filter @muhrak/api dev      # API on http://localhost:4000
-pnpm --filter @muhrak/worker dev
+pnpm --filter @muhrak/api dev      # API + background workers on http://localhost:4000
 ```
 
 ## Known state of the scaffold

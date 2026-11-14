@@ -24,7 +24,9 @@ and products).
 
 **Sat 14 Nov 2026 (developer decision):** the admin console is no longer a
 separate app. It moved from `apps/admin` into the web app under `/admin`
-(see "Admin console moved into the web app" below).
+(see "Admin console moved into the web app" below). The worker is no
+longer a separate app either: the background jobs run inside the API
+(see "Worker moved into the API" below).
 
 ## Done
 
@@ -50,6 +52,7 @@ separate app. It moved from `apps/admin` into the web app under `/admin`
 - Buyer Centre and Seller Centre shells: sidebars from Figma, empty
   dashboards, mobile drawer, "Coming soon" pages for menu items not built.
 - Staging on Railway (API, worker, Postgres, EU West) and Vercel (web).
+  (Since 14 Nov the worker runs inside the API; see below.)
 
 ### Day 3: uploads, company profile, verification (Thu 12 Nov)
 - Storage: private Amazon S3 bucket (setup and variables in
@@ -115,6 +118,26 @@ separate app. It moved from `apps/admin` into the web app under `/admin`
   Same fix on the seller Verification page.
 - Tests: 7 review tests (abuse cases), 27-check API run (wrong side, wrong
   role, tampered cursor, stale review, race), browser run of the console.
+
+### Worker moved into the API (Sat 14 Nov)
+- `apps/worker` is gone. Its code is in `apps/api/src/worker` (email
+  templates, Resend and console providers, the send-email job). `server.ts`
+  starts the workers after the API listens and closes them on shutdown
+  (running jobs finish first). Still BullMQ: requests only add jobs; retries,
+  backoff and idempotent job ids are unchanged.
+- New API variables: `RESEND_API_KEY` (unset locally: emails print to the
+  terminal; unset in production: emails wait in the queue, never printed),
+  `EMAIL_FROM`, `QUEUE_PREFIX`.
+- **Found and fixed:** local development and staging use the SAME Upstash
+  Redis, so they shared one email queue. The staging worker had been
+  sending local test emails (they failed at Resend's sandbox, 403), and
+  with workers in every API a local API could have taken a staging user's
+  email. Queues now have a per-environment prefix: `bull` in production
+  (unchanged, so queued staging jobs stay), `muhrak-dev` locally. Tested:
+  a local reset email went through the `muhrak-dev` queue and printed.
+- Note: `apps/api/.env` has a real `RESEND_API_KEY`, so local emails now
+  go to Resend (sandbox: only to the account owner). Empty it locally to
+  print emails instead.
 
 ### Admin console moved into the web app (Sat 14 Nov)
 - `apps/admin` is gone. Pages: `/admin/login`, `/admin/sellers`,
@@ -207,9 +230,10 @@ one seller type, AI through the worker, etc.).
 
 - Windows, no Docker, no `gh`. Native PostgreSQL 17 on localhost:5432.
   Skip `pnpm db:up`.
-- Redis: hosted Upstash. `REDIS_URL` (`rediss://…`) in `apps/api/.env` and
-  `apps/worker/.env`. Never commit `.env`.
-- Run locally: `pnpm --filter @muhrak/api dev`, `pnpm --filter @muhrak/worker dev`,
+- Redis: hosted Upstash, the SAME one staging uses. `REDIS_URL`
+  (`rediss://…`) in `apps/api/.env`. Keep `QUEUE_PREFIX` unset locally
+  (default `muhrak-dev`), never `bull`. Never commit `.env`.
+- Run locally: `pnpm --filter @muhrak/api dev` (API + background workers),
   `pnpm --filter @muhrak/web dev`.
 - GitHub: `github.com/Muhrak/muhrak` (remote `https://Muhrak@github.com/Muhrak/muhrak.git`).
   Commits must use the Muhrak account email, or Vercel (Hobby plan) blocks
@@ -267,8 +291,7 @@ Still open (security):
 
 Still open (Day 3 files):
 - **Developer action:** on Vercel set `STORAGE_ORIGIN` (see DEPLOY.md);
-  without it the CSP blocks uploads on the website. Also put the four AWS
-  variables in `apps/worker/.env` (only the API has them locally).
+  without it the CSP blocks uploads on the website.
 - Replaced logos and documents stay in the bucket (the API has no
   delete permission, on purpose). Fine for now; a cleanup job can come later.
 - Images are not re-encoded, so photo metadata (e.g. GPS in an ID photo)
@@ -300,8 +323,9 @@ Still open (Day 4 admin):
   Consider shorter admin sessions and two-factor login before launch.
 - No admin page shows the audit log yet ("Activity Logs" is Coming soon);
   the rows are in the `audit_log` table.
-- The worker uses the API's AWS key it does not need yet. On Day 6 give it
-  its own read-only IAM user (s3:GetObject only), then remove the shared key.
+- The workers now run inside the API and share its AWS key (one IAM user,
+  PutObject + GetObject only). The plan for a separate read-only key for
+  the worker no longer applies.
 
 ## Next up: Day 5 (Sat 14 Nov), see `docs/PLAN.md`
 

@@ -8,7 +8,8 @@
                   Express API  /v1  (modular monolith)
                  /        |         \          \
           Workers     PostgreSQL    Redis     File storage + CDN
-         (BullMQ)
+       (BullMQ, inside
+        the API process)
              |
    External services: Stream Chat, Claude API, email provider
 ```
@@ -16,7 +17,8 @@
 - Clients hold no business logic; they call the API.
 - The API is stateless: tokens for auth, object storage for files, Redis for
   shared state. It can run as many copies as needed behind a load balancer.
-- Slow work runs in the worker.
+- Slow work runs as BullMQ jobs, processed by workers inside the API
+  process (`apps/api/src/worker`), never inside a request.
 - Modules communicate through their `index.ts` exports or through events.
 
 ## Folder structure (20-day scope)
@@ -48,10 +50,10 @@ muhrak/
 │   │           ├── ledger/        Day 12, 15 (append-only money entries)
 │   │           ├── payout/        Day 15
 │   │           └── notification/  Day 2, ongoing
-│   ├── worker/
-│   │   └── src/
-│   │       ├── index.ts
-│   │       └── jobs/          ai-identify, send-notification, expire-rfqs
+│   │       └── worker/        background jobs, run in the API process
+│   │           ├── index.ts       startWorkers / closeWorkers (server.ts)
+│   │           ├── jobs/          send-email; later ai-identify, expire-rfqs
+│   │           └── email/         templates, providers/ (resend, console)
 │   ├── web/
 │   │   └── src/
 │   │       ├── app/
@@ -122,7 +124,8 @@ folder: `ai`, `chat`, `upload`, `notification`.
 
 A module publishes an event (for example `quote.sent`). The `notification`
 module subscribes, checks the user's settings, and adds a job to the queue.
-The worker renders the template and calls the email provider. Each job has a
+The email worker (inside the API) renders the template and calls the email
+provider. Each job has a
 unique key so a retry cannot send twice.
 
 ## AI safety
@@ -145,6 +148,6 @@ every call. The API key stays on the server.
 
 ## Hosting for launch
 
-API and worker on a managed platform, web apps on Vercel, managed Postgres and
+API (with its background workers) on a managed platform, web apps on Vercel, managed Postgres and
 Redis, object storage with a CDN. Two API instances for reliability. No
 Dockerfiles are required for this setup; add them when moving to AWS.

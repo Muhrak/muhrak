@@ -18,9 +18,9 @@ not exist or a small type error. Fix those first, then commit the generated
 ```
 apps/
   api/      Express API (modular monolith). All business logic lives here.
-  worker/   Background jobs (BullMQ). Placeholder for now.
-  web/      Next.js: public site, buyer centre, seller centre. Not created yet.
-  admin/    Next.js: admin console. Not created yet.
+            Background jobs (BullMQ) run inside it: src/worker.
+  web/      Next.js: public site, buyer centre, seller centre, and the admin
+            console under /admin.
 packages/
   schemas/  Zod schemas, types and money helpers shared by every app.
 ```
@@ -34,7 +34,6 @@ Requirements: Node 22 or newer, pnpm, Docker.
 ```bash
 pnpm install
 cp apps/api/.env.example apps/api/.env        # then set JWT_SECRET
-cp apps/worker/.env.example apps/worker/.env
 pnpm db:up                                    # Postgres + Redis in Docker
 pnpm db:generate                              # create the first migration
 pnpm db:migrate                               # apply it
