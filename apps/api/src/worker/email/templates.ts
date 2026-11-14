@@ -68,6 +68,67 @@ export function renderEmail(job: EmailJob): RenderedEmail {
       };
     }
 
+    case "verify-email": {
+      const { fullName, verifyUrl, expiresInHours } = job.data;
+      const url = escapeHtml(verifyUrl);
+      return {
+        subject: "Verify your email for Muhrak",
+        text: [
+          `Hi ${fullName},`,
+          "",
+          "Welcome to Muhrak. Open this link to verify your email and activate your account",
+          `(it works once and expires in ${expiresInHours} hours):`,
+          verifyUrl,
+          "",
+          "If you did not create a Muhrak account, ignore this email. Nothing will be activated.",
+        ].join("\n"),
+        html: layout(
+          "Verify your email",
+          `<tr><td style="font-size:15px;line-height:1.5;color:#3a3a40;padding-bottom:24px;">
+            Hi ${escapeHtml(fullName)}, welcome to Muhrak. Verify your email to activate your account.
+            The link works once and expires in ${expiresInHours} hours.
+          </td></tr>
+          <tr><td style="padding-bottom:24px;">
+            <a href="${url}" style="display:inline-block;background:#0a0b12;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold;padding:14px 28px;border-radius:999px;">Verify my email</a>
+          </td></tr>
+          <tr><td style="font-size:13px;line-height:1.5;color:#6b6b73;">
+            If the button does not work, copy this link into your browser:<br>
+            <a href="${url}" style="color:#0a0a0a;word-break:break-all;">${url}</a><br><br>
+            If you did not create a Muhrak account, ignore this email. Nothing will be activated.
+          </td></tr>`,
+        ),
+      };
+    }
+
+    case "account-exists": {
+      const { fullName, loginUrl, resetUrl } = job.data;
+      return {
+        subject: "You already have a Muhrak account",
+        text: [
+          `Hi ${fullName},`,
+          "",
+          "Someone tried to sign up for Muhrak with this email, but you already have an account.",
+          `Log in: ${loginUrl}`,
+          `Forgot your password? Reset it: ${resetUrl}`,
+          "",
+          "If this was not you, you can ignore this email. Your account has not changed.",
+        ].join("\n"),
+        html: layout(
+          "You already have an account",
+          `<tr><td style="font-size:15px;line-height:1.5;color:#3a3a40;padding-bottom:24px;">
+            Hi ${escapeHtml(fullName)}, someone tried to sign up for Muhrak with this email, but you already have an account.
+          </td></tr>
+          <tr><td style="padding-bottom:16px;">
+            <a href="${escapeHtml(loginUrl)}" style="display:inline-block;background:#0a0b12;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold;padding:14px 28px;border-radius:999px;">Log in</a>
+          </td></tr>
+          <tr><td style="font-size:13px;line-height:1.5;color:#6b6b73;">
+            Forgot your password? <a href="${escapeHtml(resetUrl)}" style="color:#0a0a0a;">Reset it here</a>.<br><br>
+            If this was not you, ignore this email. Your account has not changed.
+          </td></tr>`,
+        ),
+      };
+    }
+
     case "seller-verified": {
       const { fullName, companyName, dashboardUrl } = job.data;
       const url = escapeHtml(dashboardUrl);

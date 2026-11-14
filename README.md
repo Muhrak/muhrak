@@ -10,7 +10,7 @@ code; each is installed, run and deployed from its own folder.
 ```
 apps/
   api/   Express API (modular monolith). All backend: business logic,
-         database, background jobs (BullMQ, src/worker), Zod schemas
+         database, background jobs (PostgreSQL queue, src/worker), Zod schemas
          (src/schemas, the source).
   web/   Next.js. All frontend: public site, buyer centre, seller centre,
          admin console under /admin. src/schemas is an exact copy of the
@@ -20,12 +20,12 @@ docs/    Plan, architecture, deploy notes, progress.
 
 ## First run
 
-Requirements: Node 22 or newer, pnpm, PostgreSQL and Redis.
+Requirements: Node 22 or newer, pnpm, PostgreSQL.
 
 ```bash
 cd apps/api
 pnpm install
-cp .env.example .env          # then set JWT_SECRET, DATABASE_URL, REDIS_URL
+cp .env.example .env          # then set JWT_SECRET and DATABASE_URL
 pnpm db:migrate
 pnpm test
 pnpm dev                      # http://localhost:4000

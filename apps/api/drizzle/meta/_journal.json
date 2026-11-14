@@ -36,6 +36,20 @@
       "when": 1794485532658,
       "tag": "0004_hesitant_epoch",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794644583871,
+      "tag": "0005_silent_wonder_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794645590822,
+      "tag": "0006_wandering_starbolt",
+      "breakpoints": true
     }
   ]
 }

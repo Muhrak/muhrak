@@ -18,6 +18,13 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   fullName: text("full_name").notNull(),
   role: userRole("role").notNull(),
+  /**
+   * Set when the user opens the link in the verification email (or resets
+   * their password, which also proves they own the inbox). Null = cannot
+   * sign in yet (developer decision, 14 Nov 2026). Admins are created
+   * verified from the command line.
+   */
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -59,6 +66,59 @@ export const passwordResetTokens = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("password_reset_tokens_user_id_idx").on(table.userId)],
+);
+
+/**
+ * Email verification links, stored as SHA-256 hashes. Single use; only the
+ * newest link of a user works (older ones are marked used when a new one is
+ * sent).
+ */
+export const emailVerificationTokens = pgTable(
+  "email_verification_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("email_verification_tokens_user_id_idx").on(table.userId)],
+);
+
+// ---------------------------------------------------------------- background jobs
+
+/**
+ * Background jobs (emails now; AI and RFQ expiry later), kept in PostgreSQL
+ * instead of Redis (developer decision, 14 Nov 2026: no Redis for now).
+ * Requests only ADD a row; the worker in src/worker claims due rows with
+ * FOR UPDATE SKIP LOCKED, so several API copies never run the same job.
+ * `dedupeKey` is unique: adding the same job twice is a no-op. `payload` can
+ * hold one-time links, so it is cleared once the job is done or has failed.
+ */
+export const jobStatus = pgEnum("job_status", ["pending", "running", "done", "failed"]);
+
+export const jobs = pgTable(
+  "jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    queue: text("queue").notNull(),
+    name: text("name").notNull(),
+    dedupeKey: text("dedupe_key").notNull().unique(),
+    payload: jsonb("payload"),
+    status: jobStatus("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(5),
+    runAt: timestamp("run_at", { withTimezone: true }).notNull().defaultNow(),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  // The worker's query: due pending jobs, oldest first.
+  (table) => [index("jobs_status_run_at_idx").on(table.status, table.runAt)],
 );
 
 // ---------------------------------------------------------------- upload
@@ -231,3 +291,5 @@ export type UserRow = typeof users.$inferSelect;
 export type NewUserRow = typeof users.$inferInsert;
 export type RefreshTokenRow = typeof refreshTokens.$inferSelect;
 export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;
+export type EmailVerificationTokenRow = typeof emailVerificationTokens.$inferSelect;
+export type JobRow = typeof jobs.$inferSelect;

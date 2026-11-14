@@ -10,7 +10,6 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().min(1),
-  REDIS_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
@@ -21,6 +20,8 @@ const envSchema = z.object({
     .default("http://localhost:3000")
     .transform((value) => value.replace(/\/+$/, "")),
   PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(30),
+  /** How long an email verification link works. */
+  EMAIL_VERIFICATION_TTL_HOURS: z.coerce.number().int().positive().max(72).default(24),
   /**
    * How many proxies sit in front of the API and add to X-Forwarded-For
    * (Express `trust proxy`). Used to find the real client IP for rate
@@ -48,7 +49,7 @@ const envSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().min(16).optional(),
   S3_BUCKET_PRIVATE: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/).optional(),
   /**
-   * Email through Resend, sent by the background workers (src/worker).
+   * Email through Resend, sent by the background worker (src/worker).
    * Unset locally: emails are printed to the terminal instead. Unset in
    * production: emails wait in the queue (never printed) until it is set.
    */
@@ -58,17 +59,6 @@ const envSchema = z.object({
     .transform((value) => value?.trim() || undefined)
     .refine((value) => value === undefined || value.length >= 10, "RESEND_API_KEY looks too short"),
   EMAIL_FROM: z.string().min(3).default("Muhrak <onboarding@resend.dev>"),
-  /**
-   * Namespace of the BullMQ queues in Redis. Each environment that shares a
-   * Redis server MUST use its own, or one environment's workers take the
-   * other's jobs (e.g. a local API printing a staging user's reset email).
-   * Default: "bull" (BullMQ's own default) in production, "muhrak-dev"
-   * otherwise. See `queuePrefix` below.
-   */
-  QUEUE_PREFIX: z
-    .string()
-    .regex(/^[a-z][a-z0-9-]{1,30}$/, "QUEUE_PREFIX: lowercase letters, digits and dashes")
-    .optional(),
   /** Origins allowed to call the API from a browser (CORS and the auth origin check). Comma separated. */
   CORS_ORIGINS: z
     .string()
@@ -86,7 +76,4 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-export const env = {
-  ...parsed.data,
-  queuePrefix: parsed.data.QUEUE_PREFIX ?? (parsed.data.NODE_ENV === "production" ? "bull" : "muhrak-dev"),
-};
+export const env = parsed.data;

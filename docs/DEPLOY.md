@@ -8,7 +8,6 @@ from the `develop` branch of `github.com/Muhrak/muhrak`.
 | API (`apps/api`) | Railway | `apps/api/railway.json` |
 | Background jobs | inside the API | `apps/api/src/worker` |
 | PostgreSQL | Railway | Railway's Postgres template |
-| Redis | Upstash | `REDIS_URL` (`rediss://...`) |
 | Web (`apps/web`) | Vercel | Root directory `apps/web` |
 | Email | Resend | `RESEND_API_KEY` |
 
@@ -60,7 +59,6 @@ variables above are what is actually used.
    RAILPACK_START_CMD=pnpm db:migrate && pnpm start
    NODE_ENV=production
    DATABASE_URL=${{Postgres.DATABASE_URL}}
-   REDIS_URL=<rediss:// URL from Upstash, same as apps/api/.env>
    JWT_SECRET=<new random value, see below>
    RESEND_API_KEY=<from Resend>
    CORS_ORIGINS=<Vercel URL from step 5, fill in later>
@@ -84,10 +82,9 @@ There is no separate worker service any more. The background workers
 (`apps/api/src/worker`, started by `server.ts`), so the `muhrak` service
 needs `RESEND_API_KEY` (and optionally `EMAIL_FROM`).
 
-Queue namespace: `QUEUE_PREFIX` (default `bull` in production, `muhrak-dev`
-locally). Local development and staging use the same Upstash Redis, so they
-MUST keep different prefixes, or one environment takes the other's jobs.
-Never set `QUEUE_PREFIX=bull` on a developer machine.
+Since 14 Nov 2026 the job queue is the PostgreSQL `jobs` table (no Redis):
+each environment has its own database, so its own queue. `REDIS_URL` and
+`QUEUE_PREFIX` are no longer read; they can be deleted from Railway.
 
 Clean-up after the move: delete the Railway `worker` service (its start
 command `pnpm --filter @muhrak/worker start` no longer exists, so it only
@@ -131,8 +128,9 @@ staging and production at the same database.
 - API variables: `CORS_ORIGINS` must list the web URL exactly (it is also the
   CSRF origin check). `TRUST_PROXY_HOPS` = number of proxies adding to
   X-Forwarded-For (measured on staging, see PROGRESS.md).
-- Rate limits are counted in Redis (Upstash); if Redis is down they fall back
-  to per-instance memory counters.
+- Rate limits are counted in the API's memory (no Redis since 14 Nov 2026).
+  Exact with one API copy; a restart resets them. Add a shared store before
+  running several copies.
 - Web security headers (CSP, HSTS, frame-ancestors, nosniff,
   Referrer-Policy, Permissions-Policy) are set in `apps/web/next.config.ts`.
 - Database backups: enable them on the Postgres volume in the Railway

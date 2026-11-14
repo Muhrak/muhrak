@@ -25,3 +25,6 @@ export const forbidden = (message = "Not allowed") => new AppError(403, "forbidd
 export const notFound = (message = "Not found") => new AppError(404, "not_found", message);
 
 export const conflict = (message: string) => new AppError(409, "conflict", message);
+
+/** Correct password, but the email is not verified yet (code `email_not_verified`). */
+export const emailNotVerified = (message: string) => new AppError(403, "email_not_verified", message);

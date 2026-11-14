@@ -1,12 +1,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { loginSchema, type LoginInput } from "@/schemas";
+import { EMAIL_NOT_VERIFIED, loginSchema, type LoginInput } from "@/schemas";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
+import { ApiError } from "@/lib/api";
 import { login } from "./api";
 import { OrDivider, primaryButtonClass, SocialButtons } from "./auth-shell";
 import { Field, FormError, FormNotice, PasswordField } from "./field";
@@ -14,6 +15,7 @@ import { applyApiError } from "./form-errors";
 import { SignedOutOnly } from "./guards";
 import { RESET_PATH, SIGNUP_PATH, type PortalSide } from "./paths";
 import { saveSession } from "./session";
+import { ResendVerificationButton } from "./verify-email";
 
 const FIELDS = ["email", "password"] as const;
 
@@ -57,6 +59,9 @@ function LoginFormBody({ side }: { side: PortalSide }) {
     onSuccess: (session) => saveSession(side, session),
     onError: (error) => applyApiError(error, setError, FIELDS),
   });
+  // Right password, email not verified yet: offer a new link for that address.
+  const unverifiedEmail =
+    mutation.error instanceof ApiError && mutation.error.code === EMAIL_NOT_VERIFIED ? mutation.variables?.email : undefined;
 
   return (
     <div className="flex flex-col">
@@ -94,6 +99,7 @@ function LoginFormBody({ side }: { side: PortalSide }) {
           />
           <FormNotice message={notice} />
           <FormError message={errors.root?.server?.message} />
+          {unverifiedEmail ? <ResendVerificationButton email={unverifiedEmail} /> : null}
         </div>
 
         <Button type="submit" disabled={mutation.isPending || mutation.isSuccess} className={`mt-7 ${primaryButtonClass}`}>

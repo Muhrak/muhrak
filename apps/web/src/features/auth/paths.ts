@@ -32,6 +32,12 @@ export const RESET_PATH: Record<PortalSide, string> = {
   seller: "/seller/reset-password",
 };
 
+/** Where the link in the verification email opens (also: "send me a new link"). */
+export const VERIFY_PATH: Record<PortalSide, string> = {
+  buyer: "/buyer/verify-email",
+  seller: "/seller/verify-email",
+};
+
 /**
  * Where a role lands right after logging in or signing up, when there is no
  * page to go back to (developer decision, 11 Nov 2026): buyers go to the

@@ -1,6 +1,6 @@
 import { EMAIL_QUEUE, emailJobSchema, type EmailJob } from "../../schemas";
 import { env } from "../../config/env";
-import { defaultJobOptions, getQueue } from "../../shared/queue";
+import { enqueueJob } from "../../shared/jobs";
 
 /**
  * Notification module: decides WHAT to send and puts it on the queue.
@@ -9,12 +9,12 @@ import { defaultJobOptions, getQueue } from "../../shared/queue";
  */
 
 /**
- * Queue one email. `dedupeKey` becomes the job id: adding the same key twice
- * is ignored by BullMQ, so a retried request cannot send the email twice.
+ * Queue one email. `dedupeKey` is the job's unique key: adding the same key twice
+ * is ignored, so a retried request cannot send the email twice.
  */
 async function enqueueEmail(job: EmailJob, dedupeKey: string): Promise<void> {
   const payload = emailJobSchema.parse(job);
-  await getQueue(EMAIL_QUEUE).add(payload.template, payload, { ...defaultJobOptions, jobId: dedupeKey });
+  await enqueueJob(EMAIL_QUEUE, payload.template, payload, { dedupeKey });
 }
 
 export async function sendPasswordResetEmail(input: {
@@ -31,8 +31,47 @@ export async function sendPasswordResetEmail(input: {
       to: input.to,
       data: { fullName: input.fullName, resetUrl: input.resetUrl, expiresInMinutes: input.expiresInMinutes },
     },
-    // BullMQ job ids may not contain ":".
     `password-reset-${input.dedupeKey}`,
+  );
+}
+
+/** The link that activates a new account. `dedupeKey`: unique per link. */
+export async function sendVerifyEmail(input: {
+  to: string;
+  fullName: string;
+  verifyUrl: string;
+  expiresInHours: number;
+  dedupeKey: string;
+}): Promise<void> {
+  await enqueueEmail(
+    {
+      template: "verify-email",
+      to: input.to,
+      data: { fullName: input.fullName, verifyUrl: input.verifyUrl, expiresInHours: input.expiresInHours },
+    },
+    `verify-email-${input.dedupeKey}`,
+  );
+}
+
+/**
+ * Someone signed up with this address, which already has an account. The
+ * owner is told how to get in; the account itself is not changed.
+ * `dedupeKey`: unique per attempt.
+ */
+export async function sendAccountExistsEmail(input: {
+  to: string;
+  fullName: string;
+  loginUrl: string;
+  resetUrl: string;
+  dedupeKey: string;
+}): Promise<void> {
+  await enqueueEmail(
+    {
+      template: "account-exists",
+      to: input.to,
+      data: { fullName: input.fullName, loginUrl: input.loginUrl, resetUrl: input.resetUrl },
+    },
+    `account-exists-${input.dedupeKey}`,
   );
 }
 

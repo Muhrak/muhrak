@@ -156,6 +156,55 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   (Root Directory `apps/web`); its first build after the push should be
   checked.
 
+### Email verification (Sat 14 Nov)
+- Developer decision: buyers and sellers cannot sign in until they open
+  the link in the verification email (strict; admins are created verified
+  from the command line).
+- Sign-up answers `202` with no body, the same for a new or an existing
+  email, before doing the work (no enumeration, also by timing). New email:
+  unverified account + link. Existing email: nothing changes; the owner
+  gets "You already have a Muhrak account" (log in / reset links).
+- Links: random, stored as SHA-256 hashes, single use (conditional update),
+  24 h (`EMAIL_VERIFICATION_TTL_HOURS`), only the newest works. Opening a
+  link takes one click on `/buyer|seller/verify-email` (not automatic, so
+  mail scanners cannot use it up) and does NOT sign in.
+- Login: the "verify first" answer (403 `email_not_verified`) comes only
+  after the right password, so it tells a stranger nothing; the form then
+  offers "send a new link". Refresh also refuses an unverified account.
+- Resend (`POST /v1/auth/resend-verification`): always 202; 1 a minute and
+  5 sign-up emails an hour per address, 5 per 15 min per IP.
+- A completed password reset also verifies the email (the link proves the
+  inbox). This is how a real owner recovers an email that someone else
+  signed up with first (that account could never sign in).
+- Migration `0005`: `users.email_verified_at`, table
+  `email_verification_tokens`; existing accounts marked verified (staging
+  test accounts and admins; no real users yet).
+- Tested: 21 new service tests (enumeration, races, expired/used links,
+  flooding, admin never emailed, reset verifies); browser run (seller
+  sign-up → check inbox → login refused with resend → link → verified →
+  reused link refused → login works; sign-up again with that email shows
+  the same screen and sends "account exists").
+
+### Redis removed; job queue in PostgreSQL (Sat 14 Nov)
+- The free Upstash plan ran out (500,000 requests a month): the always-on
+  BullMQ worker polled it day and night, local and staging shared it, and
+  staging stopped sending emails. Developer decision: no Redis for now.
+- Background jobs now use the PostgreSQL `jobs` table (`shared/jobs.ts`,
+  migration `0006`): unique dedupe key, claimed with FOR UPDATE SKIP LOCKED
+  (several API copies never take the same job), retries with backoff
+  (10 s, 20 s, 40 s, ... up to 5 attempts), permanent errors stop at once,
+  jobs left running by a stopped process are released after 5 minutes,
+  payload (it can hold one-time links) cleared when done or failed. The
+  worker wakes when a job is added and polls every 5 s. Resend's
+  idempotency key is the job id, so a retry after a crash never sends twice.
+- Rate limits: in-memory counters only (exact with the one staging API
+  copy; a restart resets them). Need a shared store before several copies.
+- `bullmq` and `ioredis` removed; `REDIS_URL` and `QUEUE_PREFIX` no longer
+  read (delete them on Railway when convenient).
+- Tested: 12-check queue run against the local database (parallel claims
+  never overlap, dedupe, retry and backoff, permanent failure, payload
+  cleared, stale release); all API tests.
+
 ### Worker moved into the API (Sat 14 Nov)
 - `apps/worker` is gone. Its code is in `apps/api/src/worker` (email
   templates, Resend and console providers, the send-email job). `server.ts`
@@ -270,9 +319,9 @@ one seller type, AI through the worker, etc.).
 
 - Windows, no Docker, no `gh`. Native PostgreSQL 17 on localhost:5432.
   (No Docker setup in the repo any more.)
-- Redis: hosted Upstash, the SAME one staging uses. `REDIS_URL`
-  (`rediss://…`) in `apps/api/.env`. Keep `QUEUE_PREFIX` unset locally
-  (default `muhrak-dev`), never `bull`. Never commit `.env`.
+- No Redis (removed 14 Nov 2026). Never commit `.env`. To print emails
+  locally instead of sending them, start the API with `RESEND_API_KEY=`
+  empty (the local `.env` has a real key).
 - Run locally: `pnpm dev` in `apps/api` (API + background workers) and
   `pnpm dev` in `apps/web`.
 - GitHub: `github.com/Muhrak/muhrak` (remote `https://Muhrak@github.com/Muhrak/muhrak.git`).
@@ -294,8 +343,8 @@ Details in `docs/DEPLOY.md`.
 ## Open items
 
 Security hardening (12 Nov 2026), done and tested (see docs/DEPLOY.md):
-- Rate limits on every auth endpoint and a site-wide per-IP ceiling (Redis,
-  in-memory fallback). Failed logins: 5 per email+IP per 15 min, 20 per
+- Rate limits on every auth endpoint and a site-wide per-IP ceiling
+  (in-memory since 14 Nov; was Redis). Failed logins: 5 per email+IP per 15 min, 20 per
   email per hour. Reset emails: 5 per address per hour.
 - No user enumeration by timing (login dummy hash; forgot-password answers
   before working).
@@ -324,8 +373,8 @@ Still open (security):
 - Access tokens stay valid up to 15 min after logout or password reset
   (stateless JWT). Consider a per-user token version check for money
   actions.
-- Sign-up says "email already exists" (enumeration via sign-up), limited
-  by the 10/hour per-IP limit. Revisit with email verification.
+- (Fixed 14 Nov: sign-up no longer reveals existing emails; see "Email
+  verification".)
 - CAPTCHA (e.g. Cloudflare Turnstile) after repeated failures: needs a
   provider account; ask the developer.
 
@@ -343,7 +392,9 @@ Still open (Day 3 files):
 Other:
 
 - Resend has no verified domain, so emails only reach the Resend account
-  owner. Needs a domain (for example `muhrak.om`) before real users.
+  owner. Needs a domain (for example `muhrak.om`) before real users. With
+  email verification this now BLOCKS sign-up for every other address on
+  staging: only `teammuhrak@gmail.com` can complete a new account.
 - Placeholder numbers to replace before launch: buyer "2,481+ verified"
   manufacturers, seller "12,940 members" and "185 requests".
 - FAQ answers 2 to 5 on both landing pages were written by Claude; the

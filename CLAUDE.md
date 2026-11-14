@@ -39,7 +39,9 @@ the web app for the start). Do not propose further merges or splits.
   `package.json`, `pnpm-lock.yaml` and tsconfig, and is installed, run and
   deployed from its own folder. Nothing is shared between them as code.
 - Backend: Express 5 + TypeScript, one modular monolith, REST under `/v1`.
-- Database: PostgreSQL with Drizzle. Redis + BullMQ for background jobs.
+- Database: PostgreSQL with Drizzle. Background jobs use a `jobs` table in
+  PostgreSQL. No Redis for now (developer decision, 14 Nov 2026, after the
+  free Upstash plan ran out); add a shared store later where needed.
 - Frontend: Next.js (App Router), TypeScript, Tailwind, shadcn/ui, TanStack Query,
   React Hook Form + Zod.
 - Chat: Stream Chat. Email: Resend. AI: Claude API (vision), always through the
@@ -73,11 +75,11 @@ the web app for the start). Do not propose further merges or splits.
    `src/schemas/web-copy.test.ts` fails if the two differ.
 5. Outside services (AI, chat, storage, email) sit behind a small interface
    with implementations in a `providers/` folder.
-6. Slow or retryable work (AI calls, emails, RFQ expiry) is a BullMQ job,
-   never inline in a request. The workers run inside the API process
-   (`apps/api/src/worker`, started by `server.ts`; developer decision,
-   14 Nov 2026, replacing the separate `apps/worker`). Each environment
-   sharing a Redis server needs its own `QUEUE_PREFIX`.
+6. Slow or retryable work (AI calls, emails, RFQ expiry) is a background
+   job (`enqueueJob` in `apps/api/src/shared/jobs.ts`), never inline in a
+   request. Jobs live in the PostgreSQL `jobs` table (unique dedupe key,
+   retries with backoff, payload cleared when finished) and run inside the
+   API process (`apps/api/src/worker`, started by `server.ts`).
 7. Every list endpoint is paginated. Every query used in a list has an index.
 8. Orders and RFQs are state machines; allowed transitions are defined in one
    place in the service.
@@ -106,6 +108,11 @@ the web app for the start). Do not propose further merges or splits.
   uploads, and Zod-validated model output. The model fills fields; it never
   takes actions. If AI fails, fall back to the manual form.
 - Rate-limit login, sign-up, AI and messaging endpoints before any public deploy.
+  Rate-limit counters are in memory (one API copy); move them to a shared
+  store before running several copies.
+- **Email verification (14 Nov 2026):** buyers and sellers cannot sign in
+  until they open the link in the verification email. Sign-up answers the
+  same for new and existing emails (no enumeration).
 
 ## Security standard (STRICT, set by the developer on 12 Nov 2026)
 

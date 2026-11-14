@@ -14,6 +14,9 @@ export const registerSchema = z.object({
   role: z.enum(["buyer", "seller"]),
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
+// POST /v1/auth/register answers 202 with no body, whether or not the email
+// already has an account (no enumeration). The new account cannot sign in
+// until its email is verified.
 
 /**
  * `role` is the side the user is logging in on. Buyer and seller are fully
@@ -69,6 +72,27 @@ export const resetPasswordSchema = z.object({
   password: passwordSchema,
 });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+/** POST /v1/auth/verify-email. The token comes from the link in the verification email. */
+export const verifyEmailSchema = z.object({
+  token: z.string().min(20).max(200),
+});
+export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
+
+/** The verified account's side, so the page can send the user to the right login. */
+export const verifyEmailResponseSchema = z.object({
+  role: roleSchema,
+});
+export type VerifyEmailResponse = z.infer<typeof verifyEmailResponseSchema>;
+
+/** POST /v1/auth/resend-verification. Always answers 202, whether or not the email has an account. */
+export const resendVerificationSchema = z.object({
+  email: emailSchema,
+});
+export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
+
+/** Error code of a login refused because the email is not verified yet (403). */
+export const EMAIL_NOT_VERIFIED = "email_not_verified";
 
 /** GET /v1/auth/me */
 export const meResponseSchema = z.object({

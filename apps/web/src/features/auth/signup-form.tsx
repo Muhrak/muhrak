@@ -15,7 +15,7 @@ import { Field, FormError, FormNotice, PasswordField } from "./field";
 import { applyApiError } from "./form-errors";
 import { SignedOutOnly } from "./guards";
 import { LOGIN_PATH } from "./paths";
-import { saveSession } from "./session";
+import { CheckInbox } from "./verify-email";
 
 export type AccountType = "individual" | "company";
 
@@ -102,9 +102,8 @@ function AccountTypeTabs({ current }: { current: AccountType }) {
 
 function useRegister<T extends FieldValues>(setError: UseFormSetError<T>, nameField: Path<T>, fields: readonly Path<T>[]) {
   return useMutation({
+    // No sign-in: the account is activated by the link in the verification email.
     mutationFn: (input: RegisterInput) => registerAccount(input),
-    // Stored on the side the account was made for; SignedOutOnly then moves the new user on.
-    onSuccess: (session) => saveSession(session.user.role === "seller" ? "seller" : "buyer", session),
     // The API reports name problems on `fullName`; show them on the visible name field.
     onError: (error) => applyApiError(error, setError, fields, { fullName: nameField }),
   });
@@ -121,6 +120,7 @@ function IndividualForm({ notice }: { notice?: string }) {
     defaultValues: { firstName: "", lastName: "", email: "", password: "" },
   });
   const mutation = useRegister(setError, "firstName", ["email", "password"]);
+  if (mutation.isSuccess) return <CheckInbox email={mutation.variables.email} side="buyer" />;
 
   return (
     <form
@@ -197,6 +197,8 @@ function CompanyForm({ notice, role }: { notice?: string; role: "buyer" | "selle
     const email = new URLSearchParams(window.location.search).get("email");
     if (email) setValue("email", email.slice(0, 254));
   }, [setValue]);
+
+  if (mutation.isSuccess) return <CheckInbox email={mutation.variables.email} side={role} />;
 
   return (
     <form

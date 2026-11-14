@@ -5,7 +5,6 @@ import type { RefreshTokenRow, UserRow } from "../../db/schema";
 vi.hoisted(() => {
   Object.assign(process.env, {
     DATABASE_URL: "postgres://test:test@localhost:5432/test",
-    REDIS_URL: "redis://localhost:6379",
     JWT_SECRET: "test-secret-that-is-at-least-32-characters-long",
     WEB_APP_URL: "https://muhrak.test",
   });
@@ -21,12 +20,6 @@ vi.mock("./auth.repository", () => ({
 }));
 vi.mock("./password", () => ({ verifyPassword: vi.fn(), hashPassword: vi.fn() }));
 vi.mock("../notification", () => ({ sendPasswordResetEmail: vi.fn() }));
-// No Redis in unit tests: the rate limiter falls back to its in-memory counters.
-vi.mock("../../shared/redis", () => ({
-  getRedis: () => {
-    throw new Error("no redis in tests");
-  },
-}));
 
 const repo = await import("./auth.repository");
 const { verifyPassword } = await import("./password");
@@ -39,6 +32,7 @@ function user(role: UserRow["role"]): UserRow {
     passwordHash: "scrypt$00$00",
     fullName: "Khalid Al Balushi",
     role,
+    emailVerifiedAt: new Date("2026-11-10T08:05:00Z"),
     createdAt: new Date("2026-11-10T08:00:00Z"),
     updatedAt: new Date("2026-11-10T08:00:00Z"),
   } as UserRow;

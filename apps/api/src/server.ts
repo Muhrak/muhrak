@@ -2,8 +2,6 @@ import { createApp } from "./app";
 import { env } from "./config/env";
 import { pool } from "./db/client";
 import { logger } from "./shared/logger";
-import { closeQueues } from "./shared/queue";
-import { closeRedis } from "./shared/redis";
 import { closeWorkers, startWorkers } from "./worker";
 
 const app = createApp();
@@ -13,12 +11,12 @@ const server = app.listen(env.PORT, () => {
   startWorkers();
 });
 
-/** Finish in-flight requests and running jobs, then close the database pool and Redis. */
+/** Finish in-flight requests and running jobs, then close the database pool. */
 function shutdown(signal: string) {
   logger.info(`${signal} received, shutting down`);
   server.close(() => {
     closeWorkers()
-      .then(() => Promise.all([pool.end(), closeQueues(), closeRedis()]))
+      .then(() => pool.end())
       .catch((err: unknown) => logger.error({ err }, "Error closing database pool or queues"))
       .finally(() => process.exit(0));
   });

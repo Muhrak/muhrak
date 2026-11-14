@@ -16,7 +16,6 @@ import { Writable } from "node:stream";
 import { z } from "zod";
 import { pool } from "../db/client";
 import { upsertAdminAccount } from "../modules/auth";
-import { closeRedis } from "../shared/redis";
 
 const MIN_PASSWORD = 14;
 
@@ -69,5 +68,4 @@ main()
   .finally(async () => {
     rl.close();
     await pool.end();
-    await closeRedis();
   });

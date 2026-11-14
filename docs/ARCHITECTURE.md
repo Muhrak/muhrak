@@ -6,19 +6,22 @@
         Next.js web app (public, buyer, seller, admin under /admin)
                               |
                   Express API  /v1  (modular monolith)
-                 /        |         \          \
-          Workers     PostgreSQL    Redis     File storage + CDN
-       (BullMQ, inside
-        the API process)
+                 /              |              \
+          Workers           PostgreSQL         File storage + CDN
+     (inside the API      (data + job queue)
+        process)
              |
    External services: Stream Chat, Claude API, email provider
 ```
 
 - Clients hold no business logic; they call the API.
-- The API is stateless: tokens for auth, object storage for files, Redis for
-  shared state. It can run as many copies as needed behind a load balancer.
-- Slow work runs as BullMQ jobs, processed by workers inside the API
-  process (`apps/api/src/worker`), never inside a request.
+- The API keeps no session state: tokens for auth, object storage for files,
+  PostgreSQL for data and the job queue. Exception: rate-limit counters are
+  in memory, so before running several copies they need a shared store
+  (Redis was removed on 14 Nov 2026; add one back when that day comes).
+- Slow work runs as background jobs (PostgreSQL `jobs` table, claimed with
+  FOR UPDATE SKIP LOCKED), processed by the worker inside the API process
+  (`apps/api/src/worker`), never inside a request.
 - Modules communicate through their `index.ts` exports or through events.
 
 ## Folder structure (20-day scope)
@@ -152,6 +155,6 @@ every call. The API key stays on the server.
 
 ## Hosting for launch
 
-API (with its background workers) on a managed platform, web apps on Vercel, managed Postgres and
-Redis, object storage with a CDN. Two API instances for reliability. No
+API (with its background workers) on a managed platform, web app on Vercel, managed Postgres
+(plus a shared store for rate limits once there are several API copies), object storage with a CDN. Two API instances for reliability. No
 Dockerfiles are required for this setup; add them when moving to AWS.

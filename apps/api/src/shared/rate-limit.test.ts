@@ -4,16 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 vi.hoisted(() => {
   Object.assign(process.env, {
     DATABASE_URL: "postgres://test:test@localhost:5432/test",
-    REDIS_URL: "redis://localhost:6379",
     JWT_SECRET: "test-secret-that-is-at-least-32-characters-long",
     API_PROXY_SECRET: "proxy-secret-that-is-at-least-32-characters",
   });
 });
-vi.mock("./redis", () => ({
-  getRedis: () => {
-    throw new Error("no redis in tests");
-  },
-}));
 
 const { clientIp, hit } = await import("./rate-limit");
 
@@ -48,7 +42,7 @@ describe("clientIp", () => {
   });
 });
 
-describe("hit (Redis down: in-memory fallback still limits)", () => {
+describe("hit (in-memory counters)", () => {
   it("allows up to max hits per window, then refuses", async () => {
     const limit = { name: "test", max: 3, windowMs: 60_000 };
     const results = [];

@@ -4,7 +4,6 @@ import type { UploadRow } from "../../db/schema";
 vi.hoisted(() => {
   Object.assign(process.env, {
     DATABASE_URL: "postgres://test:test@localhost:5432/test",
-    REDIS_URL: "redis://localhost:6379",
     JWT_SECRET: "test-secret-that-is-at-least-32-characters-long",
   });
 });
@@ -15,11 +14,6 @@ vi.mock("./upload.repository", () => ({
   markReady: vi.fn(),
   markRejected: vi.fn(),
   attach: vi.fn(),
-}));
-vi.mock("../../shared/redis", () => ({
-  getRedis: () => {
-    throw new Error("no redis in tests");
-  },
 }));
 
 const repo = await import("./upload.repository");

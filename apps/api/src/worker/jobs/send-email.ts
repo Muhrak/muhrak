@@ -1,27 +1,34 @@
 import { emailJobSchema } from "../../schemas";
-import { UnrecoverableError, type Job } from "bullmq";
+import type { JobRow } from "../../db/schema";
 import { PermanentEmailError, type EmailProvider } from "../email/email-provider";
 import { renderEmail } from "../email/templates";
 
+/** A failure that retrying cannot fix: the job stops instead of retrying. */
+export class PermanentJobError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PermanentJobError";
+  }
+}
+
 /**
- * Handle one job from the "email" queue: validate, render, send.
+ * Run one job from the "email" queue: validate, render, send.
  * Job data is never logged: it can hold one-time links.
  */
-export function createSendEmailHandler(provider: EmailProvider) {
-  return async function sendEmail(job: Job): Promise<void> {
-    const parsed = emailJobSchema.safeParse(job.data);
-    if (!parsed.success) {
-      // A malformed job will never succeed; do not retry it.
-      throw new UnrecoverableError(`Invalid email job ${job.id}`);
+export async function sendEmailJob(provider: EmailProvider, job: Pick<JobRow, "id" | "payload">): Promise<void> {
+  const parsed = emailJobSchema.safeParse(job.payload);
+  if (!parsed.success) {
+    // A malformed job will never succeed; do not retry it.
+    throw new PermanentJobError(`Invalid email job ${job.id}`);
+  }
+  const email = renderEmail(parsed.data);
+  try {
+    // The job id is the provider's idempotency key: a retry after a crash never sends twice.
+    await provider.send({ ...email, to: parsed.data.to, idempotencyKey: job.id });
+  } catch (err) {
+    if (err instanceof PermanentEmailError) {
+      throw new PermanentJobError(err.message);
     }
-    const email = renderEmail(parsed.data);
-    try {
-      await provider.send({ ...email, to: parsed.data.to, idempotencyKey: String(job.id) });
-    } catch (err) {
-      if (err instanceof PermanentEmailError) {
-        throw new UnrecoverableError(err.message);
-      }
-      throw err;
-    }
-  };
+    throw err;
+  }
 }

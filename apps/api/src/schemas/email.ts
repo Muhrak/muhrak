@@ -18,6 +18,25 @@ export const emailJobSchema = z.discriminatedUnion("template", [
     }),
   }),
   z.object({
+    template: z.literal("verify-email"),
+    to: z.string().email(),
+    data: z.object({
+      fullName: z.string(),
+      verifyUrl: z.string().url(),
+      expiresInHours: z.number().int().positive(),
+    }),
+  }),
+  z.object({
+    /** Someone signed up with an email that already has an account. */
+    template: z.literal("account-exists"),
+    to: z.string().email(),
+    data: z.object({
+      fullName: z.string(),
+      loginUrl: z.string().url(),
+      resetUrl: z.string().url(),
+    }),
+  }),
+  z.object({
     template: z.literal("seller-verified"),
     to: z.string().email(),
     data: z.object({

@@ -1,9 +1,11 @@
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../../db/client";
 import {
+  emailVerificationTokens,
   passwordResetTokens,
   refreshTokens,
   users,
+  type EmailVerificationTokenRow,
   type NewUserRow,
   type PasswordResetTokenRow,
   type RefreshTokenRow,
@@ -126,4 +128,53 @@ export async function invalidatePasswordResetTokensForUser(userId: string): Prom
     .update(passwordResetTokens)
     .set({ usedAt: new Date() })
     .where(and(eq(passwordResetTokens.userId, userId), isNull(passwordResetTokens.usedAt)));
+}
+
+// ---------------------------------------------------------------- email verification
+
+/** Set the verified time once; returns true only if THIS call verified the user. */
+export async function markUserEmailVerified(userId: string, at = new Date()): Promise<boolean> {
+  const rows = await db
+    .update(users)
+    .set({ emailVerifiedAt: at, updatedAt: at })
+    .where(and(eq(users.id, userId), isNull(users.emailVerifiedAt)))
+    .returning({ id: users.id });
+  return rows.length === 1;
+}
+
+export async function insertEmailVerificationToken(values: { userId: string; tokenHash: string; expiresAt: Date }): Promise<void> {
+  await db.insert(emailVerificationTokens).values(values);
+}
+
+export async function findLatestEmailVerificationToken(userId: string): Promise<EmailVerificationTokenRow | undefined> {
+  const rows = await db
+    .select()
+    .from(emailVerificationTokens)
+    .where(eq(emailVerificationTokens.userId, userId))
+    .orderBy(desc(emailVerificationTokens.createdAt))
+    .limit(1);
+  return rows[0];
+}
+
+export async function findEmailVerificationTokenByHash(tokenHash: string): Promise<EmailVerificationTokenRow | undefined> {
+  const rows = await db.select().from(emailVerificationTokens).where(eq(emailVerificationTokens.tokenHash, tokenHash)).limit(1);
+  return rows[0];
+}
+
+/** Mark one link as used. Returns true only if THIS call used it, so a link cannot be used twice. */
+export async function markEmailVerificationTokenUsed(id: string): Promise<boolean> {
+  const rows = await db
+    .update(emailVerificationTokens)
+    .set({ usedAt: new Date() })
+    .where(and(eq(emailVerificationTokens.id, id), isNull(emailVerificationTokens.usedAt)))
+    .returning({ id: emailVerificationTokens.id });
+  return rows.length === 1;
+}
+
+/** Cancel every unused link for a user, so only the newest email works. */
+export async function invalidateEmailVerificationTokensForUser(userId: string): Promise<void> {
+  await db
+    .update(emailVerificationTokens)
+    .set({ usedAt: new Date() })
+    .where(and(eq(emailVerificationTokens.userId, userId), isNull(emailVerificationTokens.usedAt)));
 }

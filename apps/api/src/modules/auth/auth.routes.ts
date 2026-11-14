@@ -3,14 +3,18 @@ import {
   forgotPasswordSchema,
   loginSchema,
   registerSchema,
+  resendVerificationSchema,
   resetPasswordSchema,
   sessionSideSchema,
+  verifyEmailSchema,
   type AuthResponse,
   type ForgotPasswordInput,
   type LoginInput,
   type RegisterInput,
+  type ResendVerificationInput,
   type ResetPasswordInput,
   type SessionSideInput,
+  type VerifyEmailInput,
 } from "../../schemas";
 import { unauthorized } from "../../shared/errors";
 import { validateBody } from "../../shared/http";
@@ -41,6 +45,8 @@ const LIMITS = {
   logout: { name: "logout:ip", max: 60, windowMs: 15 * MINUTE },
   forgotPassword: { name: "forgot:ip", max: 5, windowMs: 15 * MINUTE },
   resetPassword: { name: "reset:ip", max: 10, windowMs: 15 * MINUTE },
+  verifyEmail: { name: "verify:ip", max: 20, windowMs: 15 * MINUTE },
+  resendVerification: { name: "resend-verify:ip", max: 5, windowMs: 15 * MINUTE },
   me: { name: "me:ip", max: 300, windowMs: 15 * MINUTE },
 } satisfies Record<string, Limit>;
 
@@ -57,7 +63,29 @@ authRouter.post(
   requireTrustedOrigin,
   validateBody(registerSchema),
   async (req, res) => {
-    sendSession(res, await authService.register(req.body as RegisterInput), 201);
+    // 202 with no body, the same for a new or an existing email; answered
+    // before the work so the response time reveals nothing either. The new
+    // account cannot sign in until its email is verified.
+    res.status(202).end();
+    authService.register(req.body as RegisterInput).catch((err: unknown) => logger.error({ err }, "Sign-up failed"));
+  },
+);
+
+/** Open the link from the verification email. Does not sign in; the user logs in afterwards. */
+authRouter.post("/verify-email", limitByIp(LIMITS.verifyEmail), validateBody(verifyEmailSchema), async (req, res) => {
+  res.json(await authService.verifyEmail((req.body as VerifyEmailInput).token));
+});
+
+/** Always 202 with no body: the response must not reveal whether the email has an account. */
+authRouter.post(
+  "/resend-verification",
+  limitByIp(LIMITS.resendVerification),
+  validateBody(resendVerificationSchema),
+  async (req, res) => {
+    res.status(202).end();
+    authService
+      .resendVerificationEmail((req.body as ResendVerificationInput).email)
+      .catch((err: unknown) => logger.error({ err }, "Resend verification failed"));
   },
 );
 

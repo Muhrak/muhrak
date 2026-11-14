@@ -5,7 +5,6 @@ import type { PasswordResetTokenRow, UserRow } from "../../db/schema";
 vi.hoisted(() => {
   Object.assign(process.env, {
     DATABASE_URL: "postgres://test:test@localhost:5432/test",
-    REDIS_URL: "redis://localhost:6379",
     JWT_SECRET: "test-secret-that-is-at-least-32-characters-long",
     WEB_APP_URL: "https://muhrak.test",
     PASSWORD_RESET_TTL_MINUTES: "30",
@@ -21,14 +20,10 @@ vi.mock("./auth.repository", () => ({
   markPasswordResetTokenUsed: vi.fn(),
   updateUserPassword: vi.fn(),
   revokeAllRefreshTokensForUser: vi.fn(),
+  markUserEmailVerified: vi.fn(),
+  invalidateEmailVerificationTokensForUser: vi.fn(),
 }));
 vi.mock("../notification", () => ({ sendPasswordResetEmail: vi.fn() }));
-// No Redis in unit tests: the rate limiter falls back to its in-memory counters.
-vi.mock("../../shared/redis", () => ({
-  getRedis: () => {
-    throw new Error("no redis in tests");
-  },
-}));
 
 const repo = await import("./auth.repository");
 const { sendPasswordResetEmail } = await import("../notification");
@@ -44,6 +39,7 @@ const seller: UserRow = {
   passwordHash: "scrypt$00$00",
   fullName: "Al Noor Spare Parts",
   role: "seller",
+  emailVerifiedAt: null,
   createdAt: now,
   updatedAt: now,
 };
@@ -106,9 +102,9 @@ describe("requestPasswordReset", () => {
   it("cancels the new link if the email cannot be queued", async () => {
     vi.mocked(repo.findUserByEmail).mockResolvedValue(seller);
     vi.mocked(repo.findLatestPasswordResetToken).mockResolvedValue(undefined);
-    vi.mocked(sendPasswordResetEmail).mockRejectedValueOnce(new Error("redis down"));
+    vi.mocked(sendPasswordResetEmail).mockRejectedValueOnce(new Error("queue down"));
 
-    await expect(requestPasswordReset(seller.email, now)).rejects.toThrow("redis down");
+    await expect(requestPasswordReset(seller.email, now)).rejects.toThrow("queue down");
     expect(repo.invalidatePasswordResetTokensForUser).toHaveBeenCalledTimes(2);
   });
 });
@@ -138,6 +134,13 @@ describe("resetPassword", () => {
     expect(userId).toBe(seller.id);
     expect(await verifyPassword(input.password, newHash ?? "")).toBe(true);
     expect(repo.revokeAllRefreshTokensForUser).toHaveBeenCalledWith(seller.id);
+  });
+
+  it("verifies the email too (the link proves the user owns the inbox) and cancels old verification links", async () => {
+    vi.mocked(repo.findPasswordResetTokenByHash).mockResolvedValue(tokenRow());
+    await resetPassword(input, now);
+    expect(repo.markUserEmailVerified).toHaveBeenCalledWith(seller.id, now);
+    expect(repo.invalidateEmailVerificationTokensForUser).toHaveBeenCalledWith(seller.id);
   });
 
   it.each([
