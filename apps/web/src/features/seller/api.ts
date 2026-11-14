@@ -7,7 +7,7 @@ import {
   type DocumentType,
   type SellerAccount,
   type SellerProfileInput,
-} from "@muhrak/schemas";
+} from "@/schemas";
 import { authedRequest } from "@/features/auth/authed-request";
 import { useSession } from "@/features/auth/session";
 

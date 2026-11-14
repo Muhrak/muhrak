@@ -6,7 +6,7 @@ import {
   submitDocumentSchema,
   type SellerAccount,
   type SellerProfileData,
-} from "@muhrak/schemas";
+} from "../../schemas";
 import { validateBody, validateParams } from "../../shared/http";
 import { limitByUser } from "../../shared/rate-limit";
 import { requireAuth, requireRole } from "../auth";

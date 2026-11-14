@@ -6,7 +6,7 @@ import {
   type DocumentType,
   type SellerAccount,
   type SellerDocument,
-} from "@muhrak/schemas";
+} from "@/schemas";
 import Link from "next/link";
 import { useId, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { Icon, type IconName } from "@/components/layout/icon";

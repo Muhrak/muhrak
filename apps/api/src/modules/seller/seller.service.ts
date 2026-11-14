@@ -12,7 +12,7 @@ import {
   type SellerProfileData,
   type Verification,
   type VerificationStatus,
-} from "@muhrak/schemas";
+} from "../../schemas";
 import type { SellerDocumentRow, SellerProfileRow } from "../../db/schema";
 import { AppError, badRequest, conflict, notFound } from "../../shared/errors";
 import { logger } from "../../shared/logger";

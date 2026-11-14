@@ -1,6 +1,6 @@
 "use client";
 
-import type { VerificationStatus } from "@muhrak/schemas";
+import type { VerificationStatus } from "@/schemas";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";

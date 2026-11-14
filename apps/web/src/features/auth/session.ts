@@ -1,4 +1,4 @@
-import { publicUserSchema, type AuthResponse, type PublicUser } from "@muhrak/schemas";
+import { publicUserSchema, type AuthResponse, type PublicUser } from "@/schemas";
 import { z } from "zod";
 import { useCallback, useSyncExternalStore } from "react";
 import type { AuthSide } from "./paths";

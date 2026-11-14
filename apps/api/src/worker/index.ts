@@ -1,4 +1,4 @@
-import { EMAIL_QUEUE } from "@muhrak/schemas";
+import { EMAIL_QUEUE } from "../schemas";
 import { Worker } from "bullmq";
 import { Redis } from "ioredis";
 import { env } from "../config/env";

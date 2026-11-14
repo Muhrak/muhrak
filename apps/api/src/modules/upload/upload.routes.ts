@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { createUploadSchema, type CompleteUploadResponse, type CreateUploadInput } from "@muhrak/schemas";
+import { createUploadSchema, type CompleteUploadResponse, type CreateUploadInput } from "../../schemas";
 import { validateBody, validateParams } from "../../shared/http";
 import { limitByUser } from "../../shared/rate-limit";
 import { requireAuth } from "../auth";

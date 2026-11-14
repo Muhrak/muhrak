@@ -26,7 +26,9 @@ and products).
 separate app. It moved from `apps/admin` into the web app under `/admin`
 (see "Admin console moved into the web app" below). The worker is no
 longer a separate app either: the background jobs run inside the API
-(see "Worker moved into the API" below).
+(see "Worker moved into the API" below). Then the repo was split into two
+standalone apps, all frontend in `apps/web`, all backend in `apps/api`
+(see "Two standalone apps" below).
 
 ## Done
 
@@ -93,7 +95,7 @@ longer a separate app either: the background jobs run inside the API
   Pages: `/login`, `/sellers` (Figma "Admin – Sellers" 405:1892, light),
   `/sellers/[id]` (review page, no Figma frame; same style). Other Figma
   sidebar items open "Coming soon".
-- First admin: `pnpm --filter @muhrak/api admin` asks for email, name and
+- First admin: `pnpm admin` (in `apps/api`) asks for email, name and
   password (hidden, 14+ characters). The same script sets a new password
   and signs that admin out everywhere. There is no admin sign-up, and admin
   passwords cannot be reset by email.
@@ -118,6 +120,27 @@ longer a separate app either: the background jobs run inside the API
   Same fix on the seller Verification page.
 - Tests: 7 review tests (abuse cases), 27-check API run (wrong side, wrong
   role, tampered cursor, stale review, race), browser run of the console.
+
+### Two standalone apps (Sat 14 Nov)
+- Removed `packages/schemas`, `pnpm-workspace.yaml`, `turbo.json`, the root
+  `package.json` and lockfile, `tsconfig.base.json` and `docker-compose.yml`.
+  The repo root now holds only `apps/`, `docs/`, `CLAUDE.md`, `README.md`,
+  `.gitignore` (and the local, uncommitted `refs/`).
+- Each app has its own `package.json` (with `packageManager` and
+  `engines`), `pnpm-lock.yaml` and tsconfig. Direct dependency versions are
+  exactly the ones locked before the split.
+- Schemas: `apps/api/src/schemas` is the source (with the money and seller
+  schema tests); `apps/web/src/schemas` is an exact copy. The API test
+  `web-copy.test.ts` fails if they differ (checked by changing a copy).
+- Commands now run inside each app folder (`pnpm dev`, `pnpm test`, ...).
+- Tested: API typecheck and 87 tests; web typecheck, lint, production build;
+  both apps run from their own folders and the full admin browser test
+  passes (login, isolation, review, document link, emails via the queue).
+- **Deploy change (developer, before or right after the push):** Railway
+  service `muhrak` → Settings → Root Directory `apps/api`, and variable
+  `RAILPACK_START_CMD=pnpm db:migrate && pnpm start`. Vercel is unchanged
+  (Root Directory `apps/web`); its first build after the push should be
+  checked.
 
 ### Worker moved into the API (Sat 14 Nov)
 - `apps/worker` is gone. Its code is in `apps/api/src/worker` (email
@@ -223,18 +246,18 @@ Accounts:
   separate logins, no effect on each other. Details in `CLAUDE.md`
   (Security rules).
 
-Product and code: see `CLAUDE.md` (monorepo, modules, money, security,
+Product and code: see `CLAUDE.md` (two standalone apps, modules, money, security,
 one seller type, AI through the worker, etc.).
 
 ## Environment
 
 - Windows, no Docker, no `gh`. Native PostgreSQL 17 on localhost:5432.
-  Skip `pnpm db:up`.
+  (No Docker setup in the repo any more.)
 - Redis: hosted Upstash, the SAME one staging uses. `REDIS_URL`
   (`rediss://…`) in `apps/api/.env`. Keep `QUEUE_PREFIX` unset locally
   (default `muhrak-dev`), never `bull`. Never commit `.env`.
-- Run locally: `pnpm --filter @muhrak/api dev` (API + background workers),
-  `pnpm --filter @muhrak/web dev`.
+- Run locally: `pnpm dev` in `apps/api` (API + background workers) and
+  `pnpm dev` in `apps/web`.
 - GitHub: `github.com/Muhrak/muhrak` (remote `https://Muhrak@github.com/Muhrak/muhrak.git`).
   Commits must use the Muhrak account email, or Vercel (Hobby plan) blocks
   the build.

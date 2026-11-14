@@ -7,7 +7,7 @@ import {
   type PublicUser,
   type RegisterInput,
   type ResetPasswordInput,
-} from "@muhrak/schemas";
+} from "@/schemas";
 import { apiRequest, apiRequestNoContent } from "@/lib/api";
 import { authedRequest } from "./authed-request";
 import type { AuthSide } from "./paths";

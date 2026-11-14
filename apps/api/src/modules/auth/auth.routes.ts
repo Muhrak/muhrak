@@ -11,7 +11,7 @@ import {
   type RegisterInput,
   type ResetPasswordInput,
   type SessionSideInput,
-} from "@muhrak/schemas";
+} from "../../schemas";
 import { unauthorized } from "../../shared/errors";
 import { validateBody } from "../../shared/http";
 import { logger } from "../../shared/logger";

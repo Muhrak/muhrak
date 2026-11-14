@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { GCC_COUNTRY_NAMES, gccCountrySchema, type SellerAccount, type UploadPurpose } from "@muhrak/schemas";
+import { GCC_COUNTRY_NAMES, gccCountrySchema, type SellerAccount, type UploadPurpose } from "@/schemas";
 import { ChevronDown, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";

@@ -7,7 +7,7 @@ import {
   fileLinkSchema,
   type ReviewSellerInput,
   type VerificationStatus,
-} from "@muhrak/schemas";
+} from "@/schemas";
 import { adminRequest } from "../api";
 
 export function useSellerList(status: VerificationStatus | undefined, pageSize = 20) {

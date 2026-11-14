@@ -1,4 +1,4 @@
-import { authResponseSchema } from "@muhrak/schemas";
+import { authResponseSchema } from "@/schemas";
 import type { ZodType } from "zod";
 import { ApiError, apiRequest, apiRequestNoContent, type RequestOptions } from "@/lib/api";
 import type { AuthSide } from "./paths";

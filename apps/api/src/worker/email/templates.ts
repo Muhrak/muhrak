@@ -1,4 +1,4 @@
-import type { EmailJob } from "@muhrak/schemas";
+import type { EmailJob } from "../../schemas";
 
 export interface RenderedEmail {
   subject: string;

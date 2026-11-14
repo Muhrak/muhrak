@@ -12,15 +12,16 @@ from the `develop` branch of `github.com/Muhrak/muhrak`.
 | Web (`apps/web`) | Vercel | Root directory `apps/web` |
 | Email | Resend | `RESEND_API_KEY` |
 
-Every service builds from the **repo root** (Root Directory empty), because
-the apps import the shared `packages/schemas` workspace and the lockfile is
-at the root. Setting Root Directory to `apps/api` breaks the install.
+Since 14 Nov 2026 the two apps are standalone (no workspace, no shared
+package, one lockfile per app), so each service builds from **its app
+folder**: Railway Root Directory `apps/api`, Vercel Root Directory
+`apps/web`.
 
-Each Railway service picks its app with the `RAILPACK_START_CMD` variable:
+The Railway API service starts with the `RAILPACK_START_CMD` variable:
 
-| Service | `RAILPACK_START_CMD` |
-|---|---|
-| API (`muhrak`) | `pnpm --filter @muhrak/api db:migrate && pnpm --filter @muhrak/api start` |
+| Service | Root Directory | `RAILPACK_START_CMD` |
+|---|---|---|
+| API (`muhrak`) | `apps/api` | `pnpm db:migrate && pnpm start` |
 
 Database migrations run at API start. If a migration fails, the API does not
 start and Railway keeps the previous version running.
@@ -52,11 +53,11 @@ variables above are what is actually used.
 2. Open the new service → **Settings**:
    - **Service name**: `api`
    - **Source → Branch**: `develop`
-   - **Root Directory**: leave empty (repo root)
+   - **Root Directory**: `apps/api`
 3. **Variables → Raw Editor**, paste and fill in:
 
    ```
-   RAILPACK_START_CMD=pnpm --filter @muhrak/api db:migrate && pnpm --filter @muhrak/api start
+   RAILPACK_START_CMD=pnpm db:migrate && pnpm start
    NODE_ENV=production
    DATABASE_URL=${{Postgres.DATABASE_URL}}
    REDIS_URL=<rediss:// URL from Upstash, same as apps/api/.env>
@@ -172,11 +173,10 @@ checks the real type with `file-type`, then copies exactly that version
 (ETag match) to `files/<purpose>/<id>.<ext>`. Only then can the upload be
 attached, once, by its owner, to a record of the right purpose.
 
-Note: Vercel builds through Turborepo in strict env mode, which hides any
-variable not listed under `tasks.build.env` in `turbo.json` (except
-`NEXT_PUBLIC_*`). A new build-time variable for the web app must be added
-there, or the build will not see it. The build log prints
-`[muhrak] STORAGE_ORIGIN: allowed …` when the bucket is in the CSP.
+Note: until 14 Nov 2026 Vercel built through Turborepo, which hid any
+variable not listed in `turbo.json`. Turborepo is gone; Vercel now runs
+`next build` in `apps/web` and sees every project variable. The build log
+prints `[muhrak] STORAGE_ORIGIN: allowed …` when the bucket is in the CSP.
 
 ## Admin console (`/admin` in the web app, since 14 Nov 2026)
 

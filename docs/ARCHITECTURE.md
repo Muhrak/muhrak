@@ -50,6 +50,8 @@ muhrak/
 │   │           ├── ledger/        Day 12, 15 (append-only money entries)
 │   │           ├── payout/        Day 15
 │   │           └── notification/  Day 2, ongoing
+│   │       ├── schemas/       Zod request/response schemas, money helpers
+│   │       │                  (source; copied to apps/web/src/schemas)
 │   │       └── worker/        background jobs, run in the API process
 │   │           ├── index.ts       startWorkers / closeWorkers (server.ts)
 │   │           ├── jobs/          send-email; later ai-identify, expire-rfqs
@@ -75,13 +77,15 @@ muhrak/
 │   │       │                      (layout.tsx = seller guard)
 │   │       ├── features/      one folder per API module name
 │   │       ├── components/    ui/, layout/
+│   │       ├── schemas/       exact copy of apps/api/src/schemas
 │   │       └── lib/
-└── packages/
-    ├── schemas/               Zod schemas and types, one file per module
-    ├── api-client/            typed functions for every /v1 endpoint
-    ├── ui-tokens/             colours, spacing, fonts from Figma
-    └── i18n/                  en.json now, ar.json later
+└── docs/
 ```
+
+No `packages/` and no workspace tooling (developer decision, 14 Nov 2026):
+each app has its own `package.json`, `pnpm-lock.yaml` and tsconfig. The Zod
+schemas live in `apps/api/src/schemas` (source) and are copied to
+`apps/web/src/schemas`; an API test fails if the copies differ.
 
 ## Module shape
 

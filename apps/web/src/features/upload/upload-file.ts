@@ -5,7 +5,7 @@ import {
   uploadContentTypeSchema,
   type UploadContentType,
   type UploadPurpose,
-} from "@muhrak/schemas";
+} from "@/schemas";
 import { authedRequest } from "@/features/auth/authed-request";
 import type { PortalSide } from "@/features/auth/paths";
 import { ApiError } from "@/lib/api";

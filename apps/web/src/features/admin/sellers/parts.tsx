@@ -1,4 +1,4 @@
-import { GCC_COUNTRY_NAMES, type DocumentStatus, type DocumentType, type GccCountry, type VerificationStatus } from "@muhrak/schemas";
+import { GCC_COUNTRY_NAMES, type DocumentStatus, type DocumentType, type GccCountry, type VerificationStatus } from "@/schemas";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 

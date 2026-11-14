@@ -33,7 +33,11 @@ the web app for the start). Do not propose further merges or splits.
 
 ## Decisions already made (do not reopen without asking the developer)
 
-- Monorepo: pnpm workspaces + Turborepo. Apps in `apps/`, shared code in `packages/`.
+- Two standalone apps in one Git repo (developer decision, 14 Nov 2026;
+  replaces the pnpm workspace + Turborepo + `packages/`): `apps/api`
+  (all backend) and `apps/web` (all frontend). Each has its own
+  `package.json`, `pnpm-lock.yaml` and tsconfig, and is installed, run and
+  deployed from its own folder. Nothing is shared between them as code.
 - Backend: Express 5 + TypeScript, one modular monolith, REST under `/v1`.
 - Database: PostgreSQL with Drizzle. Redis + BullMQ for background jobs.
 - Frontend: Next.js (App Router), TypeScript, Tailwind, shadcn/ui, TanStack Query,
@@ -63,7 +67,10 @@ the web app for the start). Do not propose further merges or splits.
    - `index.ts`: the only file other modules may import from.
 3. A module queries only its own tables. Other modules use its exported
    functions or events.
-4. Request and response shapes are Zod schemas in `packages/schemas`.
+4. Request and response shapes are Zod schemas in `apps/api/src/schemas`
+   (the source). `apps/web/src/schemas` is an exact copy: after changing a
+   schema, copy the file to the web app. The API test
+   `src/schemas/web-copy.test.ts` fails if the two differ.
 5. Outside services (AI, chat, storage, email) sit behind a small interface
    with implementations in a `providers/` folder.
 6. Slow or retryable work (AI calls, emails, RFQ expiry) is a BullMQ job,
@@ -78,7 +85,7 @@ the web app for the start). Do not propose further merges or splits.
 ## Money rules
 
 - Amounts are whole numbers in the smallest unit, stored with their currency.
-  OMR, KWD and BHD have three decimals. Use `packages/schemas/src/money.ts`.
+  OMR, KWD and BHD have three decimals. Use `src/schemas/money.ts` (API; same file in web).
 - Never use floats for money. Database columns for money are `bigint`.
 
 ## Security rules
@@ -152,7 +159,7 @@ happy path, and report any remaining risk honestly.
   the next.
 - Add or update tests for service-layer logic.
 - After changing `apps/api/src/db/schema.ts`, run `pnpm db:generate` then
-  `pnpm db:migrate`.
+  `pnpm db:migrate` (in `apps/api`).
 - Ask the developer before adding a new dependency, changing a decision listed
   above, or building anything outside the current day's scope in `docs/PLAN.md`.
 
@@ -164,20 +171,26 @@ happy path, and report any remaining risk honestly.
 
 ## Commands
 
+Run each command inside its app folder.
+
 ```bash
+# apps/api
 pnpm install
-pnpm db:up            # Postgres + Redis in Docker
 pnpm db:generate      # create a migration from schema changes
 pnpm db:migrate       # apply migrations
-pnpm test
+pnpm test             # includes the schema copy check against apps/web
 pnpm typecheck
-pnpm --filter @muhrak/api dev      # API + background workers on http://localhost:4000
+pnpm dev              # API + background workers on http://localhost:4000
+
+# apps/web
+pnpm install
+pnpm typecheck
+pnpm lint
+pnpm dev              # http://localhost:3000 (admin console at /admin)
 ```
 
 ## Known state of the scaffold
 
-The initial scaffold was written without running `pnpm install`. Dependency
-versions in the `package.json` files are unverified. First task: run
-`pnpm install`, `pnpm typecheck` and `pnpm test`, fix whatever fails, and
-commit the lockfile. (Done. The separate `apps/admin` of 12 Nov 2026 was
-moved into `apps/web` under `/admin` on 14 Nov 2026.)
+Installed, typechecked and tested. Each app has its own committed
+`pnpm-lock.yaml` (since 14 Nov 2026, when the workspace was split into two
+standalone apps).

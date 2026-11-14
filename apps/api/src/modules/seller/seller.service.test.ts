@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SellerProfileData, VerificationStatus } from "@muhrak/schemas";
+import type { SellerProfileData, VerificationStatus } from "../../schemas";
 import type { SellerDocumentRow, SellerProfileRow } from "../../db/schema";
 
 vi.hoisted(() => {

@@ -2,6 +2,10 @@
   "name": "@muhrak/api",
   "version": "0.0.0",
   "private": true,
+  "packageManager": "pnpm@10.9.0",
+  "engines": {
+    "node": ">=22"
+  },
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
@@ -16,7 +20,6 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1167.0",
     "@aws-sdk/s3-request-presigner": "^3.1167.0",
-    "@muhrak/schemas": "workspace:*",
     "bullmq": "^5.81.5",
     "cors": "^2.8.5",
     "dotenv": "^16.4.0",

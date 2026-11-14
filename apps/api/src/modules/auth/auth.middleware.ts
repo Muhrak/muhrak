@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import type { Role } from "@muhrak/schemas";
+import type { Role } from "../../schemas";
 import { forbidden, unauthorized } from "../../shared/errors";
 import { verifyAccessToken, type AccessTokenClaims } from "./tokens";
 

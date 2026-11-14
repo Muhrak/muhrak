@@ -1,4 +1,4 @@
-import type { LoginInput, PublicUser, RegisterInput, ResetPasswordInput, Role } from "@muhrak/schemas";
+import type { LoginInput, PublicUser, RegisterInput, ResetPasswordInput, Role } from "../../schemas";
 import { env } from "../../config/env";
 import type { UserRow } from "../../db/schema";
 import { badRequest, conflict, forbidden, notFound, unauthorized } from "../../shared/errors";

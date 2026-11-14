@@ -1,6 +1,6 @@
 "use client";
 
-import { DOCUMENT_LABELS, GCC_COUNTRY_NAMES, type AdminSellerDetail, type SellerDocument } from "@muhrak/schemas";
+import { DOCUMENT_LABELS, GCC_COUNTRY_NAMES, type AdminSellerDetail, type SellerDocument } from "@/schemas";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";

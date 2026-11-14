@@ -1,4 +1,4 @@
-import { EMAIL_QUEUE, emailJobSchema, type EmailJob } from "@muhrak/schemas";
+import { EMAIL_QUEUE, emailJobSchema, type EmailJob } from "../../schemas";
 import { env } from "../../config/env";
 import { defaultJobOptions, getQueue } from "../../shared/queue";
 

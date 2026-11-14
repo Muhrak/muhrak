@@ -1,4 +1,4 @@
-import type { DocumentStatus, VerificationStatus } from "@muhrak/schemas";
+import type { DocumentStatus, VerificationStatus } from "@/schemas";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 

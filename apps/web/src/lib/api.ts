@@ -2,7 +2,8 @@ import type { ZodType } from "zod";
 
 /**
  * The one place the web app talks to the Muhrak API.
- * Every response is parsed with a Zod schema from @muhrak/schemas, so a
+ * Every response is parsed with a Zod schema from src/schemas (a copy of
+ * the API's apps/api/src/schemas), so a
  * change on the API side shows up as a clear error here, not a broken page.
  */
 

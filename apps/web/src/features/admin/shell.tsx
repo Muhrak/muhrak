@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { adminSellerStatsSchema } from "@muhrak/schemas";
+import { adminSellerStatsSchema } from "@/schemas";
 import { Menu, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";

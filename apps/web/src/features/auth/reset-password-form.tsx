@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { forgotPasswordSchema, resetPasswordSchema } from "@muhrak/schemas";
+import { forgotPasswordSchema, resetPasswordSchema } from "@/schemas";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useForm } from "react-hook-form";

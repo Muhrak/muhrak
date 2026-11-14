@@ -1,4 +1,4 @@
-import type { Role } from "@muhrak/schemas";
+import type { Role } from "../../schemas";
 import type { Request, RequestHandler, Response } from "express";
 import { env } from "../../config/env";
 import { forbidden } from "../../shared/errors";

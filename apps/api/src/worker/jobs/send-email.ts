@@ -1,4 +1,4 @@
-import { emailJobSchema } from "@muhrak/schemas";
+import { emailJobSchema } from "../../schemas";
 import { UnrecoverableError, type Job } from "bullmq";
 import { PermanentEmailError, type EmailProvider } from "../email/email-provider";
 import { renderEmail } from "../email/templates";

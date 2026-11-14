@@ -5,7 +5,7 @@ import {
   reviewSellerSchema,
   type AdminSellerListQuery,
   type ReviewSellerData,
-} from "@muhrak/schemas";
+} from "../../schemas";
 import { validateBody, validateParams, validateQuery } from "../../shared/http";
 import { clientIp, limitByUser } from "../../shared/rate-limit";
 import { requireAuth, requireRole } from "../auth";

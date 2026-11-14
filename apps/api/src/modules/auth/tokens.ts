@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
-import type { Role } from "@muhrak/schemas";
+import type { Role } from "../../schemas";
 import { env } from "../../config/env";
 
 const secret = new TextEncoder().encode(env.JWT_SECRET);

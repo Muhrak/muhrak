@@ -9,7 +9,7 @@ import {
   type Upload,
   type UploadContentType,
   type UploadPurpose,
-} from "@muhrak/schemas";
+} from "../../schemas";
 import type { UploadRow } from "../../db/schema";
 import { badRequest, forbidden, notFound } from "../../shared/errors";
 import { logger } from "../../shared/logger";

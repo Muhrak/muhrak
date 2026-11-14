@@ -84,8 +84,6 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
-  // Shared Zod schemas are TypeScript source; Next compiles them for us.
-  transpilePackages: ["@muhrak/schemas"],
   experimental: {
     // Integrity hashes on every script tag: a tampered or swapped file will not run.
     sri: { algorithm: "sha256" },
