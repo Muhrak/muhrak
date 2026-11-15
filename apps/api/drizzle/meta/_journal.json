@@ -71,6 +71,13 @@
       "when": 1794654896323,
       "tag": "0009_calm_dexter_bennett",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794721460186,
+      "tag": "0010_elite_pet_avengers",
+      "breakpoints": true
     }
   ]
 }

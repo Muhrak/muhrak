@@ -1,7 +1,7 @@
 import type { IconName } from "@/components/layout/icon";
 
 /**
- * Figma "Admin Sidebar" (403:1592). Day 4 builds Sellers; the other items
+ * Figma "Admin Sidebar" (403:1592). Built: Sellers, Maintenance Mode; the other items
  * open a "Coming soon" page until their day in the plan.
  */
 export interface NavItem {
@@ -47,7 +47,7 @@ export function navGroups(pending: number | undefined): { label?: string; items:
         { label: "Pages & Content", href: soon("pages"), icon: "list" },
         { label: "Banners & Media", href: soon("banners"), icon: "image" },
         { label: "SEO & Metadata", href: soon("seo"), icon: "search" },
-        { label: "Maintenance Mode", href: soon("maintenance"), icon: "wrench" },
+        { label: "Maintenance Mode", href: "/admin/maintenance", icon: "wrench" },
       ],
     },
     {

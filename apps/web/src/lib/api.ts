@@ -14,6 +14,9 @@ import type { ZodType } from "zod";
  */
 const API_URL = "/api";
 
+/** Fired on window when any API call answers 503 `maintenance`. */
+export const MAINTENANCE_EVENT = "muhrak:maintenance";
+
 export interface ApiFieldError {
   path: string;
   message: string;
@@ -75,6 +78,11 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
       typeof payload === "object" && payload !== null && "error" in payload
         ? (payload as { error: { code?: unknown; message?: unknown; details?: unknown } }).error
         : undefined;
+    // The API is in maintenance for this part of the site: tell the
+    // maintenance gate (features/maintenance) to re-check the status now.
+    if (response.status === 503 && error?.code === "maintenance" && typeof window !== "undefined") {
+      window.dispatchEvent(new Event(MAINTENANCE_EVENT));
+    }
     throw new ApiError(
       response.status,
       typeof error?.code === "string" ? error.code : "unknown_error",

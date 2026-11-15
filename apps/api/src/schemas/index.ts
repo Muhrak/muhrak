@@ -7,3 +7,4 @@ export * from "./upload";
 export * from "./admin";
 export * from "./catalog";
 export * from "./storefront";
+export * from "./maintenance";

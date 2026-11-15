@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Albert_Sans, Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
+import { MaintenanceOverlay, SITE_CONTENT_ID } from "@/features/maintenance/gate";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -34,7 +36,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${albertSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+        <Providers>
+          {/* `contents`: no box of its own, so page layouts are unchanged. */}
+          <div id={SITE_CONTENT_ID} className="contents">
+            {children}
+          </div>
+          {/* Maintenance page / warning bar; the API enforces maintenance itself. */}
+          <Suspense fallback={null}>
+            <MaintenanceOverlay />
+          </Suspense>
+        </Providers>
       </body>
     </html>
   );

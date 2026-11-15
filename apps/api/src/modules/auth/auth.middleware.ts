@@ -30,6 +30,18 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
   next();
 };
 
+/**
+ * The side (role) of the request's access token, or null when there is no
+ * token or it is expired or forged. The signature is checked, so a made-up
+ * token can never claim to be an admin. For gates that run before the
+ * routes (maintenance mode); routes still use requireAuth.
+ */
+export async function tokenRole(authorization: string | undefined): Promise<Role | null> {
+  const token = authorization?.startsWith("Bearer ") ? authorization.slice("Bearer ".length) : undefined;
+  if (!token || token.length > 4096) return null;
+  return (await verifyAccessToken(token))?.role ?? null;
+}
+
 /** Use after requireAuth, e.g. `router.get("/x", requireAuth, requireRole("admin"), handler)`. */
 export function requireRole(...roles: Role[]): RequestHandler {
   return (req, _res, next) => {

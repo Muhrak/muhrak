@@ -289,6 +289,56 @@ export const auditLog = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------- maintenance
+
+/** What a maintenance window takes offline. The admin console never goes offline. */
+export const maintenanceScope = pgEnum("maintenance_scope", ["whole_site", "buyer", "seller"]);
+
+/**
+ * Maintenance windows: "turn on now" (starts_at = the moment it was
+ * turned on) or scheduled ahead. A window is in effect from starts_at
+ * until ends_at (null = until an admin ends it), unless ended or
+ * cancelled earlier. At most one window is open (running or upcoming) at
+ * a time; the service enforces it under a lock. Rows are never deleted:
+ * they are the history shown in the console ("Past windows").
+ */
+export const maintenanceWindows = pgTable(
+  "maintenance_windows",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    scope: maintenanceScope("scope").notNull(),
+    /** Shown to users on the maintenance page and the warning banner. Plain text. */
+    message: text("message").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Turned off by an admin before ends_at (or with no ends_at). */
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    endedBy: uuid("ended_by").references(() => users.id),
+    /** Cancelled before it started. */
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: uuid("cancelled_by").references(() => users.id),
+  },
+  (table) => [
+    // History, newest first (keyset cursor on starts_at, id).
+    index("maintenance_windows_starts_idx").on(table.startsAt, table.id),
+    // The gate's lookup: windows not ended or cancelled.
+    index("maintenance_windows_open_idx")
+      .on(table.startsAt)
+      .where(sql`${table.endedAt} is null and ${table.cancelledAt} is null`),
+    check("maintenance_windows_ends_after_start", sql`${table.endsAt} IS NULL OR ${table.endsAt} > ${table.startsAt}`),
+    check("maintenance_windows_message_length", sql`char_length(${table.message}) BETWEEN 1 AND 300`),
+    check("maintenance_windows_ended_pair", sql`(${table.endedAt} IS NULL) = (${table.endedBy} IS NULL)`),
+    check("maintenance_windows_cancelled_pair", sql`(${table.cancelledAt} IS NULL) = (${table.cancelledBy} IS NULL)`),
+    check("maintenance_windows_one_close", sql`${table.endedAt} IS NULL OR ${table.cancelledAt} IS NULL`),
+  ],
+);
+
+export type MaintenanceWindowRow = typeof maintenanceWindows.$inferSelect;
+
 // ---------------------------------------------------------------- catalog
 
 /** Product categories. Starting list in migration 0008; edited by admins later. */

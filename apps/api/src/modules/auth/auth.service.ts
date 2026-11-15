@@ -1,7 +1,7 @@
 import type { LoginInput, PublicUser, RegisterInput, ResetPasswordInput, Role, VerifyEmailCodeInput } from "../../schemas";
 import { env } from "../../config/env";
 import type { UserRow } from "../../db/schema";
-import { badRequest, conflict, emailNotVerified, forbidden, notFound, unauthorized } from "../../shared/errors";
+import { AppError, badRequest, conflict, emailNotVerified, forbidden, notFound, unauthorized } from "../../shared/errors";
 import { logger } from "../../shared/logger";
 import { hit, peek, reset, subjectHash, tooManyRequests, type Limit } from "../../shared/rate-limit";
 import { sendAccountExistsEmail, sendPasswordResetEmail, sendVerifyEmail } from "../notification";
@@ -342,6 +342,37 @@ export async function changeAdminEmail(input: { currentEmail: string; newEmail: 
   await repo.updateUserEmail(admin.id, input.newEmail);
   await repo.markUserEmailVerified(admin.id);
   await repo.revokeAllRefreshTokensForUser(admin.id);
+}
+
+// ---------------------------------------------------------------- password confirmation
+
+/**
+ * Wrong password confirmations per user before a 15-minute lock. Every
+ * attempt is counted BEFORE the check (a burst of parallel guesses cannot
+ * slip past the limit); a right password clears the count.
+ */
+export const PASSWORD_CONFIRM_LIMIT: Limit = { name: "confirm-password:user", max: 5, windowMs: 15 * 60_000 };
+
+/**
+ * Ask a signed-in user for their password again before a sensitive action
+ * (maintenance mode). Proves the person at the keyboard, not just a token,
+ * is the account owner. Answers 403 `password_incorrect` (not 401: the
+ * session itself is fine, and a 401 would make the web app refresh and
+ * resend the wrong password).
+ */
+export async function confirmPassword(userId: string, password: string, role: Role): Promise<void> {
+  const attempt = await hit(PASSWORD_CONFIRM_LIMIT, userId);
+  if (!attempt.allowed) {
+    logger.warn({ userId }, "Password confirmation locked after repeated wrong passwords");
+    throw tooManyRequests(attempt.retryAfterMs, "Too many wrong passwords. Wait 15 minutes and try again.");
+  }
+  const user = await repo.findUserById(userId);
+  const passwordOk = await verifyPassword(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
+  if (!user || user.role !== role || !passwordOk) {
+    logger.info({ userId }, "Password confirmation refused");
+    throw new AppError(403, "password_incorrect", "That password is not correct.");
+  }
+  await reset(PASSWORD_CONFIRM_LIMIT, userId);
 }
 
 export async function getCurrentUser(userId: string): Promise<PublicUser> {

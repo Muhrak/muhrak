@@ -6,6 +6,7 @@ import { adminRouter } from "./modules/admin";
 import { authRouter } from "./modules/auth";
 import { catalogRouter, sellerProductsRouter } from "./modules/catalog";
 import { healthRouter } from "./modules/health/health.routes";
+import { maintenanceGate, statusRouter } from "./modules/maintenance";
 import { sellerRouter } from "./modules/seller";
 import { storefrontRouter } from "./modules/storefront";
 import { uploadRouter } from "./modules/upload";
@@ -30,6 +31,10 @@ export function createApp() {
   const v1 = Router();
   // Ceiling for any single IP across the whole API; endpoints add tighter limits.
   v1.use(limitByIp({ name: "api:ip", max: 600, windowMs: 60_000 }));
+  // Maintenance mode: 503 for the parts of the site an admin has taken
+  // offline. Before every router; the admin console is never blocked.
+  v1.use(maintenanceGate);
+  v1.use("/status", statusRouter);
   v1.use("/auth", authRouter);
   v1.use("/uploads", uploadRouter);
   v1.use("/catalog", catalogRouter);

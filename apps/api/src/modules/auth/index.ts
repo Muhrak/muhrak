@@ -6,5 +6,5 @@
  * export on purpose rather than reaching inside.
  */
 export { authRouter } from "./auth.routes";
-export { requireAuth, requireRole } from "./auth.middleware";
-export { changeAdminEmail, getCurrentUser, getUsersByIds, upsertAdminAccount } from "./auth.service";
+export { requireAuth, requireRole, tokenRole } from "./auth.middleware";
+export { changeAdminEmail, confirmPassword, getCurrentUser, getUsersByIds, upsertAdminAccount } from "./auth.service";

@@ -3,12 +3,14 @@
 Read this first in every new session, then `CLAUDE.md`, `docs/PLAN.md` and
 `docs/ARCHITECTURE.md`. Update it whenever a piece of work is committed.
 
-Last updated: Sat 14 Nov 2026. Branch `develop`.
+Last updated: Sun 15 Nov 2026. Branch `develop`.
 
 ## Status
 
 Days 1 to 5 are done (Day 5 on Sat 14 Nov, after the restructuring of the
-same day), and the landing pages are done early. Next is Day 6 (AI module).
+same day), and the landing pages are done early. Maintenance mode in the
+admin console was added on Sun 15 Nov at the developer's request (outside
+the day plan). Next is Day 6 (AI module).
 
 **Replanned on Fri 13 Nov 2026 (developer decisions):**
 - MVP = limited features, each working properly. Scope and the "after
@@ -194,6 +196,57 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   save fine, but their URLs answer 403 (broken thumbnails).
 - Not built yet (later days): buyer-side product pages and search (Day 8),
   AI fill from a photo (Day 7), product views count, CSV import.
+
+### Maintenance mode (Sun 15 Nov, developer request)
+- Admin console `/admin/maintenance`, from Figma "Admin – Maintenance Mode
+  (Dark)" (414:5122) converted to light. Turn on now (optional end time),
+  schedule a window (start/end in Gulf time), end, cancel; what goes
+  offline: Whole site, Buyer app or Seller Centre; message shown to users;
+  preview; past windows (paged). Left out (developer, 15 Nov): "Payments
+  only", "Pause payouts" (no payments yet), "Email sellers 24 h before"
+  (the site banner warns everyone), theme toggle, "Super admin" badge.
+  "Admins can still log in" is always on, not a toggle.
+- API module `maintenance` (table `maintenance_windows`, migration `0010`,
+  additive only). One open window at a time, enforced under a Postgres
+  advisory lock; end/cancel are conditional updates (double click or two
+  admins: one wins, the other gets 409). Windows are never deleted. Times
+  checked on the server: no past start, 5 min to 72 h long, at most 90
+  days ahead. Every change needs the admin's password again
+  (`confirmPassword` in auth: 403 `password_incorrect`, 5 wrong per
+  admin per 15 min then 429, every attempt counted before the check) and
+  is audit logged in the same transaction (`maintenance.started`,
+  `.scheduled`, `.ended`, `.cancelled`); 30 changes per admin per 15 min.
+- Gate (`maintenance.gate.ts`) before every `/v1` route: 503 `maintenance`
+  with the admin's message and Retry-After to the part of the site the
+  window covers. Always open: `/admin/*`, `/status`, `/auth/logout`, admin
+  login/refresh, and requests with a valid admin token (signature
+  checked). Side of a request: path first (`/seller*` seller, `/sellers*`
+  buyer, `/catalog*` shared), then the login side, then the token. Paths
+  compared lower-cased without trailing slash, as Express routes them.
+  Open windows cached in memory for 5 s, cleared at once on a change; a
+  read that started before a change never stores the old state; if the
+  database cannot be read, the last known state is kept (stays in
+  maintenance).
+- Public `GET /v1/status` (no ids, no admin names). Web: an overlay next
+  to every page (root layout) shows "We will be right back" over the
+  covered side (page underneath `inert`, scroll locked) and a sticky
+  warning bar within 24 h of a scheduled window. It re-checks every
+  minute, on tab focus, and at once when any API call answers 503
+  `maintenance`. A 503 never signs anyone out (refresh keeps the session).
+  Background jobs (emails) keep running during maintenance.
+- Tested: 38 new API tests (service rules, gate per scope and side, case
+  and trailing-slash tricks, forged tokens, races, stale cache, DB down,
+  password confirmation and lock-out); 51 live API checks + lock-out
+  check; 33 headless-browser checks (desktop 1440 and phone 390: turn on
+  with a wrong then right password, buyer and seller pages covered, admin
+  login never covered, turn off, schedule a Seller Centre window, warning
+  bar only on the seller side, preview, cancel). Test admin and its data
+  removed from the local database afterwards.
+- **Rule for later days:** payment-gateway webhooks (Days 12-16) must be
+  added to the gate's always-open list: they report money that already
+  moved and must never get a 503.
+- Not built: emails before a window, payments-only scope, payout pause,
+  maintenance across several API copies faster than the 5 s cache.
 
 ### Bug fix: login stuck after logout (Sat 14 Nov)
 - After logging out (buyer, seller or admin), the login page showed

@@ -2,13 +2,29 @@ import { Router } from "express";
 import { z } from "zod";
 import {
   adminSellerListQuerySchema,
+  closeMaintenanceSchema,
+  maintenanceHistoryQuerySchema,
   reviewSellerSchema,
+  scheduleMaintenanceSchema,
+  startMaintenanceSchema,
   type AdminSellerListQuery,
+  type CloseMaintenanceInput,
+  type MaintenanceHistoryQuery,
   type ReviewSellerData,
+  type ScheduleMaintenanceInput,
+  type StartMaintenanceInput,
 } from "../../schemas";
 import { validateBody, validateParams, validateQuery } from "../../shared/http";
 import { clientIp, limitByUser } from "../../shared/rate-limit";
 import { requireAuth, requireRole } from "../auth";
+import {
+  cancelMaintenance,
+  endMaintenance,
+  getAdminMaintenance,
+  listMaintenanceHistory,
+  scheduleMaintenance,
+  startMaintenance,
+} from "../maintenance";
 import {
   getDocumentLinkForAdmin,
   getSellerForAdmin,
@@ -62,5 +78,53 @@ adminRouter.post(
   async (req, res) => {
     const { userId } = sellerParams.parse(req.params);
     res.json(await reviewSeller({ userId: req.auth!.userId, ip: clientIp(req) }, userId, req.body as ReviewSellerData));
+  },
+);
+
+// ---------------------------------------------------------------- maintenance mode
+
+/**
+ * Every change asks for the admin's password again (checked in the
+ * service, with its own lock-out after repeated wrong passwords) and is
+ * audit logged. Writes are limited per admin on top of that.
+ */
+const maintenanceWriteLimit = limitByUser({ name: "admin-maintenance:user", max: 30, windowMs: 15 * MINUTE });
+const windowParams = z.object({ id: z.string().uuid() });
+
+adminRouter.get("/maintenance", readLimit, async (_req, res) => {
+  res.json(await getAdminMaintenance());
+});
+
+adminRouter.get("/maintenance/history", readLimit, validateQuery(maintenanceHistoryQuerySchema), async (_req, res) => {
+  res.json(await listMaintenanceHistory(res.locals.query as MaintenanceHistoryQuery));
+});
+
+adminRouter.post("/maintenance/start", maintenanceWriteLimit, validateBody(startMaintenanceSchema), async (req, res) => {
+  res.json(await startMaintenance({ userId: req.auth!.userId, ip: clientIp(req) }, req.body as StartMaintenanceInput));
+});
+
+adminRouter.post("/maintenance/schedule", maintenanceWriteLimit, validateBody(scheduleMaintenanceSchema), async (req, res) => {
+  res.json(await scheduleMaintenance({ userId: req.auth!.userId, ip: clientIp(req) }, req.body as ScheduleMaintenanceInput));
+});
+
+adminRouter.post(
+  "/maintenance/:id/end",
+  maintenanceWriteLimit,
+  validateParams(windowParams),
+  validateBody(closeMaintenanceSchema),
+  async (req, res) => {
+    const { id } = windowParams.parse(req.params);
+    res.json(await endMaintenance({ userId: req.auth!.userId, ip: clientIp(req) }, id, req.body as CloseMaintenanceInput));
+  },
+);
+
+adminRouter.post(
+  "/maintenance/:id/cancel",
+  maintenanceWriteLimit,
+  validateParams(windowParams),
+  validateBody(closeMaintenanceSchema),
+  async (req, res) => {
+    const { id } = windowParams.parse(req.params);
+    res.json(await cancelMaintenance({ userId: req.auth!.userId, ip: clientIp(req) }, id, req.body as CloseMaintenanceInput));
   },
 );
