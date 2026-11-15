@@ -11,6 +11,8 @@ import {
   type ProductStatus,
   type ProductStatusAction,
   type ProductSummary,
+  type PartMatch,
+  type PartSearchResult,
   type PublicProductCard,
 } from "../../schemas";
 import type { CategoryRow, ProductRow } from "../../db/schema";
@@ -354,7 +356,7 @@ export function sellersPublishingInCategory(categoryId: string, sellerIds: strin
 
 /** Sellers whose live products match a search by part number, machine (make/model) or part brand. */
 export function sellersMatchingProductText(text: string, sellerIds: string[]): Promise<string[]> {
-  const brandPattern = `%${text.replace(/[\%_]/g, (char) => `\${char}`)}%`;
+  const brandPattern = likeContains(text);
   return repo.findSellersByProductText(
     { partNumber: normalizePartNumber(text), fitment: text.toLowerCase().replace(/[^a-z0-9]/g, ""), brandPattern },
     sellerIds,
@@ -393,4 +395,103 @@ export async function listPublishedProducts(input: {
       isNew: product.publishedAt !== null && now - new Date(product.publishedAt).getTime() < NEW_PRODUCT_DAYS * 86_400_000,
     })),
   };
+}
+
+// ---------------------------------------------------------------- public part search (for the storefront module)
+
+const MATCH_BY_RANK: Record<repo.SearchMatchRank, PartMatch> = { 4: "exact", 3: "alternative", 2: "fits", 1: "related" };
+
+/** Escape LIKE wildcards so "50%" searches for the text "50%". */
+function likeContains(text: string): string {
+  return `%${text.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+}
+
+export interface LiveProductMatch extends Omit<PartSearchResult, "seller"> {
+  sellerUserId: string;
+}
+
+/**
+ * Live products of the given (verified) sellers matching a buyer's search:
+ * by part number (ignoring punctuation), machine, or every word in the
+ * name, brand or machines. Strongest match first.
+ */
+export async function searchLiveProducts(input: {
+  text: string;
+  categoryId: string | null;
+  sellerIds: string[];
+  page: number;
+  pageSize: number;
+}): Promise<{ items: LiveProductMatch[]; total: number }> {
+  const text = input.text.trim();
+  const words = [...new Set(text.toLowerCase().split(/\s+/).filter((word) => word.length >= 2))].slice(0, 6);
+  const { rows, total } = await repo.searchPublishedProducts({
+    sellerIds: input.sellerIds,
+    categoryId: input.categoryId,
+    partNumber: normalizePartNumber(text),
+    fitment: text.toLowerCase().replace(/[^a-z0-9]/g, ""),
+    wordPatterns: words.map(likeContains),
+    // Shorter fragments ("50") would match inside too many model names.
+    wordFitments: words.map((word) => {
+      const fit = word.replace(/[^a-z0-9]/g, "");
+      return fit.length >= 3 ? fit : "";
+    }),
+    offset: (input.page - 1) * input.pageSize,
+    limit: input.pageSize,
+  });
+  const byId = new Map((await repo.findProductsByIds(rows.map((row) => row.id))).map((row) => [row.id, row]));
+  const ordered = rows.flatMap((row) => {
+    const product = byId.get(row.id);
+    return product && product.status === "published" ? [{ product, rank: row.rank }] : [];
+  });
+  const mapped = await toProducts(ordered.map((entry) => entry.product));
+  return {
+    total,
+    items: mapped.map((product, index) => {
+      const entry = ordered[index]!;
+      const fit = product.fitments[0];
+      return {
+        productId: product.id,
+        sellerUserId: entry.product.sellerUserId,
+        name: product.name,
+        partNumber: product.partNumbers[0] ?? null,
+        brand: product.brand,
+        condition: product.condition,
+        categoryName: product.category.name,
+        fitment: fit ? `${fit.make} ${fit.model}` : null,
+        price: product.price,
+        unit: product.unit,
+        stockQuantity: product.stockQuantity,
+        availability: product.availability,
+        leadTimeDays: product.leadTimeDays,
+        photoUrl: product.photos[0]?.thumbUrl ?? null,
+        match: MATCH_BY_RANK[entry.rank],
+      };
+    }),
+  };
+}
+
+// ---------------------------------------------------------------- for the rfq module
+
+/** A LIVE product a buyer can ask a quote for, or undefined (unknown, draft or archived). */
+export async function getLiveProductForRfq(
+  productId: string,
+): Promise<{ id: string; sellerUserId: string; name: string; unit: ProductRow["unit"] } | undefined> {
+  const row = await repo.findProduct(productId);
+  if (!row || row.status !== "published") return undefined;
+  return { id: row.id, sellerUserId: row.sellerUserId, name: row.name, unit: row.unit };
+}
+
+/** Name and cover thumbnail of products, whatever their status (old requests keep showing them). */
+export async function getProductSnapshots(ids: string[]): Promise<Map<string, { id: string; name: string; photoUrl: string | null }>> {
+  const rows = await repo.findProductsByIds([...new Set(ids)]);
+  const photos = (await repo.findChildren(rows.map((row) => row.id))).photos;
+  const covers = new Map<string, string>();
+  for (const photo of photos) if (!covers.has(photo.productId)) covers.set(photo.productId, photo.uploadId);
+  const urls = await getProductPhotoUrls([...covers.values()]);
+  return new Map(
+    rows.map((row) => {
+      const cover = covers.get(row.id);
+      return [row.id, { id: row.id, name: row.name, photoUrl: cover ? (urls.get(cover)?.thumbUrl ?? null) : null }];
+    }),
+  );
 }

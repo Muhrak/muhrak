@@ -9,6 +9,7 @@ vi.hoisted(() => {
 
 vi.mock("../seller", () => ({
   getVerifiedSellerProfile: vi.fn(),
+  getVerifiedSellerProfiles: vi.fn(),
   listVerifiedSellerIds: vi.fn(),
   listVerifiedSellersPage: vi.fn(),
 }));
@@ -16,6 +17,7 @@ vi.mock("../catalog", () => ({
   countSellersPerCategory: vi.fn(),
   getSellerCatalogStats: vi.fn(),
   listPublishedProducts: vi.fn(),
+  searchLiveProducts: vi.fn(),
   sellersMatchingProductText: vi.fn(),
   sellersPublishingInCategory: vi.fn(),
 }));
@@ -24,7 +26,7 @@ vi.mock("../upload", () => ({ getPublicLogoUrls: vi.fn() }));
 const seller = await import("../seller");
 const catalog = await import("../catalog");
 const { getPublicLogoUrls } = await import("../upload");
-const { getDirectory, getSeller, getSellerProducts } = await import("./storefront.service");
+const { getDirectory, getSeller, getSellerProducts, searchParts } = await import("./storefront.service");
 
 const now = new Date("2026-11-14T12:00:00Z");
 const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -112,5 +114,41 @@ describe("getSeller / getSellerProducts", () => {
     vi.mocked(catalog.listPublishedProducts).mockResolvedValue({ items: [], total: 0 });
     await getSellerProducts(A, { page: 3, category: CATEGORY });
     expect(catalog.listPublishedProducts).toHaveBeenCalledWith({ sellerUserId: A, categoryId: CATEGORY, page: 3, pageSize: 8 });
+  });
+});
+
+describe("searchParts", () => {
+  const match = (sellerUserId: string, productId: string) => ({
+    productId,
+    sellerUserId,
+    name: "Front head bushing",
+    partNumber: "15-FB-02",
+    brand: null,
+    condition: "new" as const,
+    categoryName: "Hydraulics",
+    fitment: null,
+    price: { amountMinor: 46000, currency: "OMR" as const },
+    unit: "piece" as const,
+    stockQuantity: 3,
+    availability: "in_stock" as const,
+    leadTimeDays: null,
+    photoUrl: null,
+    match: "exact" as const,
+  });
+
+  it("searches only among VERIFIED sellers and shows only public seller fields", async () => {
+    vi.mocked(catalog.searchLiveProducts).mockResolvedValue({ items: [match(A, CATEGORY)], total: 1 });
+    vi.mocked(seller.getVerifiedSellerProfiles).mockResolvedValue(new Map([[A, profile(A, 3)]]));
+    const result = await searchParts({ q: "15-FB-02", page: 2 });
+    expect(catalog.searchLiveProducts).toHaveBeenCalledWith({ text: "15-FB-02", categoryId: null, sellerIds: [A, B], page: 2, pageSize: 20 });
+    expect(result.items[0]?.seller).toEqual({ id: A, companyName: "Gulf Breaker Parts", city: "Muscat", countryName: "Oman" });
+    expect(JSON.stringify(result)).not.toContain("sellerUserId");
+  });
+
+  it("leaves out a product whose seller lost verification between the two reads", async () => {
+    vi.mocked(catalog.searchLiveProducts).mockResolvedValue({ items: [match(A, CATEGORY), match(B, CATEGORY)], total: 2 });
+    vi.mocked(seller.getVerifiedSellerProfiles).mockResolvedValue(new Map([[A, profile(A, 3)]]));
+    const result = await searchParts({ q: "bushing", page: 1 });
+    expect(result.items.map((item) => item.seller.id)).toEqual([A]);
   });
 });

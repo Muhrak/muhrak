@@ -107,6 +107,9 @@ approved in time, launch moves; payment is not skipped.
 - **Day 3, Thu 12 Nov:** uploads, seller company profile, verification.
 - **Day 4, Thu 12 Nov (a day early):** admin console, seller review, audit log.
 - **Day 5, Sat 14 Nov:** categories and products (seller side), photo cleaning.
+- **Day 8 (text half) and Day 9, Sun 15 Nov:** part search and matching
+  (no AI), quote requests, buyer requests, seller RFQ inbox, expiry. Day 6
+  (AI) is on hold until the Claude API key arrives (developer, 15 Nov).
 - **Early:** buyer and seller landing pages.
 
 Details in `docs/PROGRESS.md`.

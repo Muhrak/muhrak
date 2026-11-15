@@ -254,7 +254,8 @@ describe("maintenance gate", () => {
   });
 
   it("starts a scheduled window on time without a database reload", async () => {
-    vi.mocked(repo.findOpenWindows).mockResolvedValue([row({ startsAt: new Date(Date.now() + 50) })]);
+    // Real clock here (the gate reads Date.now()), so no fixed end time: one would pass as the days go by.
+    vi.mocked(repo.findOpenWindows).mockResolvedValue([row({ startsAt: new Date(Date.now() + 50), endsAt: null })]);
     expect(await blocked(request("GET", "/sellers"))).toBe(false);
     await new Promise((resolve) => setTimeout(resolve, 80));
     expect(await blocked(request("GET", "/sellers"))).toBe(true);

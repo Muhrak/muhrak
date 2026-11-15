@@ -547,3 +547,18 @@ export async function listVerifiedSellersPage(input: {
   return { rows: rows.map(toPublicProfile), total };
 }
 
+
+/** Verified sellers among `userIds`, with what a public page may show. */
+export async function getVerifiedSellerProfiles(userIds: string[]): Promise<Map<string, PublicSellerProfile>> {
+  const rows = await repo.findProfilesByIds([...new Set(userIds)]);
+  return new Map(rows.filter((row) => row.verificationStatus === "approved").map((row) => [row.userId, toPublicProfile(row)]));
+}
+
+/**
+ * Company name and place of sellers, whatever their status now (an old
+ * quote request keeps showing who it went to). Public fields only.
+ */
+export async function getSellerCompanies(userIds: string[]): Promise<Map<string, { companyName: string; city: string; country: GccCountry }>> {
+  const rows = await repo.findProfilesByIds([...new Set(userIds)]);
+  return new Map(rows.map((row) => [row.userId, { companyName: row.companyName, city: row.city, country: row.country as GccCountry }]));
+}

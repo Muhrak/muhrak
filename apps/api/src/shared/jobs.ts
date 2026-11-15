@@ -18,7 +18,15 @@ export interface EnqueueOptions {
   maxAttempts?: number;
   /** Run no earlier than this. Default: now. */
   runAt?: Date;
+  /**
+   * A transaction to add the job in, so it exists only if the business
+   * write commits (e.g. "email the seller" only if the request was saved).
+   */
+  tx?: JobExecutor;
 }
+
+/** The database, or a transaction of it. */
+export type JobExecutor = Pick<typeof db, "insert">;
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -31,7 +39,7 @@ export function onJobAdded(listener: Listener): () => void {
 
 /** Add a job. Returns false if a job with this dedupe key already exists. */
 export async function enqueueJob(queue: string, name: string, payload: unknown, options: EnqueueOptions): Promise<boolean> {
-  const rows = await db
+  const rows = await (options.tx ?? db)
     .insert(jobs)
     .values({
       queue,
@@ -43,8 +51,15 @@ export async function enqueueJob(queue: string, name: string, payload: unknown, 
     })
     .onConflictDoNothing({ target: jobs.dedupeKey })
     .returning({ id: jobs.id });
-  if (rows.length === 1) for (const listener of listeners) listener();
+  // In a transaction the row is not visible until commit; the worker's next
+  // poll (or the wake-up after commit, if the caller asks) picks it up.
+  if (rows.length === 1 && !options.tx) for (const listener of listeners) listener();
   return rows.length === 1;
+}
+
+/** Wake the worker now (after a transaction that added jobs has committed). */
+export function wakeWorker(): void {
+  for (const listener of listeners) listener();
 }
 
 /**

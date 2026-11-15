@@ -3,14 +3,21 @@
 Read this first in every new session, then `CLAUDE.md`, `docs/PLAN.md` and
 `docs/ARCHITECTURE.md`. Update it whenever a piece of work is committed.
 
-Last updated: Sun 15 Nov 2026. Branch `develop`.
+Last updated: Sun 15 Nov 2026 (Day 8 text search and Day 9). Branch `develop`.
 
 ## Status
 
 Days 1 to 5 are done (Day 5 on Sat 14 Nov, after the restructuring of the
 same day), and the landing pages are done early. Maintenance mode in the
 admin console was added on Sun 15 Nov at the developer's request (outside
-the day plan). Next is Day 6 (AI module).
+the day plan).
+
+**Sun 15 Nov (developer decision): Day 6 (AI) is on hold** until the
+company has a Claude API key and has settled its payment procedures. Done
+instead the same day: the non-AI half of Day 8 (part search by text and
+matching) and all of Day 9 (quote requests, buyer "Inquiries & RFQs",
+seller "RFQ Inbox", expiry, email to the seller). Still to do from Days
+6-8: the AI module, AI fill on Add product, and the buyer photo upload.
 
 **Replanned on Fri 13 Nov 2026 (developer decisions):**
 - MVP = limited features, each working properly. Scope and the "after
@@ -196,6 +203,85 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   save fine, but their URLs answer 403 (broken thumbnails).
 - Not built yet (later days): buyer-side product pages and search (Day 8),
   AI fill from a photo (Day 7), product views count, CSV import.
+
+### Day 8 (text half): part search (Sun 15 Nov)
+- Public `GET /v1/parts?q=&category=&page=` (storefront module; 120
+  requests / 5 min per IP; 20 per page, up to 50 pages). Only PUBLISHED
+  products of VERIFIED sellers; seller shown by public name and place only.
+- Matching (catalog repository, one parameterised query), strongest first,
+  then newest: **Exact match** (main part number, punctuation ignored),
+  **Cross reference** (another part number, or one starting with the
+  search), **Fits your machine** (make + model contains it), **Related
+  part** (every word in the name, brand or machines). LIKE wildcards in
+  the search are escaped. Machine matching per word needs 3+ characters.
+- Index `products_status_published_idx` (migration `0011`). Word and
+  machine matches are substring searches that read all live products of
+  verified sellers: fine for the market test; add a trigram index (needs
+  the `pg_trgm` extension, ask first) when the catalogue grows.
+- Web `/search` (public): hero like the Sellers page, results in the row
+  style of Figma "Muhrak AI – Results v2" › "Recommended sellers"
+  (248:6895), dark only, converted to light. The landing "Find a part" and
+  the buyer dashboard "Browse parts" now open `/search`; "Ask Muhrak AI"
+  still opens the Coming soon page (photo route, after the AI module).
+- Fixed in passing: the Sellers directory's brand search escaped `%` and
+  `_` wrongly (it searched for a literal placeholder text instead).
+
+### Day 9: quote requests (Sun 15 Nov)
+- Developer decisions (15 Nov): **one seller per request** (Figma "Request
+  sent to Korvex Hydraulics"; to ask three sellers the buyer sends three
+  requests) and **7-day expiry** for unanswered requests.
+- API module `rfq`, table `rfqs` (migration `0011`, additive only).
+  Reference `RQ-<number>` (identity from 1001). Status machine in
+  `RFQ_TRANSITIONS` (rfq.service.ts): open -> quoted (Day 11) / declined
+  (seller) / cancelled (buyer) / expired (sweep); every change is a
+  conditional update scoped to the owner and refused after expiry.
+- Create (`POST /v1/buyer/rfqs`): buyer only; seller, product and unit
+  come from the LIVE product of a VERIFIED seller on the server (the client
+  sends only the product id); fields part, part number, machine, quantity
+  (1-100,000), needed by, delivery city + GCC country, note (1,000).
+  Idempotent: the browser makes a `requestKey` when the form opens, unique
+  per buyer, so a double click or retry returns the first request (tested
+  with two simultaneous submits). One OPEN request per buyer and product
+  (partial unique index); 50 open per buyer; 20 sends an hour and 60 a day
+  per buyer.
+- The seller's "New quote request" email is queued in the SAME transaction
+  as the request (`enqueueJob` now takes an optional transaction), so it
+  exists only if the request does; dedupe key `rfq-new-<id>`.
+- Expiry: the worker closes open requests past `expires_at` once a minute
+  (`FOR UPDATE SKIP LOCKED`, batches of 500; index `rfqs_open_expires_idx`).
+  Until the sweep runs, an open request past its time already shows and
+  acts as expired. The sweep also runs when no email key is set.
+- Buyer endpoints `/v1/buyer/rfqs` (list with tabs All/Open/Quoted/Closed
+  and counts, keyset pages; get; cancel). Seller endpoints
+  `/v1/seller/rfqs` (list with tabs and an unseen count; get, which marks
+  it seen; decline with an optional reason). Another user's request is a
+  404. The seller sees the buyer's NAME only; the buyer sees the seller's
+  public name and place only. Maintenance gate: `/buyer*` and `/parts*`
+  belong to the buyer side.
+- Web: quote form and "sent" dialog on `/search` (Figma "Request quote –
+  Review v2" 249:7023 and "Sent v2" 249:8013, converted to light; AI chips
+  left out; added delivery city/country and a note; "Go to messenger"
+  became "See my requests" until Day 10). A visitor (or a seller signed in,
+  who counts as a visitor on the buyer side) goes to the buyer login and
+  comes back with the form open (`/search` is now an allowed return page
+  for buyer login). Buyer `/buyer/requests` (Figma "Buyer – Inquiries &
+  RFQs (Dark)" 304:12, light) and seller `/seller/rfq-inbox` (Figma
+  "Seller – RFQ Inbox (Dark)" 177:731, light) with an orange unread count
+  on the sidebar. On desktop the inbox opens the newest request, which
+  marks it read. Not built yet: the "Send quote" fields (Day 11), the buyer
+  photo (AI route), "Condition" (requests do not ask for one).
+- Tested: 21 rfq service tests + 2 search tests (abuse cases: other buyer
+  or seller, wrong side, tampered seller/unit/status, draft or unverified
+  product, double submit and race, request key reused, illegal and racing
+  transitions, expired, tampered cursor; no emails in responses); live API
+  run of 35 checks; search checks (part number with punctuation, cross
+  reference, machine, words, `%` and `_`, injection text, page past the
+  end); browser run of 25 checks at 1440 and 390 px (search, login on the
+  way, form, sent, my requests, seller badge, inbox, decline, buyer sees
+  the reason, both sessions kept). Test accounts and data removed from the
+  local database afterwards.
+- Fixed while testing: a maintenance test failed from 15 Nov 11:00 UTC on
+  (it used a fixed end time); it now uses an open-ended window.
 
 ### Maintenance mode (Sun 15 Nov, developer request)
 - Admin console `/admin/maintenance`, from Figma "Admin – Maintenance Mode
@@ -552,14 +638,17 @@ Still open (Day 4 admin):
   PutObject + GetObject only). The plan for a separate read-only key for
   the worker no longer applies.
 
-## Next up: Day 6 (Sun 15 Nov), see `docs/PLAN.md`
+## Next up, see `docs/PLAN.md`
 
-- AI module: queue job, vision model behind an interface, fixed output
-  fields with a confidence level each, Zod-validated.
-- Safety: image checks, per-user daily limit, monthly budget cap, on/off
-  switch, every job logged.
-- Aim: sending a photo to the API returns the part's name, category, part
-  number and fitment (the Day 5 fields).
+- Day 6 (AI module) waits for the company's Claude API key (no real API
+  call without the developer's OK, cost estimate and cap). Then Day 7 (AI
+  fill on Add product) and the photo half of Day 8.
+- Without the key, Day 11 (Send quote; the `quote` transition already
+  exists in `RFQ_TRANSITIONS`) needs no outside service. Day 10 (Stream
+  Chat) needs a Stream account.
+- Local note: a `pnpm dev` left running since 14 Nov (port 4000) shares the
+  local job queue and uses the real Resend key; stop it before local tests
+  so it does not take test emails.
 
 **Developer actions, payment (start now):** choose and apply to a payment
 gateway (merchant approval can take 1-2 weeks), and ask the gateway and a

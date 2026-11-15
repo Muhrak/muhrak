@@ -395,6 +395,8 @@ export const products = pgTable(
     // The seller's list: their products by status, newest change first (keyset cursor on updated_at, id).
     index("products_seller_status_updated_idx").on(table.sellerUserId, table.status, table.updatedAt, table.id),
     index("products_category_status_idx").on(table.categoryId, table.status),
+    // Public part search: live products, newest first.
+    index("products_status_published_idx").on(table.status, table.publishedAt),
     check("products_price_pair", sql`(${table.priceAmount} IS NULL) = (${table.priceCurrency} IS NULL)`),
     check("products_price_positive", sql`${table.priceAmount} IS NULL OR ${table.priceAmount} > 0`),
     check("products_price_currency", sql`${table.priceCurrency} IS NULL OR ${table.priceCurrency} IN ('OMR','KWD','BHD','SAR','AED','QAR')`),
@@ -458,6 +460,79 @@ export const productPhotos = pgTable(
   },
   (table) => [index("product_photos_product_idx").on(table.productId, table.position)],
 );
+
+// ---------------------------------------------------------------- rfq
+
+export const rfqStatus = pgEnum("rfq_status", ["open", "quoted", "declined", "cancelled", "expired"]);
+export const rfqNeededBy = pgEnum("rfq_needed_by", ["asap", "one_week", "two_weeks", "one_month", "flexible"]);
+
+/**
+ * Quote requests: one buyer asks one seller about one of the seller's
+ * products (developer decision, 15 Nov 2026). Never deleted (business
+ * record); closed requests keep their final status. Status changes only
+ * through RFQ_TRANSITIONS in rfq.service.ts, as conditional updates.
+ *
+ * - (buyer, request_key) is unique: a double submit returns the first request.
+ * - A buyer has at most one OPEN request per product.
+ * - The seller and unit come from the product at the time of the request.
+ */
+export const rfqs = pgTable(
+  "rfqs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Human reference "RQ-<number>". */
+    number: integer("number").notNull().generatedAlwaysAsIdentity({ startWith: 1001 }),
+    buyerUserId: uuid("buyer_user_id")
+      .notNull()
+      .references(() => users.id),
+    sellerUserId: uuid("seller_user_id")
+      .notNull()
+      .references(() => users.id),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    requestKey: uuid("request_key").notNull(),
+    partName: text("part_name").notNull(),
+    partNumber: text("part_number"),
+    fitment: text("fitment"),
+    quantity: integer("quantity").notNull(),
+    unit: productUnit("unit").notNull(),
+    neededBy: rfqNeededBy("needed_by").notNull(),
+    deliveryCountry: text("delivery_country").notNull(),
+    deliveryCity: text("delivery_city").notNull(),
+    note: text("note"),
+    status: rfqStatus("status").notNull().default("open"),
+    sellerSeenAt: timestamp("seller_seen_at", { withTimezone: true }),
+    declineReason: text("decline_reason"),
+    expiresAt: timestamp("expires_at", { withTimezone: true, precision: 3 }).notNull(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    // Millisecond precision (like JavaScript dates) so list cursors are exact.
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("rfqs_number_idx").on(table.number),
+    uniqueIndex("rfqs_buyer_request_key_idx").on(table.buyerUserId, table.requestKey),
+    uniqueIndex("rfqs_one_open_per_product_idx")
+      .on(table.buyerUserId, table.productId)
+      .where(sql`${table.status} = 'open'`),
+    // Lists, newest first (keyset cursor on created_at, id).
+    index("rfqs_buyer_created_idx").on(table.buyerUserId, table.createdAt, table.id),
+    index("rfqs_seller_created_idx").on(table.sellerUserId, table.createdAt, table.id),
+    index("rfqs_seller_status_created_idx").on(table.sellerUserId, table.status, table.createdAt, table.id),
+    // The expiry sweep: open requests by expiry time.
+    index("rfqs_open_expires_idx")
+      .on(table.expiresAt)
+      .where(sql`${table.status} = 'open'`),
+    check("rfqs_quantity", sql`${table.quantity} BETWEEN 1 AND 100000`),
+    check("rfqs_country", sql`${table.deliveryCountry} IN ('OM','AE','SA','QA','KW','BH')`),
+    check("rfqs_buyer_not_seller", sql`${table.buyerUserId} <> ${table.sellerUserId}`),
+    check("rfqs_closed_at", sql`(${table.status} IN ('open','quoted')) = (${table.closedAt} IS NULL)`),
+    check("rfqs_decline_reason", sql`${table.declineReason} IS NULL OR ${table.status} = 'declined'`),
+  ],
+);
+
+export type RfqRow = typeof rfqs.$inferSelect;
 
 export type CategoryRow = typeof categories.$inferSelect;
 export type ProductRow = typeof products.$inferSelect;

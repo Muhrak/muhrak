@@ -44,6 +44,8 @@ function bodyRole(req: Request): unknown {
 export function requestSide(path: string, role: unknown, tokenSide: string | null): RequestSide {
   if (under(path, "/seller")) return "seller"; // Seller Centre API (also /seller/products)
   if (under(path, "/sellers")) return "buyer"; // public sellers directory and storefronts
+  if (under(path, "/buyer")) return "buyer"; // the buyer's own data (quote requests)
+  if (under(path, "/parts")) return "buyer"; // public part search
   if (under(path, "/catalog")) return "shared"; // categories: used by the buyer site and the seller product form
   if (under(path, "/auth")) {
     if (role === "buyer" || role === "seller") return role; // login, refresh, sign-up, verify email

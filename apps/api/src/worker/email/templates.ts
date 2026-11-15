@@ -189,5 +189,49 @@ export function renderEmail(job: EmailJob): RenderedEmail {
         ),
       };
     }
+
+    case "rfq-new": {
+      const { fullName, reference, buyerName, partName, partNumber, quantity, neededBy, deliverTo, inboxUrl } = job.data;
+      const url = escapeHtml(inboxUrl);
+      const rows: [string, string][] = [
+        ["Part", partName],
+        ...(partNumber ? ([["Part number", partNumber]] as [string, string][]) : []),
+        ["Quantity", quantity],
+        ["Needed by", neededBy],
+        ["Deliver to", deliverTo],
+        ["Buyer", buyerName],
+      ];
+      const rowHtml = rows
+        .map(
+          ([label, value]) =>
+            `<tr><td style="font-size:13px;color:#6b6b73;padding:6px 16px 6px 0;white-space:nowrap;vertical-align:top;">${escapeHtml(label)}</td><td style="font-size:14px;color:#0a0a0a;padding:6px 0;">${escapeHtml(value)}</td></tr>`,
+        )
+        .join("");
+      return {
+        subject: `New quote request ${reference}: ${partName}`,
+        text: [
+          `Hi ${fullName},`,
+          "",
+          `A buyer asked you for a quote on Muhrak (${reference}).`,
+          "",
+          ...rows.map(([label, value]) => `${label}: ${value}`),
+          "",
+          `Open it in your RFQ inbox: ${inboxUrl}`,
+          "",
+          "Requests close by themselves after 7 days without a reply.",
+        ].join("\n"),
+        html: layout(
+          "New quote request",
+          `<tr><td style="font-size:15px;line-height:1.5;color:#3a3a40;padding-bottom:16px;">
+            Hi ${escapeHtml(fullName)}, a buyer asked you for a quote on Muhrak (${escapeHtml(reference)}).
+          </td></tr>
+          <tr><td style="padding-bottom:20px;"><table role="presentation" cellpadding="0" cellspacing="0">${rowHtml}</table></td></tr>
+          <tr><td style="padding-bottom:16px;">
+            <a href="${url}" style="display:inline-block;background:#0a0b12;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold;padding:14px 28px;border-radius:999px;">Open RFQ inbox</a>
+          </td></tr>
+          <tr><td style="font-size:13px;line-height:1.5;color:#6b6b73;">Requests close by themselves after 7 days without a reply.</td></tr>`,
+        ),
+      };
+    }
   }
 }

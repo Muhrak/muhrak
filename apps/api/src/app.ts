@@ -7,8 +7,9 @@ import { authRouter } from "./modules/auth";
 import { catalogRouter, sellerProductsRouter } from "./modules/catalog";
 import { healthRouter } from "./modules/health/health.routes";
 import { maintenanceGate, statusRouter } from "./modules/maintenance";
+import { buyerRfqRouter, sellerRfqRouter } from "./modules/rfq";
 import { sellerRouter } from "./modules/seller";
-import { storefrontRouter } from "./modules/storefront";
+import { partSearchRouter, storefrontRouter } from "./modules/storefront";
 import { uploadRouter } from "./modules/upload";
 import { errorHandler, notFoundHandler } from "./shared/http";
 import { limitByIp } from "./shared/rate-limit";
@@ -40,8 +41,12 @@ export function createApp() {
   v1.use("/catalog", catalogRouter);
   // Public: verified sellers and their live products.
   v1.use("/sellers", storefrontRouter);
-  // Before /seller: the products sub-router has its own auth and limits.
+  v1.use("/parts", partSearchRouter);
+  // The signed-in buyer's own data.
+  v1.use("/buyer/rfqs", buyerRfqRouter);
+  // Before /seller: these sub-routers have their own auth and limits.
   v1.use("/seller/products", sellerProductsRouter);
+  v1.use("/seller/rfqs", sellerRfqRouter);
   v1.use("/seller", sellerRouter);
   v1.use("/admin", adminRouter);
   app.use("/v1", v1);

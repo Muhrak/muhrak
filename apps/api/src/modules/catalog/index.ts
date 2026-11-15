@@ -4,7 +4,11 @@
 export { catalogRouter, sellerProductsRouter } from "./catalog.routes";
 export {
   countSellersPerCategory,
+  getLiveProductForRfq,
+  getProductSnapshots,
   getSellerCatalogStats,
+  searchLiveProducts,
+  type LiveProductMatch,
   listPublishedProducts,
   sellersMatchingProductText,
   sellersPublishingInCategory,

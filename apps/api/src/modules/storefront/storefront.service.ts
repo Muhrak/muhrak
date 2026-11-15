@@ -1,6 +1,9 @@
 import {
   GCC_COUNTRY_NAMES,
+  PART_SEARCH_PAGE_SIZE,
   STOREFRONT_PAGE_SIZE,
+  type PartSearchQuery,
+  type PartSearchResponse,
   type PublicSeller,
   type SellerDirectoryQuery,
   type SellerDirectoryResponse,
@@ -8,8 +11,15 @@ import {
   type SellerProductsResponse,
 } from "../../schemas";
 import { notFound } from "../../shared/errors";
-import { countSellersPerCategory, getSellerCatalogStats, listPublishedProducts, sellersMatchingProductText, sellersPublishingInCategory } from "../catalog";
-import { getVerifiedSellerProfile, listVerifiedSellerIds, listVerifiedSellersPage } from "../seller";
+import {
+  countSellersPerCategory,
+  getSellerCatalogStats,
+  listPublishedProducts,
+  searchLiveProducts,
+  sellersMatchingProductText,
+  sellersPublishingInCategory,
+} from "../catalog";
+import { getVerifiedSellerProfile, getVerifiedSellerProfiles, listVerifiedSellerIds, listVerifiedSellersPage } from "../seller";
 import { getPublicLogoUrls } from "../upload";
 
 /**
@@ -104,4 +114,32 @@ export async function getSellerProducts(sellerId: string, query: SellerProductsQ
     pageSize: STOREFRONT_PAGE_SIZE,
   });
   return { ...result, page: query.page, pageSize: STOREFRONT_PAGE_SIZE };
+}
+
+/**
+ * Public part search (Day 8, the non-AI route): live products of VERIFIED
+ * sellers only, best match first, with the seller's public name and place.
+ */
+export async function searchParts(query: PartSearchQuery): Promise<PartSearchResponse> {
+  const verifiedIds = await listVerifiedSellerIds();
+  const { items, total } = await searchLiveProducts({
+    text: query.q,
+    categoryId: query.category ?? null,
+    sellerIds: verifiedIds,
+    page: query.page,
+    pageSize: PART_SEARCH_PAGE_SIZE,
+  });
+  const profiles = await getVerifiedSellerProfiles(items.map((item) => item.sellerUserId));
+  return {
+    // A seller un-verified between the two reads is left out, never shown.
+    items: items.flatMap(({ sellerUserId, ...item }) => {
+      const profile = profiles.get(sellerUserId);
+      return profile
+        ? [{ ...item, seller: { id: profile.userId, companyName: profile.companyName, city: profile.city, countryName: GCC_COUNTRY_NAMES[profile.country] } }]
+        : [];
+    }),
+    total,
+    page: query.page,
+    pageSize: PART_SEARCH_PAGE_SIZE,
+  };
 }

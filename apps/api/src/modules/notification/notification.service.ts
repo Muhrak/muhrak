@@ -1,6 +1,6 @@
 import { EMAIL_QUEUE, emailJobSchema, type EmailJob } from "../../schemas";
 import { env } from "../../config/env";
-import { enqueueJob } from "../../shared/jobs";
+import { enqueueJob, type JobExecutor } from "../../shared/jobs";
 
 /**
  * Notification module: decides WHAT to send and puts it on the queue.
@@ -12,9 +12,9 @@ import { enqueueJob } from "../../shared/jobs";
  * Queue one email. `dedupeKey` is the job's unique key: adding the same key twice
  * is ignored, so a retried request cannot send the email twice.
  */
-async function enqueueEmail(job: EmailJob, dedupeKey: string): Promise<void> {
+async function enqueueEmail(job: EmailJob, dedupeKey: string, tx?: JobExecutor): Promise<void> {
   const payload = emailJobSchema.parse(job);
-  await enqueueJob(EMAIL_QUEUE, payload.template, payload, { dedupeKey });
+  await enqueueJob(EMAIL_QUEUE, payload.template, payload, { dedupeKey, tx });
 }
 
 export async function sendPasswordResetEmail(input: {
@@ -118,5 +118,37 @@ export async function sendSellerChangesNeededEmail(input: {
       },
     },
     `seller-changes-needed-${input.dedupeKey}`,
+  );
+}
+
+/**
+ * Tell a seller about a new quote request. Pass the transaction that saves
+ * the request, so the email exists only if the request does.
+ * `dedupeKey`: the request id.
+ */
+export async function sendNewRfqEmail(
+  input: {
+    to: string;
+    fullName: string;
+    reference: string;
+    buyerName: string;
+    partName: string;
+    partNumber: string | null;
+    quantity: string;
+    neededBy: string;
+    deliverTo: string;
+    rfqId: string;
+  },
+  tx?: JobExecutor,
+): Promise<void> {
+  const { to, rfqId, ...data } = input;
+  await enqueueEmail(
+    {
+      template: "rfq-new",
+      to,
+      data: { ...data, inboxUrl: `${env.WEB_APP_URL}/seller/rfq-inbox?id=${encodeURIComponent(rfqId)}` },
+    },
+    `rfq-new-${rfqId}`,
+    tx,
   );
 }

@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useCurrentUser, useSignOut } from "@/features/auth/hooks";
 import { HOME_PATH, type PortalSide } from "@/features/auth/paths";
 import { initials } from "@/features/auth/user-display";
+import { useSellerUnseenRfqs } from "@/features/rfq/api";
 import { cn } from "@/lib/utils";
 import { Icon } from "./icon";
 import { isGroup, PORTAL_NAV, type NavGroup, type NavLink } from "./portal-nav";
@@ -164,6 +165,7 @@ function NavItem({
     >
       {link.icon ? <Icon name={link.icon} className="size-[18px]" /> : null}
       <span className="min-w-0 flex-1 truncate">{link.label}</span>
+      {side === "seller" && link.slug === "rfq-inbox" ? <UnseenRfqBadge /> : null}
       {active ? <span aria-hidden className={cn("size-[7px] shrink-0 rounded-full", dotClass)} /> : null}
     </Link>
   );
@@ -216,5 +218,18 @@ function CollapsibleGroup({
         ))}
       </div>
     </div>
+  );
+}
+
+/** Figma "Seller Sidebar": orange count on RFQ Inbox, here the requests not opened yet. Seller session only. */
+function UnseenRfqBadge() {
+  const count = useSellerUnseenRfqs();
+  if (count === 0) return null;
+  return (
+    <span className="shrink-0 rounded-full bg-seller-orange px-[7px] py-px text-[11px] leading-[16px] font-semibold text-white">
+      <span className="sr-only">, </span>
+      {count > 99 ? "99+" : count}
+      <span className="sr-only"> unread</span>
+    </span>
   );
 }

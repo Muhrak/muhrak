@@ -213,6 +213,12 @@ export async function findVerifiedSellerIds(): Promise<string[]> {
   return rows.map((row) => row.userId);
 }
 
+/** Profiles of these sellers, whatever their verification status. */
+export async function findProfilesByIds(userIds: string[]): Promise<SellerProfileRow[]> {
+  if (userIds.length === 0) return [];
+  return db.select().from(sellerProfiles).where(inArray(sellerProfiles.userId, userIds));
+}
+
 export async function findVerifiedProfile(userId: string): Promise<SellerProfileRow | undefined> {
   const rows = await db
     .select()

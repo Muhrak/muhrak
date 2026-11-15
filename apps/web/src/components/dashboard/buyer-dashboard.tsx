@@ -23,7 +23,7 @@ export function BuyerDashboard() {
         badge={<AccountBadge label="Buyer account" dotClass="bg-white" />}
         actions={
           <>
-            <OutlinePillLink href="/buyer/find-part">Browse parts</OutlinePillLink>
+            <OutlinePillLink href="/search">Browse parts</OutlinePillLink>
             <SolidPillLink href="/buyer/find-part">
               Ask Muhrak AI
             </SolidPillLink>

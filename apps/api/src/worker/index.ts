@@ -2,6 +2,7 @@ import { EMAIL_QUEUE } from "../schemas";
 import { env } from "../config/env";
 import { claimDueJobs, markJobDone, markJobFailed, onJobAdded, releaseStaleJobs } from "../shared/jobs";
 import { logger } from "../shared/logger";
+import { expireDueRfqs } from "../modules/rfq";
 import type { EmailProvider } from "./email/email-provider";
 import { createConsoleProvider } from "./email/providers/console";
 import { createResendProvider } from "./email/providers/resend";
@@ -23,6 +24,9 @@ const POLL_MS = 5_000;
 const BATCH = 5;
 /** A job "running" longer than this was left by a stopped process; run it again. */
 const STALE_MS = 5 * 60_000;
+/** How often open quote requests past their time are closed. */
+const SWEEP_MS = 60_000;
+let lastSweep = 0;
 
 let timer: NodeJS.Timeout | undefined;
 let running: Promise<void> | undefined;
@@ -66,14 +70,28 @@ async function drainEmails(provider: EmailProvider): Promise<void> {
 }
 
 /** One pass. Never runs twice at once; a wake-up during a pass triggers one more pass. */
+/** Close expired quote requests, at most once a minute. Safe with several API copies (SKIP LOCKED). */
+async function sweep(): Promise<void> {
+  if (Date.now() - lastSweep < SWEEP_MS) return;
+  lastSweep = Date.now();
+  const expired = await expireDueRfqs();
+  if (expired > 0) logger.info(`Closed ${expired} expired quote request(s)`);
+}
+
 function tick(): void {
-  if (stopped || !emailProvider) return;
+  if (stopped) return;
   if (running) {
     wakeAgain = true;
     return;
   }
   const provider = emailProvider;
   running = (async () => {
+    try {
+      await sweep();
+    } catch (err) {
+      logger.warn({ err: { message: err instanceof Error ? err.message : String(err) } }, "Quote request expiry sweep failed");
+    }
+    if (!provider) return;
     try {
       await releaseStaleJobs(STALE_MS);
       await drainEmails(provider);
@@ -94,14 +112,14 @@ export function startWorkers(): void {
   if (!stopped) return;
   emailProvider = createEmailProvider();
   if (!emailProvider) {
+    // Other background work (the quote request expiry) still runs.
     logger.error("RESEND_API_KEY is not set: emails are NOT sent; they wait in the queue until it is set");
-    return;
   }
   stopped = false;
   unsubscribe = onJobAdded(tick);
   timer = setInterval(tick, POLL_MS);
   tick();
-  logger.info(`Background workers started (email provider: ${emailProvider.name}, queue: PostgreSQL)`);
+  logger.info(`Background workers started (email provider: ${emailProvider?.name ?? "none"}, queue: PostgreSQL)`);
 }
 
 /** Stop polling and let a running pass finish. */

@@ -12,7 +12,8 @@ import { AiFeature, Benefits, Cta, Faq, Footer, heroUnit, onCanvas, SiteNav, Sta
  * the seller landing (sections.tsx).
  */
 
-const FIND_A_PART = "/buyer/find-part";
+/** Text search (Day 8). The photo route (Muhrak AI) comes with the AI module. */
+const FIND_A_PART = "/search";
 
 export function LandingPage() {
   return (

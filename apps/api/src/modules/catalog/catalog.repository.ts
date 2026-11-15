@@ -304,3 +304,90 @@ export async function listPublishedForSeller(input: {
   return { rows, total: counted[0]?.count ?? 0 };
 }
 
+
+// ---------------------------------------------------------------- public part search
+
+export type SearchMatchRank = 1 | 2 | 3 | 4;
+
+/**
+ * One page of live products of the given sellers matching a buyer's search,
+ * strongest match first, then newest. Rank: 4 = main part number equal,
+ * 3 = another part number equal or a part number starting with it,
+ * 2 = a machine it fits contains it, 1 = every word in the name, brand or
+ * machines. Every value is a bound parameter (no SQL built from text).
+ *
+ * The word and machine matches are substring searches, so they read all
+ * live products of these sellers (fine for the market test; a trigram
+ * index is the next step when the catalogue grows).
+ */
+export async function searchPublishedProducts(input: {
+  sellerIds: string[];
+  categoryId: string | null;
+  /** Normalised part number ("6020F4"); empty = no part number search. */
+  partNumber: string;
+  /** Normalised machine ("kobelcosk380"); empty = no machine search. */
+  fitment: string;
+  /** ILIKE patterns, one per word, wildcards already escaped. */
+  wordPatterns: string[];
+  /** Normalised words, for matching machines word by word. */
+  wordFitments: string[];
+  offset: number;
+  limit: number;
+}): Promise<{ rows: { id: string; rank: SearchMatchRank }[]; total: number }> {
+  if (input.sellerIds.length === 0) return { rows: [], total: 0 };
+  const pn = input.partNumber;
+  const exact = pn
+    ? sql`exists (select 1 from ${productPartNumbers} pn where pn.product_id = p.id and pn.normalized = ${pn} and pn.position = 0)`
+    : sql`false`;
+  const alternative = pn
+    ? sql`exists (select 1 from ${productPartNumbers} pn where pn.product_id = p.id and (pn.normalized = ${pn} or (${pn.length >= 3} and pn.normalized like ${`${pn}%`})))`
+    : sql`false`;
+  const fits =
+    input.fitment.length >= 3
+      ? sql`exists (select 1 from ${productFitments} f where f.product_id = p.id and f.normalized like ${`%${input.fitment}%`})`
+      : sql`false`;
+  const words =
+    input.wordPatterns.length > 0
+      ? sql.join(
+          input.wordPatterns.map((pattern, index) => {
+            const fit = input.wordFitments[index] ?? "";
+            return sql`(p.name ilike ${pattern} or coalesce(p.brand, '') ilike ${pattern}${
+              fit ? sql` or exists (select 1 from ${productFitments} f where f.product_id = p.id and f.normalized like ${`%${fit}%`})` : sql``
+            })`;
+          }),
+          sql` and `,
+        )
+      : sql`false`;
+  const category = input.categoryId ? sql`and p.category_id = ${input.categoryId}` : sql``;
+
+  const result = await db.execute<{ id: string; rank: number; total: number }>(sql`
+    with ranked as (
+      select p.id, p.published_at,
+        case when ${exact} then 4 when ${alternative} then 3 when ${fits} then 2 when ${words} then 1 else 0 end as rank
+      from ${products} p
+      where p.status = 'published' and ${inArray(sql`p.seller_user_id`, input.sellerIds)} ${category}
+    )
+    select id, rank, (count(*) over ())::int as total
+    from ranked
+    where rank > 0
+    order by rank desc, published_at desc, id desc
+    offset ${input.offset} limit ${input.limit}
+  `);
+  const rows = result.rows.map((row) => ({ id: String(row.id), rank: Number(row.rank) as SearchMatchRank }));
+  let total = result.rows[0] ? Number(result.rows[0].total) : 0;
+  // A page past the end has no rows to carry the total: count separately.
+  if (rows.length === 0 && input.offset > 0) {
+    const counted = await db.execute<{ total: number }>(sql`
+      select count(*)::int as total from ${products} p
+      where p.status = 'published' and ${inArray(sql`p.seller_user_id`, input.sellerIds)} ${category}
+        and (${exact} or ${alternative} or ${fits} or ${words})
+    `);
+    total = Number(counted.rows[0]?.total ?? 0);
+  }
+  return { rows, total };
+}
+
+export async function findProductsByIds(ids: string[]): Promise<ProductRow[]> {
+  if (ids.length === 0) return [];
+  return db.select().from(products).where(inArray(products.id, ids));
+}

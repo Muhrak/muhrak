@@ -48,5 +48,8 @@ const AFTER_LOGIN_PATH: Record<AuthSide, string> = { buyer: "/", seller: "/sell"
 export function afterLoginPath(side: AuthSide, next: string | null | undefined): string {
   const home = AFTER_LOGIN_PATH[side];
   if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return home;
-  return next.startsWith(`/${side}/`) ? next : home;
+  if (next.startsWith(`/${side}/`)) return next;
+  // A buyer sent to login from the public part search goes back to it (and its open quote form).
+  if (side === "buyer" && (next === "/search" || next.startsWith("/search?"))) return next;
+  return home;
 }

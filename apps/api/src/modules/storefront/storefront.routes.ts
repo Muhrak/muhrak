@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
 import {
+  partSearchQuerySchema,
   sellerDirectoryQuerySchema,
+  type PartSearchQuery,
   sellerProductsQuerySchema,
   type PublicSellerResponse,
   type SellerDirectoryQuery,
@@ -16,6 +18,8 @@ import * as storefront from "./storefront.service";
  * may be cached briefly by browsers (nothing personal in them).
  */
 export const storefrontRouter = Router();
+/** Public part search: /v1/parts?q=… */
+export const partSearchRouter = Router();
 
 const MINUTE = 60_000;
 const limit = limitByIp({ name: "storefront:ip", max: 300, windowMs: 5 * MINUTE });
@@ -36,4 +40,9 @@ storefrontRouter.get("/:id", limit, validateParams(idParams), async (req, res) =
 storefrontRouter.get("/:id/products", limit, validateParams(idParams), validateQuery(sellerProductsQuerySchema), async (req, res) => {
   res.setHeader("Cache-Control", cache);
   res.json(await storefront.getSellerProducts((req.params as { id: string }).id, res.locals.query as SellerProductsQuery));
+});
+
+partSearchRouter.get("/", limitByIp({ name: "part-search:ip", max: 120, windowMs: 5 * MINUTE }), validateQuery(partSearchQuerySchema), async (_req, res) => {
+  res.setHeader("Cache-Control", cache);
+  res.json(await storefront.searchParts(res.locals.query as PartSearchQuery));
 });
