@@ -17,18 +17,18 @@ const answer = (text: string, finishReason = "STOP") => ({
 describe("Gemini provider", () => {
   it("sends the key in a header (never the URL) and parses the JSON answer", async () => {
     const fetchImpl = reply(200, answer('{"isPart":true}'));
-    const provider = createGeminiProvider({ apiKey: KEY, model: "gemini-2.5-flash", fetchImpl });
+    const provider = createGeminiProvider({ apiKey: KEY, model: "gemini-3.8-flash", fetchImpl });
     const result = await provider.identifyPart(input);
     expect(result).toEqual({ output: { isPart: true }, usage: { inputTokens: 1200, outputTokens: 450 } });
 
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent");
+    expect(url).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent");
     expect(url).not.toContain(KEY);
     expect((init.headers as Record<string, string>)["x-goog-api-key"]).toBe(KEY);
     const body = JSON.parse(init.body as string);
     expect(body.contents[0].parts[0].inlineData).toEqual({ mimeType: "image/webp", data: "AQID" });
     expect(body.contents[0].parts[1].text).toContain("- filters: Filters");
-    expect(body.generationConfig).toMatchObject({ responseMimeType: "application/json", temperature: 0 });
+    expect(body.generationConfig).toMatchObject({ responseMimeType: "application/json", temperature: 0, thinkingConfig: { thinkingLevel: "low" } });
   });
 
   it("retries rate limits and server errors, not bad requests", async () => {

@@ -81,7 +81,7 @@ const envSchema = z.object({
     .optional()
     .transform((value) => value?.trim() || undefined)
     .refine((value) => value === undefined || value.length >= 20, "GEMINI_API_KEY looks too short"),
-  GEMINI_MODEL: z.string().regex(/^[a-z0-9.-]{3,64}$/, "GEMINI_MODEL must be a model id, e.g. gemini-2.5-flash").default("gemini-2.5-flash"),
+  GEMINI_MODEL: z.string().regex(/^[a-z0-9.-]{3,64}$/, "GEMINI_MODEL must be a model id, e.g. gemini-3.8-flash").default("gemini-3.8-flash"),
   /**
    * "free": Google may use free-tier data to improve its products, so AI
    * then works ONLY for the accounts in AI_TEST_USER_IDS (the developer's
@@ -96,8 +96,8 @@ const envSchema = z.object({
   /** Hard monthly cap on AI spend, in US dollars, e.g. "5" or "5.00". When reached, AI is off until next month. */
   AI_MONTHLY_BUDGET_USD: usdSchema.prefault("5"),
   /** The model's prices in US dollars per million tokens (check Google's pricing page when changing GEMINI_MODEL). */
-  GEMINI_INPUT_USD_PER_MTOK: usdSchema.prefault("0.30"),
-  GEMINI_OUTPUT_USD_PER_MTOK: usdSchema.prefault("2.50"),
+  GEMINI_INPUT_USD_PER_MTOK: usdSchema.prefault("1.50"),
+  GEMINI_OUTPUT_USD_PER_MTOK: usdSchema.prefault("7.50"),
   /** Identifications per user per 24 hours. */
   AI_DAILY_LIMIT_PER_USER: z.coerce.number().int().min(1).max(1000).default(30),
   /** Origins allowed to call the API from a browser (CORS and the auth origin check). Comma separated. */

@@ -9,7 +9,7 @@ import { MAX_OUTPUT_TOKENS, SYSTEM_PROMPT, userPrompt } from "../prompt";
  */
 
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
-const TIMEOUT_MS = 45_000;
+const TIMEOUT_MS = 90_000;
 
 const confidence = { type: "STRING", enum: ["high", "medium", "low"] };
 const field = (value: object) => ({
@@ -81,6 +81,8 @@ export function createGeminiProvider(options: { apiKey: string; model: string; f
           responseSchema: RESPONSE_SCHEMA,
           temperature: 0,
           maxOutputTokens: MAX_OUTPUT_TOKENS,
+          // Gemini 3+ thinks by default (slower, billed as output); reading a part needs little.
+          ...(/^gemini-([3-9]|\d{2,})/.test(options.model) ? { thinkingConfig: { thinkingLevel: "low" } } : {}),
         },
       };
 

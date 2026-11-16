@@ -10,6 +10,8 @@ import {
   productConditionSchema,
   productUnitSchema,
   UNIT_LABELS,
+  type AiConfidence,
+  type AiSuggestion,
   type Fitment,
   type Product,
   type ProductInput,
@@ -21,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
+import { useAiAvailable } from "@/features/ai/api";
 import { FormError } from "@/features/auth/field";
 import { applyApiError } from "@/features/auth/form-errors";
 import { useSellerAccount } from "@/features/seller/api";
@@ -28,6 +31,7 @@ import { describedBy, FieldBlock, focusRing, inputClass } from "@/features/selle
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useCategories, useCreateProduct, useProductStatus, useUpdateProduct } from "./api";
+import { AiFill } from "./ai-fill";
 import { ProductStatusChip, toDecimalText } from "./parts";
 import { PhotoPicker, type PhotoItem } from "./photo-picker";
 
@@ -148,6 +152,9 @@ export function ProductForm({ product }: { product: Product | null }) {
   const [saved, setSaved] = useState(false);
   const [stale, setStale] = useState(false);
   const [listError, setListError] = useState<string>();
+  /** Fields the AI filled in, with how sure it was (shown under the field). */
+  const [aiFilled, setAiFilled] = useState<Partial<Record<AiField, AiConfidence>>>({});
+  const aiAvailable = useAiAvailable(!product);
 
   const verified = account.data?.verification.status === "approved";
   const archived = product?.status === "archived";
@@ -160,9 +167,57 @@ export function ProductForm({ product }: { product: Product | null }) {
     setError,
     reset,
     control,
+    getValues,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({ resolver: zodResolver(formSchema), defaultValues: valuesFrom(product) });
   const [priceOnRequest, availability] = useWatch({ control, name: ["priceOnRequest", "availability"] });
+
+  /**
+   * Fill the form from the AI's suggestion. Only empty fields are filled,
+   * so nothing the seller typed is overwritten. Guesses ("low") are left
+   * out for part numbers, category and machines, where a wrong value would
+   * mislead buyers. Returns how many fields were filled.
+   */
+  function applySuggestion(suggestion: AiSuggestion): number {
+    const filled: Partial<Record<AiField, AiConfidence>> = {};
+    const fill = (field: "name" | "brand" | "description" | "partNumber" | "categoryId", value: string | null, confidence: AiConfidence) => {
+      if (!value || getValues(field).trim()) return;
+      setValue(field, value, { shouldDirty: true, shouldValidate: true });
+      filled[field] = confidence;
+    };
+    const sure = (confidence: AiConfidence) => confidence !== "low";
+
+    fill("name", suggestion.name.value, suggestion.name.confidence);
+    fill("brand", suggestion.brand.value, suggestion.brand.confidence);
+    fill("description", suggestion.description.value, suggestion.description.confidence);
+    if (sure(suggestion.category.confidence) && suggestion.category.value) {
+      fill("categoryId", suggestion.category.value.id, suggestion.category.confidence);
+    }
+    if (sure(suggestion.partNumbers.confidence) && suggestion.partNumbers.value.length > 0) {
+      const [main, ...others] = suggestion.partNumbers.value;
+      fill("partNumber", main ?? null, suggestion.partNumbers.confidence);
+      const known = [getValues("partNumber"), ...extraPartNumbers].map(normalizePartNumber);
+      const extra = others.filter((value) => !known.includes(normalizePartNumber(value)));
+      if (extra.length > 0) {
+        setExtraPartNumbers((current) => [...current, ...extra].slice(0, PRODUCT_LIMITS.partNumbers - 1));
+        filled.otherPartNumbers = suggestion.partNumbers.confidence;
+      }
+    }
+    if (sure(suggestion.fitments.confidence) && suggestion.fitments.value.length > 0 && fitments.every((fit) => !fit.make.trim() && !fit.model.trim())) {
+      setFitments(suggestion.fitments.value.slice(0, PRODUCT_LIMITS.fitments));
+      filled.fitments = suggestion.fitments.confidence;
+    }
+    setAiFilled((current) => ({ ...current, ...filled }));
+    return Object.keys(filled).length;
+  }
+
+  /** The note under a field the AI filled in. */
+  const aiHint = (field: AiField) => {
+    const confidence = aiFilled[field];
+    if (!confidence) return undefined;
+    return confidence === "high" ? "Filled in from your photo" : "Filled in from your photo: check it";
+  };
 
   function checkLists(): boolean {
     const blank = fitments.findIndex((fit) => !fit.make.trim() || !fit.model.trim());
@@ -306,6 +361,10 @@ export function ProductForm({ product }: { product: Product | null }) {
         </p>
       ) : null}
 
+      {!product && aiAvailable.data ? (
+        <AiFill onPhoto={(item) => setPhotos((current) => [item, ...current])} onSuggestion={applySuggestion} />
+      ) : null}
+
       <form
         id={FORM_ID}
         method="post"
@@ -325,7 +384,7 @@ export function ProductForm({ product }: { product: Product | null }) {
             </div>
 
             <Row>
-              <FieldBlock id="name" label="Product name" error={errors.name?.message}>
+              <FieldBlock id="name" label="Product name" error={errors.name?.message} hint={aiHint("name")}>
                 <input
                   id="name"
                   placeholder="e.g. Front head bushing for KHB-1550"
@@ -336,7 +395,7 @@ export function ProductForm({ product }: { product: Product | null }) {
                   {...register("name")}
                 />
               </FieldBlock>
-              <FieldBlock id="partNumber" label="Part number" optional error={errors.partNumber?.message}>
+              <FieldBlock id="partNumber" label="Part number" optional error={errors.partNumber?.message} hint={aiHint("partNumber")}>
                 <input
                   id="partNumber"
                   placeholder="e.g. 15-FB-02"
@@ -351,7 +410,7 @@ export function ProductForm({ product }: { product: Product | null }) {
             </Row>
 
             <Row>
-              <FieldBlock id="categoryId" label="Category" error={errors.categoryId?.message}>
+              <FieldBlock id="categoryId" label="Category" error={errors.categoryId?.message} hint={aiHint("categoryId")}>
                 <Select id="categoryId" invalid={Boolean(errors.categoryId)} error={errors.categoryId?.message} {...register("categoryId")}>
                   <option value="" disabled>
                     {categories.isPending ? "Loading categories…" : "Select a category"}
@@ -409,7 +468,7 @@ export function ProductForm({ product }: { product: Product | null }) {
               </FieldBlock>
             </Row>
 
-            <FieldBlock id="description" label="Description" optional error={errors.description?.message}>
+            <FieldBlock id="description" label="Description" optional error={errors.description?.message} hint={aiHint("description")}>
               <textarea
                 id="description"
                 rows={4}
@@ -431,11 +490,11 @@ export function ProductForm({ product }: { product: Product | null }) {
               <p className="text-sm text-text-muted">Buyers look for parts by machine and part number. The more you fill in, the more often you are found.</p>
             </div>
 
-            <MachineList fitments={fitments} onChange={setFitments} />
+            <MachineList fitments={fitments} onChange={setFitments} note={aiHint("fitments")} />
 
             <ChipList
               label="Other part numbers"
-              hint="OEM or cross-reference numbers, e.g. 6020/F4"
+              hint={aiHint("otherPartNumbers") ?? "OEM or cross-reference numbers, e.g. 6020/F4"}
               addLabel="+ Add part number"
               values={extraPartNumbers}
               max={PRODUCT_LIMITS.partNumbers - 1}
@@ -444,7 +503,7 @@ export function ProductForm({ product }: { product: Product | null }) {
             />
 
             <Row>
-              <FieldBlock id="brand" label="Brand" optional error={errors.brand?.message}>
+              <FieldBlock id="brand" label="Brand" optional error={errors.brand?.message} hint={aiHint("brand")}>
                 <input id="brand" placeholder="e.g. Bosch, CAT, Komatsu" maxLength={60} className={inputClass} {...register("brand")} />
               </FieldBlock>
               <FieldBlock id="partSource" label="Genuine or aftermarket" optional>
@@ -496,6 +555,8 @@ export function ProductForm({ product }: { product: Product | null }) {
     </>
   );
 }
+
+type AiField = "name" | "brand" | "description" | "partNumber" | "categoryId" | "otherPartNumbers" | "fitments";
 
 function Row({ children }: { children: ReactNode }) {
   return <div className="flex flex-col gap-[18px] sm:flex-row sm:items-start">{children}</div>;
@@ -588,14 +649,14 @@ function SmallButton({ children, primary, ...rest }: { children: ReactNode; prim
 }
 
 /** "Fits machines": rows of make + model (e.g. Kobelco / SK380). */
-function MachineList({ fitments, onChange }: { fitments: Fitment[]; onChange: (next: Fitment[]) => void }) {
+function MachineList({ fitments, onChange, note }: { fitments: Fitment[]; onChange: (next: Fitment[]) => void; note?: string }) {
   const set = (index: number, field: keyof Fitment, value: string) =>
     onChange(fitments.map((fit, i) => (i === index ? { ...fit, [field]: value } : fit)));
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex flex-col gap-0.5 leading-[normal]">
         <p className="text-sm font-medium text-text-strong">Fits machines</p>
-        <p className="text-[13px] text-text-muted">Make and model, e.g. Kobelco SK380, Doosan DX300, Hitachi ZW310</p>
+        <p className="text-[13px] text-text-muted">{note ?? "Make and model, e.g. Kobelco SK380, Doosan DX300, Hitachi ZW310"}</p>
       </div>
       {fitments.map((fit, index) => (
         <div key={index} className="flex items-center gap-2.5">

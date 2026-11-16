@@ -3,7 +3,7 @@
 Read this first in every new session, then `CLAUDE.md`, `docs/PLAN.md` and
 `docs/ARCHITECTURE.md`. Update it whenever a piece of work is committed.
 
-Last updated: Mon 16 Nov 2026 (Day 6 AI module on Google Gemini). Branch `develop`.
+Last updated: Mon 16 Nov 2026 (Day 7 AI fill and buyer Centre zoom, untested on screen). Branch `develop`.
 
 ## Status
 
@@ -546,6 +546,35 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   ownership for AI. No real call was made.
 - Not done yet: prompt tuning on real photos (needs the key and the
   developer's OK); the web side is Day 7.
+
+### Day 7: AI fill on Add product (Mon 16 Nov, NOT tested on screen yet)
+- `/seller/products/new`: a "Fill in from a photo" card above the form,
+  shown only when `GET /v1/seller/ai/status` says AI is available. No
+  Figma frame exists; built in the Add product card style, seller palette.
+- Phones and tablets (coarse pointer): "Take photo" (rear camera,
+  `capture="environment"`) and "Choose from gallery". Computers: "Browse a
+  photo". The photo is uploaded as a normal product photo and becomes the
+  cover; the form polls the identification (every 1.5 s, up to 75 s).
+- Fills only EMPTY fields (never overwrites the seller's typing); part
+  numbers, category and machines are skipped when the AI only guessed
+  ("low"). Filled fields show "Filled in from your photo" (": check it"
+  when not sure). Not a part, failure, limit or AI off: a short message,
+  the manual form stays as it was.
+- Gemini: `gemini-2.5-flash` is closed to new accounts (404), so the
+  default model is now `gemini-3.8-flash`, priced at its January 2027
+  rates ($1.50 in / $7.50 out per million tokens, higher than the
+  introductory rates, so the budget never under-counts), "low" thinking,
+  90 s timeout.
+- Real test on 16 Nov did NOT get an answer: `gemini-3.8-flash` on the
+  free tier answered 503 "high demand" or timed out. US$0 billed. Retry on
+  the paid tier (17 Nov), 1 photo at a time (developer's rule).
+- To do 17 Nov: screenshots desktop + phone, 1 real photo, fix anything.
+
+### Buyer Centre zoomed out (Mon 16 Nov, developer request, NOT checked on screen yet)
+- On `lg` and up, the buyer Centre page content (not the sidebar) is shown
+  at 85% (`zoom: 0.85` on `<main>` in `portal-shell.tsx`), like a
+  zoomed-out browser. Buyer Centre pages have no pop-up dialogs (a zoomed
+  parent would misplace them); keep it that way or revisit.
 
 ## Decisions and rules (the developer set these; do not change without asking)
 
