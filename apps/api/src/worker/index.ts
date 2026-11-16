@@ -1,7 +1,8 @@
-import { EMAIL_QUEUE } from "../schemas";
+import { AI_QUEUE, EMAIL_QUEUE } from "../schemas";
 import { env } from "../config/env";
 import { claimDueJobs, markJobDone, markJobFailed, onJobAdded, releaseStaleJobs } from "../shared/jobs";
 import { logger } from "../shared/logger";
+import { failAiJob, PermanentAiJobError, runAiJob } from "../modules/ai";
 import { expireDueRfqs } from "../modules/rfq";
 import type { EmailProvider } from "./email/email-provider";
 import { createConsoleProvider } from "./email/providers/console";
@@ -22,6 +23,8 @@ import { PermanentJobError, sendEmailJob } from "./jobs/send-email";
 
 const POLL_MS = 5_000;
 const BATCH = 5;
+/** AI calls at once per API copy (the free Gemini tier allows only a few per minute). */
+const AI_BATCH = 2;
 /** A job "running" longer than this was left by a stopped process; run it again. */
 const STALE_MS = 5 * 60_000;
 /** How often open quote requests past their time are closed. */
@@ -69,7 +72,28 @@ async function drainEmails(provider: EmailProvider): Promise<void> {
   }
 }
 
-/** One pass. Never runs twice at once; a wake-up during a pass triggers one more pass. */
+/** Run every due AI identification job, a few at a time, until none is left. */
+async function drainAi(): Promise<void> {
+  for (;;) {
+    const batch = await claimDueJobs(AI_QUEUE, AI_BATCH);
+    if (batch.length === 0) return;
+    await Promise.all(
+      batch.map(async (job) => {
+        try {
+          await runAiJob(job);
+          await markJobDone(job.id);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          const outcome = await markJobFailed(job, message, err instanceof PermanentAiJobError);
+          // Retries used up: the identification fails and the user gets the manual form.
+          if (outcome === "failed") await failAiJob(job, message);
+          logger.error(`AI job ${job.dedupeKey} failed, attempt ${job.attempts}, ${outcome}: ${message}`);
+        }
+      }),
+    );
+  }
+}
+
 /** Close expired quote requests, at most once a minute. Safe with several API copies (SKIP LOCKED). */
 async function sweep(): Promise<void> {
   if (Date.now() - lastSweep < SWEEP_MS) return;
@@ -78,6 +102,7 @@ async function sweep(): Promise<void> {
   if (expired > 0) logger.info(`Closed ${expired} expired quote request(s)`);
 }
 
+/** One pass. Never runs twice at once; a wake-up during a pass triggers one more pass. */
 function tick(): void {
   if (stopped) return;
   if (running) {
@@ -91,10 +116,10 @@ function tick(): void {
     } catch (err) {
       logger.warn({ err: { message: err instanceof Error ? err.message : String(err) } }, "Quote request expiry sweep failed");
     }
-    if (!provider) return;
     try {
       await releaseStaleJobs(STALE_MS);
-      await drainEmails(provider);
+      if (provider) await drainEmails(provider);
+      await drainAi();
     } catch (err) {
       logger.warn({ err: { message: err instanceof Error ? err.message : String(err) } }, "Background jobs pass failed");
     }

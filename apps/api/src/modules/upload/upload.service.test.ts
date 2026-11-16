@@ -18,7 +18,7 @@ vi.mock("./upload.repository", () => ({
 
 const repo = await import("./upload.repository");
 const { setStorage } = await import("./storage");
-const { createUpload, completeUpload, attachUpload, pendingKey, UPLOAD_COMPLETE_WINDOW_MS } = await import("./upload.service");
+const { createUpload, completeUpload, attachUpload, getOwnedPhotoForAi, readPhotoForAi, pendingKey, UPLOAD_COMPLETE_WINDOW_MS } = await import("./upload.service");
 
 const SELLER = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -141,5 +141,33 @@ describe("attachUpload", () => {
     vi.mocked(repo.attach).mockResolvedValue(undefined);
     await expect(attachUpload(OTHER, UPLOAD, "seller_logo")).rejects.toMatchObject({ status: 400 });
     expect(repo.attach).toHaveBeenCalledWith(UPLOAD, OTHER, "seller_logo");
+  });
+});
+
+describe("photos for the AI", () => {
+  const photo = (overrides: Partial<UploadRow> = {}) =>
+    row({ purpose: "product_photo", contentType: "image/jpeg", status: "ready", storageKey: `public/products/${UPLOAD}.webp`, ...overrides });
+
+  it("gives the owner their own ready product photo", async () => {
+    vi.mocked(repo.findUpload).mockResolvedValue(photo());
+    await expect(getOwnedPhotoForAi(SELLER, UPLOAD)).resolves.toMatchObject({ id: UPLOAD });
+  });
+
+  it("hides another user's photo, a document and an unchecked photo as not found", async () => {
+    vi.mocked(repo.findUpload).mockResolvedValue(photo());
+    await expect(getOwnedPhotoForAi(OTHER, UPLOAD)).rejects.toMatchObject({ status: 404 });
+    vi.mocked(repo.findUpload).mockResolvedValue(photo({ purpose: "seller_document" }));
+    await expect(getOwnedPhotoForAi(SELLER, UPLOAD)).rejects.toMatchObject({ status: 404 });
+    vi.mocked(repo.findUpload).mockResolvedValue(photo({ status: "pending" }));
+    await expect(getOwnedPhotoForAi(SELLER, UPLOAD)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("reads the cleaned WebP copy, never the raw upload", async () => {
+    vi.mocked(repo.findUpload).mockResolvedValue(photo());
+    storage.stat.mockResolvedValue({ sizeBytes: 3, etag: "e1" });
+    storage.read.mockResolvedValue(new Uint8Array([1, 2, 3]));
+    await expect(readPhotoForAi(UPLOAD)).resolves.toEqual({ bytes: new Uint8Array([1, 2, 3]), contentType: "image/webp" });
+    expect(storage.stat).toHaveBeenCalledWith(`public/products/${UPLOAD}.webp`);
+    expect(storage.read).toHaveBeenCalledWith(`public/products/${UPLOAD}.webp`, "e1");
   });
 });

@@ -11,7 +11,7 @@
      (inside the API      (data + job queue)
         process)
              |
-   External services: Stream Chat, Claude API, email provider
+   External services: Stream Chat, Google Gemini (AI), email provider
 ```
 
 - Clients hold no business logic; they call the API.

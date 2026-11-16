@@ -534,6 +534,56 @@ export const rfqs = pgTable(
 
 export type RfqRow = typeof rfqs.$inferSelect;
 
+// ---------------------------------------------------------------- ai
+
+export const aiIdentificationStatus = pgEnum("ai_identification_status", ["pending", "running", "done", "failed"]);
+
+/**
+ * Every AI part identification (Day 6). Also the AI log and the budget
+ * ledger: tokens and cost of every model call are stored here, and the
+ * monthly cap is checked against their sum. One identification per photo
+ * (upload_id unique), so a double submit never pays twice. Never deleted.
+ *
+ * Cost is in micro US dollars (1 USD = 1,000,000), an integer: the
+ * provider bills in USD, and this is our own spend, not a user's money.
+ */
+export const aiIdentifications = pgTable(
+  "ai_identifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    uploadId: uuid("upload_id")
+      .notNull()
+      .unique()
+      .references(() => uploads.id),
+    status: aiIdentificationStatus("status").notNull().default("pending"),
+    /** Validated suggestion (aiModelOutputSchema), set when done. */
+    result: jsonb("result"),
+    /** Why it failed. Server-side only; the user just sees the manual form. */
+    error: text("error"),
+    provider: text("provider"),
+    model: text("model"),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    costMicroUsd: bigint("cost_micro_usd", { mode: "number" }).notNull().default(0),
+    durationMs: integer("duration_ms"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (table) => [
+    // Daily limit per user.
+    index("ai_identifications_user_created_idx").on(table.userId, table.createdAt),
+    // Monthly budget: spend since the start of the month.
+    index("ai_identifications_created_idx").on(table.createdAt),
+    check("ai_identifications_cost", sql`${table.costMicroUsd} >= 0`),
+    check("ai_identifications_finished", sql`(${table.status} IN ('done','failed')) = (${table.finishedAt} IS NOT NULL)`),
+  ],
+);
+
+export type AiIdentificationRow = typeof aiIdentifications.$inferSelect;
+
 export type CategoryRow = typeof categories.$inferSelect;
 export type ProductRow = typeof products.$inferSelect;
 export type ProductPartNumberRow = typeof productPartNumbers.$inferSelect;

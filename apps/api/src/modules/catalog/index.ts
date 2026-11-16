@@ -9,6 +9,7 @@ export {
   getSellerCatalogStats,
   searchLiveProducts,
   type LiveProductMatch,
+  listCategories,
   listPublishedProducts,
   sellersMatchingProductText,
   sellersPublishingInCategory,

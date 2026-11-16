@@ -85,6 +85,13 @@
       "when": 1794742119006,
       "tag": "0011_handy_satana",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794815640727,
+      "tag": "0012_black_moira_mactaggert",
+      "breakpoints": true
     }
   ]
 }

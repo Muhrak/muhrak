@@ -109,7 +109,10 @@ approved in time, launch moves; payment is not skipped.
 - **Day 5, Sat 14 Nov:** categories and products (seller side), photo cleaning.
 - **Day 8 (text half) and Day 9, Sun 15 Nov:** part search and matching
   (no AI), quote requests, buyer requests, seller RFQ inbox, expiry. Day 6
-  (AI) is on hold until the Claude API key arrives (developer, 15 Nov).
+  (AI) was on hold for a Claude API key (developer, 15 Nov).
+- **Day 6, Mon 16 Nov:** AI module on Google Gemini instead (developer
+  decision, 16 Nov): API, job, limits, budget cap, tests. Prompt tuning on
+  real photos waits for the developer's key and OK.
 - **Early:** buyer and seller landing pages.
 
 Details in `docs/PROGRESS.md`.

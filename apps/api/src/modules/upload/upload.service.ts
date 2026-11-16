@@ -252,6 +252,37 @@ export async function getPublicLogoUrls(uploadIds: string[]): Promise<Map<string
   return result;
 }
 
+/** Upload purposes whose photos may be sent to the AI. Buyer part photos join on Day 8. */
+const AI_PHOTO_PURPOSES: UploadPurpose[] = ["product_photo"];
+
+/**
+ * For the AI module: the caller's own ready photo. Someone else's upload,
+ * a document or a file still being checked looks like one that does not exist.
+ */
+export async function getOwnedPhotoForAi(userId: string, uploadId: string): Promise<Upload> {
+  const row = await repo.findUpload(uploadId);
+  if (!row || row.ownerUserId !== userId || row.status !== "ready" || !AI_PHOTO_PURPOSES.includes(row.purpose as UploadPurpose)) {
+    throw notFound("Photo not found");
+  }
+  return toUpload(row);
+}
+
+/**
+ * For the AI module (background job): the bytes of the CLEANED copy of a
+ * ready photo (re-encoded WebP, no metadata such as GPS), never the raw upload.
+ */
+export async function readPhotoForAi(uploadId: string): Promise<{ bytes: Uint8Array; contentType: "image/webp" }> {
+  const row = await repo.findUpload(uploadId);
+  if (!row || row.status !== "ready" || !AI_PHOTO_PURPOSES.includes(row.purpose as UploadPurpose)) {
+    throw new Error(`Upload ${uploadId} is not a ready photo`);
+  }
+  const storage = getStorage();
+  const key = productPhotoKeys(row.id).large;
+  const stored = await storage.stat(key);
+  if (!stored) throw new Error(`Cleaned photo for upload ${uploadId} is missing`);
+  return { bytes: await storage.read(key, stored.etag), contentType: "image/webp" };
+}
+
 /** For other modules: facts about uploads they already reference. */
 export async function getUploads(uploadIds: string[]): Promise<Upload[]> {
   return (await repo.findUploads(uploadIds)).map(toUpload);

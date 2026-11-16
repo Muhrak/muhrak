@@ -3,7 +3,7 @@
 Read this first in every new session, then `CLAUDE.md`, `docs/PLAN.md` and
 `docs/ARCHITECTURE.md`. Update it whenever a piece of work is committed.
 
-Last updated: Mon 16 Nov 2026 (compact seller profile header). Branch `develop`.
+Last updated: Mon 16 Nov 2026 (Day 6 AI module on Google Gemini). Branch `develop`.
 
 ## Status
 
@@ -12,8 +12,12 @@ same day), and the landing pages are done early. Maintenance mode in the
 admin console was added on Sun 15 Nov at the developer's request (outside
 the day plan).
 
-**Sun 15 Nov (developer decision): Day 6 (AI) is on hold** until the
-company has a Claude API key and has settled its payment procedures. Done
+**Mon 16 Nov (developer decision): Day 6 (AI) is built on Google Gemini**
+instead of waiting for a Claude key; another provider can replace it later
+(one file in `modules/ai/providers`). See "AI module (Day 6)" below.
+
+**Sun 15 Nov (developer decision): Day 6 (AI) was on hold** until the
+company had a Claude API key and had settled its payment procedures. Done
 instead the same day: the non-AI half of Day 8 (part search by text and
 matching) and all of Day 9 (quote requests, buyer "Inquiries & RFQs",
 seller "RFQ Inbox", expiry, email to the seller). Still to do from Days
@@ -505,6 +509,44 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   one leaves the other. 5 new service tests (`login.test.ts`). The old
   shared session key is dropped, so everyone logs in once more.
 
+### AI module (Day 6, Mon 16 Nov, Google Gemini)
+- Provider: Google Gemini over REST with plain fetch (no SDK, no new
+  dependency), behind `AiProvider` (`modules/ai/ai-provider.ts`); swapping
+  provider = one new file in `modules/ai/providers`. Key in a header, never
+  in the URL or logs. 45 s timeout. Model and prices from env.
+- API (seller side): `GET /v1/seller/ai/status` ({available}),
+  `POST /v1/seller/ai/identifications` {uploadId} (202, queued),
+  `GET /v1/seller/ai/identifications/:id` (polled). Answer: name, brand,
+  part numbers, category, fitments, description, each with a confidence,
+  plus `isPart`. Errors with code `ai_unavailable` mean "show the manual form".
+- The model call is a job on the `ai` queue (worker in the API, 2 at a
+  time, 3 tries for rate limits and outages only).
+- Safety: off unless `AI_ENABLED=true` and a key; on `GEMINI_TIER=free`
+  only the user ids in `AI_TEST_USER_IDS` may use it (Google may use
+  free-tier data: never real users' photos). Only the owner's own READY
+  product photo; the model gets the cleaned WebP (no metadata), never the
+  raw upload. One identification per photo (double submit returns the
+  first). Per-user limit per 24 h (`AI_DAILY_LIMIT_PER_USER`, 30). Hard
+  monthly cap (`AI_MONTHLY_BUDGET_USD`, US$5): calls still running count at
+  their highest cost, checked and inserted under one advisory lock, so
+  parallel requests cannot overshoot. Answer validated with Zod
+  (`aiModelOutputSchema`), text clipped to the form's limits, unknown
+  category dropped; text in the photo is treated as data. The model never
+  saves or publishes anything.
+- Log and ledger: table `ai_identifications` (migration 0012): status,
+  validated result, server-side error, provider, model, tokens, cost in
+  micro US dollars (integer), duration. Every billed call is costed, even
+  an unusable answer. Never deleted.
+- `pnpm ai:try --yes <photos>` (apps/api): tries real photos with the
+  real categories, prints answer, tokens and cost. NOT counted in the
+  in-app budget; real calls only with the developer's OK.
+- Tests: service (switch off, free tier, someone else's photo or result,
+  daily limit, budget with calls in flight, double submit, bad and hostile
+  answers, retries, cost recording), Gemini provider (fake fetch), upload
+  ownership for AI. No real call was made.
+- Not done yet: prompt tuning on real photos (needs the key and the
+  developer's OK); the web side is Day 7.
+
 ## Decisions and rules (the developer set these; do not change without asking)
 
 Design:
@@ -646,9 +688,13 @@ Still open (Day 4 admin):
 
 ## Next up, see `docs/PLAN.md`
 
-- Day 6 (AI module) waits for the company's Claude API key (no real API
-  call without the developer's OK, cost estimate and cap). Then Day 7 (AI
-  fill on Add product) and the photo half of Day 8.
+- Day 6: put a Gemini key in `apps/api/.env`, your user id in
+  `AI_TEST_USER_IDS`, then (with your OK) `pnpm ai:try --yes <photos>` on
+  real part photos and adjust `src/modules/ai/prompt.ts`. Then Day 7 (AI
+  fill on Add product) and the photo half of Day 8 (buyer photo purpose
+  and a `/v1/buyer/ai` router).
+- Before launch: a PAID Gemini key (`GEMINI_TIER=paid`); set the AI
+  variables on Railway.
 - Without the key, Day 11 (Send quote; the `quote` transition already
   exists in `RFQ_TRANSITIONS`) needs no outside service. Day 10 (Stream
   Chat) needs a Stream account.

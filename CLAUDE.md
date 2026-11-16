@@ -44,8 +44,10 @@ the web app for the start). Do not propose further merges or splits.
   free Upstash plan ran out); add a shared store later where needed.
 - Frontend: Next.js (App Router), TypeScript, Tailwind, shadcn/ui, TanStack Query,
   React Hook Form + Zod.
-- Chat: Stream Chat. Email: Resend. AI: Claude API (vision), always through the
-  `ai` module and a queue job.
+- Chat: Stream Chat. Email: Resend. AI: Google Gemini (vision) over its REST
+  API with plain fetch, no SDK (developer decision, 16 Nov 2026; replaces the
+  Claude API, which can come back later as another provider), always through
+  the `ai` module and a queue job.
 - Background jobs run inside the API process (`apps/api/src/worker`), not a
   separate worker app (developer decision, 14 Nov 2026).
 - Roles: `buyer`, `seller`, `admin`. There is ONE seller type. Manufacturers,

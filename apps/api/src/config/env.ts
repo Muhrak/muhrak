@@ -6,6 +6,16 @@ import { z } from "zod";
  * The rest of the code imports `env` and never touches process.env.
  * If a value is missing or wrong, the API refuses to start.
  */
+/** "2.50" -> 2_500_000 micro US dollars, without floating point. */
+const usdSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{1,6}(\.\d{1,6})?$/, "Enter an amount in US dollars, e.g. 5 or 0.30")
+  .transform((value) => {
+    const [whole = "0", fraction = ""] = value.split(".");
+    return Number(whole) * 1_000_000 + Number(fraction.padEnd(6, "0"));
+  });
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
@@ -59,6 +69,37 @@ const envSchema = z.object({
     .transform((value) => value?.trim() || undefined)
     .refine((value) => value === undefined || value.length >= 10, "RESEND_API_KEY looks too short"),
   EMAIL_FROM: z.string().min(3).default("Muhrak <onboarding@resend.dev>"),
+  /**
+   * AI part identification (Day 6; Google Gemini, developer decision
+   * 16 Nov 2026). Off unless AI_ENABLED=true AND a key is set; when off,
+   * the AI endpoints answer `ai_unavailable` and the web app shows the
+   * manual form.
+   */
+  AI_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  GEMINI_API_KEY: z
+    .string()
+    .optional()
+    .transform((value) => value?.trim() || undefined)
+    .refine((value) => value === undefined || value.length >= 20, "GEMINI_API_KEY looks too short"),
+  GEMINI_MODEL: z.string().regex(/^[a-z0-9.-]{3,64}$/, "GEMINI_MODEL must be a model id, e.g. gemini-2.5-flash").default("gemini-2.5-flash"),
+  /**
+   * "free": Google may use free-tier data to improve its products, so AI
+   * then works ONLY for the accounts in AI_TEST_USER_IDS (the developer's
+   * own test photos, never real users' photos). "paid" for everyone.
+   */
+  GEMINI_TIER: z.enum(["free", "paid"]).default("free"),
+  AI_TEST_USER_IDS: z
+    .string()
+    .default("")
+    .transform((value) => value.split(",").map((id) => id.trim().toLowerCase()).filter(Boolean))
+    .pipe(z.array(z.string().uuid("AI_TEST_USER_IDS must be user ids (uuid), comma separated"))),
+  /** Hard monthly cap on AI spend, in US dollars, e.g. "5" or "5.00". When reached, AI is off until next month. */
+  AI_MONTHLY_BUDGET_USD: usdSchema.prefault("5"),
+  /** The model's prices in US dollars per million tokens (check Google's pricing page when changing GEMINI_MODEL). */
+  GEMINI_INPUT_USD_PER_MTOK: usdSchema.prefault("0.30"),
+  GEMINI_OUTPUT_USD_PER_MTOK: usdSchema.prefault("2.50"),
+  /** Identifications per user per 24 hours. */
+  AI_DAILY_LIMIT_PER_USER: z.coerce.number().int().min(1).max(1000).default(30),
   /** Origins allowed to call the API from a browser (CORS and the auth origin check). Comma separated. */
   CORS_ORIGINS: z
     .string()
