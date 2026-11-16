@@ -3,7 +3,7 @@
 Read this first in every new session, then `CLAUDE.md`, `docs/PLAN.md` and
 `docs/ARCHITECTURE.md`. Update it whenever a piece of work is committed.
 
-Last updated: Sun 15 Nov 2026 (Day 8 text search and Day 9). Branch `develop`.
+Last updated: Mon 16 Nov 2026 (compact seller profile header). Branch `develop`.
 
 ## Status
 
@@ -128,6 +128,12 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   Same fix on the seller Verification page.
 - Tests: 7 review tests (abuse cases), 27-check API run (wrong side, wrong
   role, tampered cursor, stale review, race), browser run of the console.
+
+### Seller profile header made compact (Mon 16 Nov, developer request)
+- The Figma 600 px top band left about 300 px of empty gradient above the
+  company card. Developer decision: the identity block now follows the nav
+  (band as tall as its content, about 315 px at 1440), with a soft fade
+  into the page. Phone layout unchanged apart from less top space.
 
 ### Public Sellers directory and seller profile (Sat 14 Nov, early)
 - Developer decisions: "Manufacturers" renamed "Sellers" (nav -> `/sellers`,

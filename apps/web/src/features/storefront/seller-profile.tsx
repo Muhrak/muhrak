@@ -81,10 +81,13 @@ function Profile({ seller }: { seller: PublicSeller }) {
 
   return (
     <main className="flex flex-1 flex-col bg-canvas text-ink">
-      {/* Figma "Top": 600 px, identity block from 400 px. */}
-      <AuroraBand className="lg:h-[600px]">
+      {/* Compact top (developer, 16 Nov 2026): the identity block follows the
+          nav instead of the Figma 600 px band, which left ~300 px empty. */}
+      <AuroraBand>
         <SiteNav side="buyer" current="Sellers" />
-        <div className="relative flex flex-col gap-6 px-4 pt-16 pb-10 sm:flex-row sm:items-center sm:gap-7 sm:px-10 lg:absolute lg:top-[400px] lg:left-0 lg:p-0 lg:pl-[60px] xl:pl-[60px]">
+        {/* Fade the shortened aurora into the page so it has no hard edge. */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-linear-to-b from-transparent to-canvas" />
+        <div className="relative flex flex-col gap-6 px-4 pt-12 pb-10 sm:flex-row sm:items-center sm:gap-7 sm:px-10 lg:pt-16 lg:pb-14 xl:px-[60px]">
           <div className="flex h-[112px] w-[200px] shrink-0 items-center justify-center overflow-hidden rounded-[18px] border border-black/9 bg-linear-to-b from-white to-white/80 p-4">
             {seller.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- public logo from storage
