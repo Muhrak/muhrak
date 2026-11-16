@@ -8,3 +8,6 @@ dist
 coverage
 .DS_Store
 *.tsbuildinfo
+
+# Local design references and AI test photos (never committed)
+refs/
