@@ -577,14 +577,17 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   parent would misplace them); keep it that way or revisit.
 
 ### Sellers page arranged like a shop listing (Tue 17 Nov, developer request)
-- `/sellers`: rectangular search in the nav on desktop (`SiteNav`
-  `search` slot, only this page uses it), under the title below `lg`.
-  No "VERIFIED SELLERS" label; "Sellers (n)" at 44 px (34 px on phones),
-  lined up with the logo (page padding = nav padding, `sm:px-12`). Smaller
-  cards: 2 / 3 / 4 / 5 / 6 per row (phone, sm, lg, xl, 1600 px+).
-  Replaces the 470 px centred Figma hero on purpose.
+- `/sellers`: the Figma 470 px aurora hero is kept (signature shape) with
+  the big "Sellers" title centred and no label; the search is a
+  rectangle in the nav on desktop (`SiteNav` `search` slot, only this
+  page uses it) and under the title below `lg`. Page padding = nav
+  padding (`sm:px-12`). Smaller cards: 2 / 3 / 4 / 5 / 6 per row (phone,
+  sm, lg, xl, 1600 px+).
 - Site nav, signed in (all landing pages): the round avatar only, no
   first name or chevron.
+- Buyer dashboard: a white welcome card (name, email, Browse parts, Ask
+  Muhrak AI) and the black Muhrak AI card share one row (half each from
+  `lg`); the "Buyer account" badge is gone (17 Nov, developer request).
 
 ## Decisions and rules (the developer set these; do not change without asking)
 

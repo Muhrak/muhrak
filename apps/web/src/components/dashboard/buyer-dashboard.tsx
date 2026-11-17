@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Icon } from "@/components/layout/icon";
 import { useCurrentUser } from "@/features/auth/hooks";
-import { AccountBadge, EmptyPanel, OutlinePillLink, PageHeader, PanelRow, SolidPillLink, StatCards } from "./parts";
+import { EmptyPanel, OutlinePillLink, PanelRow, SolidPillLink, StatCards } from "./parts";
 
 /**
  * Figma "Buyer – Dashboard" converted to the light theme of
@@ -17,20 +17,20 @@ export function BuyerDashboard() {
 
   return (
     <>
-      <PageHeader
-        title={`Welcome back, ${user.fullName}`}
-        meta={user.email}
-        badge={<AccountBadge label="Buyer account" dotClass="bg-white" />}
-        actions={
-          <>
+      {/* Welcome card and Muhrak AI card side by side (developer request, 17 Nov 2026). */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <section aria-label="Your account" className="flex flex-col justify-between gap-6 rounded-[24px] bg-panel px-5 py-6 sm:px-7">
+          <div className="flex min-w-0 flex-col gap-2.5 leading-[normal]">
+            <h1 className="text-[24px] font-medium tracking-[-0.02em] break-words text-text-strong sm:text-[28px]">Welcome back, {user.fullName}</h1>
+            <p className="truncate text-base text-text-muted">{user.email}</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
             <OutlinePillLink href="/search">Browse parts</OutlinePillLink>
-            <SolidPillLink href="/buyer/find-part">
-              Ask Muhrak AI
-            </SolidPillLink>
-          </>
-        }
-      />
-      <MuhrakAiCard />
+            <SolidPillLink href="/buyer/find-part">Ask Muhrak AI</SolidPillLink>
+          </div>
+        </section>
+        <MuhrakAiCard />
+      </div>
       <StatCards
         stats={[
           { label: "Open requests", value: 0, note: "No requests yet" },

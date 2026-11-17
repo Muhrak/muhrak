@@ -74,23 +74,20 @@ export function SellersDirectory() {
 
   return (
     <main className="flex flex-1 flex-col bg-canvas text-ink">
-      {/* Shop-listing header (developer request, 17 Nov 2026): search in the
-          nav on desktop (under the title on smaller screens), the title with
-          the count lined up with the logo, in the short aurora band. */}
-      <AuroraBand>
+      {/* Figma Hero (470 px aurora band) with the title centred; the search
+          sits in the nav on desktop and under the title below lg
+          (developer request, 17 Nov 2026). */}
+      <AuroraBand className="lg:h-[470px]">
         <SiteNav side="buyer" current="Sellers" search={searchBox("seller-search")} />
-        {/* Fade the shortened aurora into the page so it has no hard edge. */}
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-linear-to-b from-transparent to-canvas" />
-        <div className="relative flex flex-col gap-5 px-4 pt-8 pb-6 sm:px-12 lg:pt-12 lg:pb-8">
-          <h1 className="flex items-baseline gap-2.5 text-[34px] leading-[normal] font-medium tracking-[-0.03em] text-ink sm:text-[44px]">
+        <div className="relative flex flex-col items-center px-4 pt-10 pb-14 text-center sm:px-12 lg:pt-[110px] lg:pb-0">
+          <h1 className="bg-linear-to-b from-ink via-[#292b36] via-55% to-[#737585] bg-clip-text pb-2 text-[64px] leading-[0.9] font-medium tracking-[-0.05em] text-transparent sm:text-[96px] lg:text-[120px]">
             Sellers
-            {data ? <span className="text-[15px] font-normal tracking-normal text-ink-tertiary">({data.allCount})</span> : null}
           </h1>
-          <div className="lg:hidden">{searchBox("seller-search-mobile")}</div>
+          <div className="mt-8 w-full max-w-[560px] lg:hidden">{searchBox("seller-search-mobile")}</div>
         </div>
       </AuroraBand>
 
-      <section aria-label="Sellers" className="flex flex-col px-4 pt-2 pb-[110px] sm:px-12">
+      <section aria-label="Sellers" className="flex flex-col px-4 pt-12 pb-[110px] sm:px-12">
         <CategoryTabs
           tabs={tabs}
           active={category}
@@ -100,7 +97,7 @@ export function SellersDirectory() {
             onToggle: () => go({ sort: sort === "name" ? "newest" : "name", page: 1 }),
           }}
         />
-        <div className="h-8" />
+        <div className="h-10" />
 
         {directory.isPending ? (
           <p role="status" className="py-20 text-center text-sm text-ink-tertiary">
