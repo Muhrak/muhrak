@@ -577,8 +577,10 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   parent would misplace them); keep it that way or revisit.
 
 ### Sellers page arranged like a shop listing (Tue 17 Nov, developer request)
-- `/sellers`: the Figma 470 px aurora hero is kept (signature shape) with
-  the big "Sellers" title centred and no label; the search is a
+- `/sellers`: the aurora hero, shortened to 320 px on desktop by squashing
+  the aurora to 68% height (`AuroraBand` `decorClassName`), so the whole
+  signature shape stays; "Sellers" centred at 88 px (56/72 px smaller)
+  and no label; the search is a
   rectangle in the nav on desktop (`SiteNav` `search` slot, only this
   page uses it) and under the title below `lg`. Page padding = nav
   padding (`sm:px-12`). Smaller cards: 2 / 3 / 4 / 5 / 6 per row (phone,

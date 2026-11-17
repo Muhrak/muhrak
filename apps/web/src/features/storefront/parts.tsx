@@ -21,10 +21,11 @@ export const focus = "outline-none focus-visible:ring-3 focus-visible:ring-ring/
  * (aurora 2300×1000 at -430,-520; dome 1750×1200 at -155,70), clipped to
  * the frame's height.
  */
-export function AuroraBand({ className, children }: { className?: string; children: ReactNode }) {
+export function AuroraBand({ className, decorClassName, children }: { className?: string; decorClassName?: string; children: ReactNode }) {
   return (
     <section className={cn("relative overflow-hidden bg-canvas", className)} style={heroUnit}>
-      <div aria-hidden className="pointer-events-none absolute inset-0">
+      {/* `decorClassName` can squash the aurora vertically (origin top) for a shorter band, keeping its whole shape. */}
+      <div aria-hidden className={cn("pointer-events-none absolute inset-0 origin-top", decorClassName)}>
         <Image src="/landing/hero-aurora.svg" alt="" width={2480} height={1180} priority className="absolute max-w-none" style={onCanvas(-520, -610, 2480, 1180)} />
         <Image src="/landing/hero-dome.svg" alt="" width={1970} height={1420} priority className="absolute max-w-none" style={onCanvas(-265, -40, 1970, 1420)} />
       </div>

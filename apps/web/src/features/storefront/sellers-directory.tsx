@@ -78,17 +78,19 @@ export function SellersDirectory() {
       {/* Figma Hero (470 px aurora band) with the title centred; the search
           sits in the nav on desktop and under the title below lg
           (developer request, 17 Nov 2026). */}
-      <AuroraBand className="lg:h-[470px]">
+      {/* Shorter band (developer request, 17 Nov 2026): the aurora is squashed
+          to 68% height so the whole signature shape still fits. */}
+      <AuroraBand className="lg:h-[320px]" decorClassName="lg:scale-y-[0.68]">
         <SiteNav side="buyer" current="Sellers" search={searchBox("seller-search")} />
-        <div className="relative flex flex-col items-center px-4 pt-10 pb-14 text-center sm:px-12 lg:pt-[110px] lg:pb-0">
-          <h1 className="bg-linear-to-b from-ink via-[#292b36] via-55% to-[#737585] bg-clip-text pb-2 text-[64px] leading-[0.9] font-medium tracking-[-0.05em] text-transparent sm:text-[96px] lg:text-[120px]">
+        <div className="relative flex flex-col items-center px-4 pt-8 pb-12 text-center sm:px-12 lg:pt-[52px] lg:pb-0">
+          <h1 className="bg-linear-to-b from-ink via-[#292b36] via-55% to-[#737585] bg-clip-text pb-2 text-[56px] leading-[0.9] font-medium tracking-[-0.05em] text-transparent sm:text-[72px] lg:text-[88px]">
             Sellers
           </h1>
           <div className="mt-8 w-full max-w-[560px] lg:hidden">{searchBox("seller-search-mobile")}</div>
         </div>
       </AuroraBand>
 
-      <section aria-label="Sellers" className="flex flex-col px-4 pt-12 pb-[110px] sm:px-12">
+      <section aria-label="Sellers" className="flex flex-col px-4 pt-6 pb-[110px] sm:px-12">
         <CategoryTabs
           tabs={tabs}
           active={category}
