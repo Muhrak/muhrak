@@ -9,7 +9,7 @@ import { browser } from "react-dom";
 import { useSignOut } from "@/features/auth/hooks";
 import { HOME_PATH, LOGIN_PATH } from "@/features/auth/paths";
 import { useSession } from "@/features/auth/session";
-import { initials, shortName } from "@/features/auth/user-display";
+import { initials } from "@/features/auth/user-display";
 import { cn } from "@/lib/utils";
 import { MobileGlow } from "./mobile-glow";
 import { NAV_LINKS, SELLER_NAV_LINKS } from "./nav-links";
@@ -20,8 +20,8 @@ export type LandingSide = "buyer" | "seller";
  * Right side of the landing page nav.
  * - Desktop (lg+), signed out: "Sign in". No theme toggle: the site is
  *   light only (developer decision, 13 Nov 2026).
- * - Desktop, signed in: the profile button from Figma
- *   "Buyer – Landing v2 (Signed in)" in light colours; it opens the dashboard.
+ * - Desktop, signed in: the round avatar (no name, developer request
+ *   17 Nov 2026); it opens the dashboard.
  * - Below lg: a hamburger button opening a full-screen menu.
  * "Find a part" is not in the nav: the hero has the dedicated button
  * (developer decision, 11 Nov 2026).
@@ -78,11 +78,11 @@ function Actions({ user, side }: { user: PublicUser | null; side: LandingSide })
           <Link
             href={HOME_PATH[side]}
             aria-label={`${user.fullName}: open your dashboard`}
-            className={cn("flex items-center gap-2 rounded-full border border-black/22 bg-white/60 py-1 pr-3.5 pl-1 backdrop-blur-[15px] hover:bg-white/80", focus)}
+            title={user.fullName}
+            className={cn("flex rounded-full border border-black/22 bg-white/60 p-1 backdrop-blur-[15px] hover:bg-white/80", focus)}
           >
-            <Avatar user={user} size={34} />
-            <span className="max-w-[140px] truncate text-sm leading-[1.3] text-ink">{shortName(user.fullName)}</span>
-            <Chevron />
+            {/* Avatar only, no name (developer request, 17 Nov 2026). */}
+            <Avatar user={user} size={36} />
           </Link>
         ) : (
           <Link

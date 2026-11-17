@@ -42,6 +42,31 @@ export function SellersDirectory() {
     go({ q: draft.trim() });
   }
 
+  // Rectangular search like a shop header; one copy in the nav (lg+), one in the page below lg.
+  const searchBox = (id: string) => (
+    <form
+      role="search"
+      onSubmit={onSearch}
+      className="flex h-11 w-full items-center rounded-[10px] border border-black/14 bg-white/70 pl-4 backdrop-blur-[15px] focus-within:ring-3 focus-within:ring-ring/40 lg:w-[300px]"
+    >
+      <label htmlFor={id} className="sr-only">
+        Search sellers
+      </label>
+      <input
+        id={id}
+        type="search"
+        value={draft}
+        maxLength={60}
+        onChange={(event) => setDraft(event.target.value)}
+        placeholder="Search sellers, brands, part no."
+        className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-placeholder"
+      />
+      <button type="submit" aria-label="Search" className={cn("flex h-full w-11 shrink-0 items-center justify-center rounded-r-[10px] text-ink hover:bg-black/4", focus)}>
+        <Search aria-hidden className="size-[18px]" />
+      </button>
+    </form>
+  );
+
   const tabs = [
     { key: "", label: "All", count: data?.allCount ?? 0 },
     ...(data?.categories ?? []).map((item) => ({ key: item.id, label: item.name, count: item.count })),
@@ -49,47 +74,23 @@ export function SellersDirectory() {
 
   return (
     <main className="flex flex-1 flex-col bg-canvas text-ink">
-      {/* Shop-listing header (developer request, 17 Nov 2026): small label and
-          title with the count on the left, compact search on the right, in
-          the short aurora band used by the seller profile. */}
+      {/* Shop-listing header (developer request, 17 Nov 2026): search in the
+          nav on desktop (under the title on smaller screens), the title with
+          the count lined up with the logo, in the short aurora band. */}
       <AuroraBand>
-        <SiteNav side="buyer" current="Sellers" />
+        <SiteNav side="buyer" current="Sellers" search={searchBox("seller-search")} />
         {/* Fade the shortened aurora into the page so it has no hard edge. */}
         <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-linear-to-b from-transparent to-canvas" />
-        <div className="relative flex flex-col gap-6 px-4 pt-10 pb-8 sm:px-10 md:flex-row md:items-end md:justify-between md:gap-10 lg:pt-14 lg:pb-10 xl:px-[60px]">
-          <div className="flex flex-col gap-3 leading-[normal]">
-            <p className="text-[13px] tracking-[0.06em] text-[rgba(74,77,89,0.9)]">VERIFIED SELLERS</p>
-            <h1 className="flex items-baseline gap-2.5 text-[34px] font-medium tracking-[-0.03em] text-ink sm:text-[44px]">
-              Sellers
-              {data ? <span className="text-[15px] font-normal tracking-normal text-ink-tertiary">({data.allCount})</span> : null}
-            </h1>
-          </div>
-          <form
-            role="search"
-            onSubmit={onSearch}
-            className="flex w-full items-center gap-2.5 rounded-full border border-black/22 bg-white/60 py-1 pr-1 pl-[18px] backdrop-blur-[15px] focus-within:ring-3 focus-within:ring-ring/40 md:mb-1 md:max-w-[400px]"
-          >
-            <Search aria-hidden className="size-4 shrink-0 text-ink-tertiary" />
-            <label htmlFor="seller-search" className="sr-only">
-              Search sellers
-            </label>
-            <input
-              id="seller-search"
-              type="search"
-              value={draft}
-              maxLength={60}
-              onChange={(event) => setDraft(event.target.value)}
-              placeholder="Company, brand, model or part no."
-              className="h-9 min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-placeholder"
-            />
-            <button type="submit" className={cn("rounded-full bg-ink px-[18px] py-[9px] text-[13px] leading-[normal] font-medium text-white hover:opacity-90", focus)}>
-              Search
-            </button>
-          </form>
+        <div className="relative flex flex-col gap-5 px-4 pt-8 pb-6 sm:px-12 lg:pt-12 lg:pb-8">
+          <h1 className="flex items-baseline gap-2.5 text-[34px] leading-[normal] font-medium tracking-[-0.03em] text-ink sm:text-[44px]">
+            Sellers
+            {data ? <span className="text-[15px] font-normal tracking-normal text-ink-tertiary">({data.allCount})</span> : null}
+          </h1>
+          <div className="lg:hidden">{searchBox("seller-search-mobile")}</div>
         </div>
       </AuroraBand>
 
-      <section aria-label="Sellers" className="flex flex-col px-4 pt-4 pb-[110px] sm:px-10 xl:px-[60px]">
+      <section aria-label="Sellers" className="flex flex-col px-4 pt-2 pb-[110px] sm:px-12">
         <CategoryTabs
           tabs={tabs}
           active={category}
@@ -99,7 +100,7 @@ export function SellersDirectory() {
             onToggle: () => go({ sort: sort === "name" ? "newest" : "name", page: 1 }),
           }}
         />
-        <div className="h-10" />
+        <div className="h-8" />
 
         {directory.isPending ? (
           <p role="status" className="py-20 text-center text-sm text-ink-tertiary">
@@ -111,7 +112,7 @@ export function SellersDirectory() {
           </p>
         ) : data && data.items.length > 0 ? (
           <>
-            <ul className="grid grid-cols-1 gap-x-2.5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+            <ul className="grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 min-[1600px]:grid-cols-6">
               {data.items.map((seller) => (
                 <li key={seller.id}>
                   <SellerCardView seller={seller} />

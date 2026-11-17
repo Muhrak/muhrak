@@ -50,7 +50,8 @@ export const solidPill = cn(
 // ---------------------------------------------------------------- nav
 
 /** `current`: the nav label of the page being shown (bold, as in Figma). */
-export function SiteNav({ side, current }: { side: LandingSide; current?: string }) {
+/** `search` (desktop only) sits left of the account button; only the Sellers page passes one. */
+export function SiteNav({ side, current, search }: { side: LandingSide; current?: string; search?: ReactNode }) {
   const links = side === "seller" ? SELLER_NAV_LINKS : NAV_LINKS;
   return (
     <header className="relative z-20 flex items-center px-4 py-5 sm:px-12">
@@ -75,6 +76,7 @@ export function SiteNav({ side, current }: { side: LandingSide; current?: string
         )}
       </nav>
       <div className="hidden flex-1 lg:block" />
+      {search ? <div className="mr-3 hidden lg:block">{search}</div> : null}
       <Suspense fallback={<SignedOutActions side={side} />}>
         <NavActions side={side} />
       </Suspense>

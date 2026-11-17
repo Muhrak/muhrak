@@ -577,12 +577,14 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   parent would misplace them); keep it that way or revisit.
 
 ### Sellers page arranged like a shop listing (Tue 17 Nov, developer request)
-- `/sellers`: compact header like the seller profile (short aurora band
-  with a fade): small "VERIFIED SELLERS" label, "Sellers" at 44 px (34 px
-  on phones) with the seller count, a compact search (400 px) on the right
-  (stacked below `md`), then the tabs and 4 cards per row from `lg` with
-  a 10 px gap. Replaces the 470 px centred Figma hero on purpose. Checked
-  on screen with no sellers in the local DB (cards not seen yet).
+- `/sellers`: rectangular search in the nav on desktop (`SiteNav`
+  `search` slot, only this page uses it), under the title below `lg`.
+  No "VERIFIED SELLERS" label; "Sellers (n)" at 44 px (34 px on phones),
+  lined up with the logo (page padding = nav padding, `sm:px-12`). Smaller
+  cards: 2 / 3 / 4 / 5 / 6 per row (phone, sm, lg, xl, 1600 px+).
+  Replaces the 470 px centred Figma hero on purpose.
+- Site nav, signed in (all landing pages): the round avatar only, no
+  first name or chevron.
 
 ## Decisions and rules (the developer set these; do not change without asking)
 
