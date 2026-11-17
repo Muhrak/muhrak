@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useCurrentUser, useSignOut } from "@/features/auth/hooks";
-import { HOME_PATH, type PortalSide } from "@/features/auth/paths";
+import { LANDING_PATH, type PortalSide } from "@/features/auth/paths";
 import { initials } from "@/features/auth/user-display";
 import { useSellerUnseenRfqs } from "@/features/rfq/api";
 import { cn } from "@/lib/utils";
@@ -52,9 +52,9 @@ export function PortalSidebar({ side, onNavigate }: { side: PortalSide; onNaviga
     <div className={cn("flex h-full flex-col gap-1 overflow-y-auto border-r border-sidebar-edge bg-sidebar-bg px-[18px] font-portal", style.padding)}>
       <div className="flex flex-col gap-2 px-2.5 pb-[30px]">
         <Link
-          href={HOME_PATH[side]}
+          href={LANDING_PATH[side]}
           onClick={onNavigate}
-          aria-label={`Muhrak ${style.title}`}
+          aria-label="Muhrak home"
           className="flex w-fit rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-white/40"
         >
           <Image src="/portal/muhrak-logo-white.svg" alt="Muhrak" width={156.357} height={29.8588} priority />

@@ -4,7 +4,7 @@ import { Menu, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
-import { HOME_PATH, type PortalSide } from "@/features/auth/paths";
+import { LANDING_PATH, type PortalSide } from "@/features/auth/paths";
 import { cn } from "@/lib/utils";
 import { PortalSidebar } from "./portal-sidebar";
 
@@ -49,7 +49,7 @@ export function PortalShell({ side, children }: { side: PortalSide; children: Re
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between bg-sidebar-bg px-4 lg:hidden">
-          <Link href={HOME_PATH[side]} aria-label="Muhrak home" className="flex">
+          <Link href={LANDING_PATH[side]} aria-label="Muhrak home" className="flex">
             <Image src="/portal/muhrak-logo-white.svg" alt="Muhrak" width={120} height={22.9} />
           </Link>
           <button

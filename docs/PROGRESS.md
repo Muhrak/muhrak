@@ -588,6 +588,11 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
 - Buyer dashboard: a white welcome card (name, email, Browse parts, Ask
   Muhrak AI) and the black Muhrak AI card share one row (half each from
   `lg`); the "Buyer account" badge is gone (17 Nov, developer request).
+- After login, buyers land on `/` and sellers on `/sell` even when the
+  login came from logging out on the dashboard (`afterLoginPath` ignores
+  a `next` that is the side's dashboard). The Muhrak logo in the buyer
+  and seller Centres (sidebar and phone top bar) opens the landing page
+  (`LANDING_PATH`), not the dashboard.
 
 ## Decisions and rules (the developer set these; do not change without asking)
 

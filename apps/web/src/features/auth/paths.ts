@@ -40,6 +40,9 @@ export const RESET_PATH: Record<PortalSide, string> = {
  */
 const AFTER_LOGIN_PATH: Record<AuthSide, string> = { buyer: "/", seller: "/sell", admin: "/admin/sellers" };
 
+/** Each side's landing page; the Muhrak logo in the Centres leads here (developer request, 17 Nov 2026). */
+export const LANDING_PATH: Record<PortalSide, string> = { buyer: "/", seller: "/sell" };
+
 /**
  * Where to go after login on `side`: the page the user was sent away from
  * (`next`), if it is a path inside this site on the same side; otherwise
@@ -48,6 +51,9 @@ const AFTER_LOGIN_PATH: Record<AuthSide, string> = { buyer: "/", seller: "/sell"
 export function afterLoginPath(side: AuthSide, next: string | null | undefined): string {
   const home = AFTER_LOGIN_PATH[side];
   if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return home;
+  // Logging out on the dashboard leaves `next` pointing at it; a fresh login
+  // still starts on the landing page (developer request, 17 Nov 2026).
+  if (side !== "admin" && (next === HOME_PATH[side] || next.startsWith(`${HOME_PATH[side]}?`))) return home;
   if (next.startsWith(`/${side}/`)) return next;
   // A buyer sent to login from the public part search goes back to it (and its open quote form).
   if (side === "buyer" && (next === "/search" || next.startsWith("/search?"))) return next;
