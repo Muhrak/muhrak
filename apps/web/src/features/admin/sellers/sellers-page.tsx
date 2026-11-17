@@ -8,6 +8,7 @@ import { useSellerStats } from "../shell";
 import { cn } from "@/lib/utils";
 import { useSellerList } from "./api";
 import { Avatar, DOC_SHORT, focusRing, formatDate, Panel, place, StatusChip, VERIFICATION, waitingFor } from "./parts";
+import { LogoLoader } from "@/components/ui/logo-loader";
 
 /**
  * Figma "Admin – Sellers" (405:1892), dark frame converted to light.
@@ -77,7 +78,7 @@ function Queue() {
         </div>
       </div>
       {list.isPending ? (
-        <p className="py-6 text-sm text-text-muted">Loading…</p>
+        <LogoLoader className="py-10" />
       ) : list.isError ? (
         <p role="alert" className="py-6 text-sm text-destructive">Could not load the queue. Reload the page.</p>
       ) : rows.length === 0 ? (
@@ -182,7 +183,7 @@ function AllSellers() {
             ))}
           </tbody>
         </table>
-        {list.isPending ? <p className="py-6 text-sm text-text-muted">Loading…</p> : null}
+        {list.isPending ? <LogoLoader className="py-10" /> : null}
         {list.isError ? <p role="alert" className="py-6 text-sm text-destructive">Could not load sellers. Reload the page.</p> : null}
         {!list.isPending && !list.isError && rows.length === 0 ? <p className="py-6 text-sm text-text-muted">No sellers here yet.</p> : null}
       </div>

@@ -16,6 +16,7 @@ import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { getDocumentLink, useSellerAccount, useSubmitDocument, useSubmitForReview } from "./api";
 import { DOCUMENT_STATUS, focusRing, inputClass, StatusChip, type Tone, VERIFICATION_STATUS } from "./parts";
+import { useToast } from "@/components/ui/toast";
 
 /**
  * Figma "Seller – Verification" (396:6512), dark frame converted to the
@@ -58,6 +59,7 @@ export function Verification() {
 function VerificationView({ account }: { account: SellerAccount }) {
   const { profile, documents, verification } = account;
   const submit = useSubmitForReview();
+  const toast = useToast();
   const current = new Map(documents.map((doc) => [doc.type, doc]));
   const [selected, setSelected] = useState<DocumentType>(
     verification.missingDocuments[0] ?? verification.requiredDocuments[0] ?? "commercial_registration",
@@ -79,7 +81,7 @@ function VerificationView({ account }: { account: SellerAccount }) {
           <button
             type="button"
             disabled={!verification.canSubmit || submit.isPending}
-            onClick={() => submit.mutate()}
+            onClick={() => submit.mutate(undefined, { onSuccess: () => toast.success("Sent for review.", "We email you when the Muhrak team has checked your documents.") })}
             className={cn(
               "flex h-[52px] items-center justify-center rounded-full bg-side-accent px-7 text-base font-semibold whitespace-nowrap text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50",
               focusRing,

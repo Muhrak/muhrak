@@ -13,6 +13,7 @@ import { availability, ProductPhoto, QuoteRequestDialog } from "@/features/rfq/q
 import { AuroraBand, focus, Pagination } from "@/features/storefront/parts";
 import { cn } from "@/lib/utils";
 import { usePartSearch } from "./api";
+import { LogoLoader } from "@/components/ui/logo-loader";
 
 /**
  * /search: find a part by part number, name or machine (Day 8, the non-AI
@@ -98,9 +99,7 @@ export function SearchPage() {
         {q.length < 2 ? (
           <Intro text="Type a part number such as 6020/F4, a part name, or a machine such as Kobelco SK380." />
         ) : search.isPending ? (
-          <p role="status" className="py-10 text-sm text-ink-tertiary">
-            Searching…
-          </p>
+<LogoLoader label="Searching" className="py-16" />
         ) : search.isError ? (
           <p role="alert" className="py-10 text-sm text-destructive">
             Could not search right now. Please try again.

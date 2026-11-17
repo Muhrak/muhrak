@@ -9,7 +9,9 @@ import { focusRing } from "@/features/seller/parts";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useProductList, useProductStatus } from "./api";
-import { priceLabel, ProductStatusChip, stockLabel } from "./parts";
+import { priceLabel, ProductStatusChip, STATUS_DONE, stockLabel } from "./parts";
+import { LogoLoader } from "@/components/ui/logo-loader";
+import { useToast } from "@/components/ui/toast";
 
 /**
  * Figma "Seller – Products" (396:2525), dark only, converted to the light
@@ -37,6 +39,16 @@ export function ProductsPage() {
   const filterParam = productListFilterSchema.safeParse(params.get("filter"));
   const filter: ProductListFilter = filterParam.success ? filterParam.data : "all";
   const flash = FLASH[params.get("saved") ?? ""];
+  const toast = useToast();
+
+  // "?saved=" from the product form: show it once as a toast, then drop it from the URL.
+  useEffect(() => {
+    if (!flash) return;
+    toast.success(flash);
+    const rest = new URLSearchParams(params);
+    rest.delete("saved");
+    router.replace(rest.size ? `/seller/products?${rest}` : "/seller/products", { scroll: false });
+  }, [flash, params, router, toast]);
 
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
@@ -69,12 +81,6 @@ export function ProductsPage() {
           Add product
         </Link>
       </div>
-
-      {flash ? (
-        <p role="status" className="rounded-[16px] bg-success/16 px-5 py-3.5 text-sm font-medium text-text-strong">
-          {flash}
-        </p>
-      ) : null}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <nav aria-label="Filter products" className="-mx-1 flex flex-1 gap-2 overflow-x-auto px-1 pb-1 lg:pb-0">
@@ -120,16 +126,8 @@ export function ProductsPage() {
           <p className="text-[13px] text-text-subtle">Most recently changed first</p>
         </div>
 
-        {status.error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {status.error instanceof ApiError ? status.error.message : "Something went wrong. Please try again."}
-          </p>
-        ) : null}
-
         {list.isPending ? (
-          <p role="status" className="py-10 text-center text-sm text-text-muted">
-            Loading your products…
-          </p>
+<LogoLoader label="Loading your products" className="py-10" />
         ) : list.isError ? (
           <p role="alert" className="py-10 text-center text-sm text-destructive">
             Could not load your products. Reload the page to try again.
@@ -142,7 +140,13 @@ export function ProductsPage() {
             busy={status.isPending}
             onAction={(id, action) => {
               status.reset();
-              status.mutate({ id, action });
+              status.mutate(
+                { id, action },
+                {
+                  onSuccess: () => toast.success(STATUS_DONE[action]),
+                  onError: (error) => toast.error(error instanceof ApiError ? error.message : "Something went wrong. Please try again."),
+                },
+              );
             }}
           />
         )}

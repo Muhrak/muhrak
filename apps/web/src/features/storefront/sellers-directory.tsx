@@ -9,6 +9,7 @@ import { Footer, SiteNav } from "@/components/landing/sections";
 import { cn } from "@/lib/utils";
 import { useSellerDirectory } from "./api";
 import { AuroraBand, CardImage, CategoryTabs, focus, initials, Pagination } from "./parts";
+import { LogoLoader } from "@/components/ui/logo-loader";
 
 /**
  * /sellers: Figma "Buyer – Manufacturers v2" (244:6812), renamed Sellers,
@@ -100,9 +101,7 @@ export function SellersDirectory() {
         <div className="h-10" />
 
         {directory.isPending ? (
-          <p role="status" className="py-20 text-center text-sm text-ink-tertiary">
-            Loading sellers…
-          </p>
+          <LogoLoader label="Loading sellers" className="py-20" />
         ) : directory.isError ? (
           <p role="alert" className="py-20 text-center text-sm text-destructive">
             Could not load sellers. Please try again.

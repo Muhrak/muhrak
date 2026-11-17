@@ -9,6 +9,8 @@ import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { getDocumentLink, useReviewSeller, useSellerDetail } from "./api";
 import { Avatar, DOCUMENT_STATUS, focusRing, formatDate, Panel, place, StatusChip, VERIFICATION } from "./parts";
+import { LogoLoader } from "@/components/ui/logo-loader";
+import { useToast } from "@/components/ui/toast";
 
 /**
  * Review one seller: company details, every document (open it, then
@@ -25,7 +27,7 @@ export function ReviewPage({ userId }: { userId: string }) {
         Sellers
       </Link>
       {detail.isPending ? (
-        <p className="text-sm text-text-muted">Loading…</p>
+        <LogoLoader className="py-16" />
       ) : detail.isError ? (
         <p role="alert" className="rounded-[12px] bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {detail.error instanceof ApiError && detail.error.status === 404 ? "This seller does not exist." : "Could not load this seller. Reload the page."}
@@ -43,6 +45,7 @@ type Choice = { status: "approved" | "rejected" | null; reason: string };
 function Review({ seller }: { seller: AdminSellerDetail }) {
   const { profile, user, documents, verification, history } = seller;
   const review = useReviewSeller(user.id);
+  const toast = useToast();
   const pending = verification.status === "pending";
   const current = documents.filter((doc) => verification.requiredDocuments.includes(doc.type));
   const [choices, setChoices] = useState<Record<string, Choice>>(() =>
@@ -68,6 +71,8 @@ function Review({ seller }: { seller: AdminSellerDetail }) {
         status: choices[doc.id]!.status!,
         reason: choices[doc.id]!.status === "rejected" ? choices[doc.id]!.reason.trim() : undefined,
       })),
+    }, {
+      onSuccess: () => toast.success(decision === "approve" ? "Seller approved." : "Seller rejected.", "The seller gets an email."),
     });
   }
 

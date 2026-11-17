@@ -26,6 +26,8 @@ import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { focusRing, Panel, StatusChip } from "../sellers/parts";
 import { useAdminMaintenance, useMaintenanceAction, useMaintenanceHistory, type MaintenanceAction } from "./api";
+import { LogoLoader } from "@/components/ui/logo-loader";
+import { useToast } from "@/components/ui/toast";
 
 /**
  * Figma "Admin – Maintenance Mode (Dark)" (414:5122), converted to light
@@ -118,7 +120,7 @@ export function MaintenancePage() {
       </div>
 
       {state.isPending ? (
-        <p className="text-sm text-text-muted">Loading…</p>
+        <LogoLoader className="py-16" />
       ) : state.isError ? (
         <p role="alert" className="rounded-[12px] bg-destructive/10 px-4 py-3 text-sm text-destructive">
           Could not load the maintenance status. Reload the page.
@@ -357,7 +359,7 @@ function History({ currentId }: { currentId: string | undefined }) {
     <Panel label="Past windows" className="flex-1">
       <h2 className="pb-2 text-xl leading-[normal] font-medium text-text-strong">Past windows</h2>
       {list.isPending ? (
-        <p className="py-4 text-sm text-text-muted">Loading…</p>
+        <LogoLoader className="py-8" />
       ) : list.isError ? (
         <p role="alert" className="py-4 text-sm text-destructive">Could not load past windows.</p>
       ) : rows.length === 0 ? (
@@ -443,6 +445,7 @@ const DIALOG_TEXT: Record<DialogKind["kind"], { title: string; action: string; d
 
 function ConfirmDialog({ dialog, onClose }: { dialog: DialogKind; onClose: () => void }) {
   const action = useMaintenanceAction();
+  const toast = useToast();
   const [password, setPassword] = useState("");
   const [until, setUntil] = useState(dialog.kind === "start" ? dialog.endsAt : "");
   const [localError, setLocalError] = useState<string>();
@@ -494,8 +497,12 @@ function ConfirmDialog({ dialog, onClose }: { dialog: DialogKind; onClose: () =>
         request = { kind: "cancel", windowId: dialog.window.id, input: { password } };
         break;
     }
+    const done = { start: "Maintenance started.", schedule: "Maintenance scheduled.", end: "Maintenance ended.", cancel: "Scheduled maintenance cancelled." }[dialog.kind];
     action.mutate(request, {
-      onSuccess: onClose,
+      onSuccess: () => {
+        onClose();
+        toast.success(done);
+      },
       onError: () => setPassword(""),
     });
   }

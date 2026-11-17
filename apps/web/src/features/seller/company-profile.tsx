@@ -16,6 +16,7 @@ import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useSaveProfile, useSellerAccount } from "./api";
 import { describedBy, FieldBlock, focusRing, initials, inputClass } from "./parts";
+import { useToast } from "@/components/ui/toast";
 
 /**
  * Figma "Seller – Company Profile" (179:797), dark frame converted to the
@@ -75,7 +76,7 @@ export function CompanyProfile() {
 
 function ProfileEditor({ account, fallbackName, userId }: { account: SellerAccount; fallbackName: string; userId: string }) {
   const save = useSaveProfile();
-  const [saved, setSaved] = useState(false);
+  const toast = useToast();
   const [brands, setBrands] = useState<string[]>(account.profile?.brands ?? []);
   const [logo, setLogo] = useState<PickedImage | null>(null);
   const underReview = account.verification.status === "pending";
@@ -86,7 +87,7 @@ function ProfileEditor({ account, fallbackName, userId }: { account: SellerAccou
     reset,
     setError,
     control,
-    formState: { errors, isDirty },
+    formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: valuesFrom(account, fallbackName),
@@ -96,7 +97,6 @@ function ProfileEditor({ account, fallbackName, userId }: { account: SellerAccou
   useEffect(() => () => void (logo && URL.revokeObjectURL(logo.previewUrl)), [logo]);
 
   const onSubmit = handleSubmit((values) => {
-    setSaved(false);
     save.mutate(
       {
         companyName: values.companyName,
@@ -112,7 +112,12 @@ function ProfileEditor({ account, fallbackName, userId }: { account: SellerAccou
       {
         onSuccess: (next) => {
           reset(valuesFrom(next, fallbackName));
-          setSaved(true);
+          // Changes after approval send the company back to review (developer rule, 12 Nov 2026).
+          if (account.verification.status === "approved" && next.verification.status !== "approved") {
+            toast.info("Company profile saved.", "Your changes go to the Muhrak team for review.");
+          } else {
+            toast.success("Company profile saved.");
+          }
           setLogo(null);
         },
         onError: (error) => applyApiError(error, setError, FIELDS),
@@ -127,7 +132,6 @@ function ProfileEditor({ account, fallbackName, userId }: { account: SellerAccou
   const name = watchedName || fallbackName;
   const parsedCountry = gccCountrySchema.safeParse(countryValue);
   const country = parsedCountry.success ? parsedCountry.data : null;
-  const unsaved = isDirty || logo !== null || brands.join("\n") !== (account.profile?.brands ?? []).join("\n");
 
   return (
     <>
@@ -137,11 +141,6 @@ function ProfileEditor({ account, fallbackName, userId }: { account: SellerAccou
           <h1 className="text-[28px] font-medium tracking-[-0.02em] text-text-strong sm:text-[40px]">Company profile</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {saved && !unsaved ? (
-            <p role="status" className="text-sm font-medium text-text-muted">
-              Saved
-            </p>
-          ) : null}
           <Link
             // The public store page (only shown to buyers once the company is verified).
             href={`/sellers/${userId}`}

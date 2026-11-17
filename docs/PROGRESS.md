@@ -594,6 +594,24 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   and seller Centres (sidebar and phone top bar) opens the landing page
   (`LANDING_PATH`), not the dashboard.
 
+### Logo loader and toasts (Tue 17 Nov, developer request)
+- `components/ui/logo-loader.tsx` (`LogoLoader`): the Muhrak logo as a CSS
+  mask with a white reflection sweeping across (`.logo-shine` in
+  globals.css; static for reduced motion). Replaces every "Loading…" text:
+  Centre/admin page gate (156 px), lists, details, search, seller pages.
+  "Load more" buttons keep their text.
+- `components/ui/toast.tsx` (`ToastProvider` in `app/providers.tsx`,
+  `useToast().success/error/info(title, description?)`): dark card,
+  tone icon, bottom centre on phones, bottom right from `sm`, max 3,
+  4 s (errors 6 s), paused on hover, dismiss button. Form errors stay
+  inline; toasts are for results of actions. Used for: product saved /
+  published / unpublished / archived / restored (list and form; replaces
+  the green "?saved=" banner and the "Saved" text), company profile
+  saved (info + review note when an approved seller's change sends them
+  back to review), verification sent, RFQ cancelled (buyer) / declined
+  (seller), admin approve/reject, maintenance start/schedule/end/cancel,
+  and logout. The quote request dialog keeps its own "sent" screen.
+
 ## Decisions and rules (the developer set these; do not change without asking)
 
 Design:

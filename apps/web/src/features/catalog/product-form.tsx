@@ -32,8 +32,9 @@ import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useCategories, useCreateProduct, useProductStatus, useUpdateProduct } from "./api";
 import { AiFill } from "./ai-fill";
-import { ProductStatusChip, toDecimalText } from "./parts";
+import { ProductStatusChip, STATUS_DONE, toDecimalText } from "./parts";
 import { PhotoPicker, type PhotoItem } from "./photo-picker";
+import { useToast } from "@/components/ui/toast";
 
 /**
  * Figma "Seller – Add product (Light)" (121:335): the "Product form" card
@@ -149,7 +150,7 @@ export function ProductForm({ product }: { product: Product | null }) {
   const [photos, setPhotos] = useState<PhotoItem[]>(() => photosFrom(product));
   const [extraPartNumbers, setExtraPartNumbers] = useState<string[]>(() => product?.partNumbers.slice(1) ?? []);
   const [fitments, setFitments] = useState<Fitment[]>(() => product?.fitments ?? []);
-  const [saved, setSaved] = useState(false);
+  const toast = useToast();
   const [stale, setStale] = useState(false);
   const [listError, setListError] = useState<string>();
   /** Fields the AI filled in, with how sure it was (shown under the field). */
@@ -238,7 +239,6 @@ export function ProductForm({ product }: { product: Product | null }) {
   const submit = (publish: boolean) =>
     handleSubmit((values) => {
       if (!checkLists()) return;
-      setSaved(false);
       const input = toInput(values, extraPartNumbers, fitments, photos);
       if (!product) {
         create.mutate(input, {
@@ -267,7 +267,7 @@ export function ProductForm({ product }: { product: Product | null }) {
           onSuccess: (next) => {
             reset(valuesFrom(next));
             setPhotos(photosFrom(next));
-            setSaved(true);
+            toast.success("Changes saved.");
           },
         },
       );
@@ -275,7 +275,16 @@ export function ProductForm({ product }: { product: Product | null }) {
 
   function changeStatus(action: ProductStatusAction) {
     if (!product) return;
-    status.mutate({ id: product.id, action }, { onError: onApiError, onSuccess: (next) => reset(valuesFrom(next)) });
+    status.mutate(
+      { id: product.id, action },
+      {
+        onError: onApiError,
+        onSuccess: (next) => {
+          reset(valuesFrom(next));
+          toast.success(STATUS_DONE[action]);
+        },
+      },
+    );
   }
 
   const publishNote =
@@ -305,11 +314,6 @@ export function ProductForm({ product }: { product: Product | null }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {saved ? (
-            <p role="status" className="text-sm font-medium text-text-muted">
-              Saved
-            </p>
-          ) : null}
           <Link href="/seller/products" className={outlineButton}>
             Cancel
           </Link>

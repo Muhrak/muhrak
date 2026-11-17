@@ -9,6 +9,7 @@ import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { usePublicSeller, useSellerProducts } from "./api";
 import { AuroraBand, CardImage, CategoryTabs, focus, initials, Pagination } from "./parts";
+import { LogoLoader } from "@/components/ui/logo-loader";
 
 /**
  * /sellers/[id]: Figma "Buyer – Manufacturer Profile v2" (245:6812),
@@ -26,9 +27,7 @@ export function SellerProfile({ id }: { id: string }) {
   if (seller.isPending) {
     return (
       <Shell>
-        <p role="status" className="py-32 text-center text-sm text-ink-tertiary">
-          Loading…
-        </p>
+        <LogoLoader className="py-32" />
       </Shell>
     );
   }
@@ -159,9 +158,7 @@ function Products({
       <CategoryTabs tabs={tabs} active={category} onSelect={onCategory} />
       <div className="h-10" />
       {products.isPending ? (
-        <p role="status" className="py-20 text-center text-sm text-ink-tertiary">
-          Loading products…
-        </p>
+<LogoLoader label="Loading products" className="py-20" />
       ) : products.isError ? (
         <p role="alert" className="py-20 text-center text-sm text-destructive">
           Could not load products. Please try again.

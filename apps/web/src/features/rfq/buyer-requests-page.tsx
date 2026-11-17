@@ -11,6 +11,8 @@ import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useBuyerRfq, useBuyerRfqs, useCancelRfq } from "./api";
 import { buyerStatus, closesIn, DetailTiles, neededByLabel, quantityLabel, RfqChip, sentAgo } from "./parts";
+import { LogoLoader } from "@/components/ui/logo-loader";
+import { useToast } from "@/components/ui/toast";
 
 /**
  * /buyer/requests: Figma "Buyer – Inquiries & RFQs (Dark)" (304:12),
@@ -91,9 +93,7 @@ export function BuyerRequestsPage() {
           className={cn("flex w-full shrink-0 flex-col rounded-[24px] bg-panel p-2.5 lg:sticky lg:top-6 lg:w-[420px]", idParam && "hidden lg:flex")}
         >
           {list.isPending ? (
-            <p role="status" className="px-4 py-10 text-center text-sm text-text-muted">
-              Loading your requests…
-            </p>
+<LogoLoader label="Loading your requests" className="py-10" />
           ) : list.isError ? (
             <p role="alert" className="px-4 py-10 text-center text-sm text-destructive">
               Could not load your requests. Reload the page to try again.
@@ -172,9 +172,7 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
   if (detail.isPending) {
     return (
-      <p role="status" className="rounded-[24px] bg-panel p-8 text-center text-sm text-text-muted">
-        Loading…
-      </p>
+      <LogoLoader className="rounded-[24px] bg-panel p-10" />
     );
   }
   if (!rfq) {
@@ -249,6 +247,7 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
 function Outcome({ rfq }: { rfq: BuyerRfq }) {
   const cancel = useCancelRfq();
+  const toast = useToast();
   const [confirming, setConfirming] = useState(false);
   const error = cancel.error instanceof ApiError ? cancel.error.message : cancel.error ? "Something went wrong. Please try again." : null;
 
@@ -289,7 +288,12 @@ function Outcome({ rfq }: { rfq: BuyerRfq }) {
             <button
               type="button"
               disabled={cancel.isPending}
-              onClick={() => cancel.mutate(rfq.id, { onSuccess: () => setConfirming(false) })}
+              onClick={() => cancel.mutate(rfq.id, {
+                  onSuccess: () => {
+                    setConfirming(false);
+                    toast.success("Request cancelled.", "The seller can no longer reply to it.");
+                  },
+                })}
               className={cn("h-9 rounded-full bg-[#0c0c0d] px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60", focusRing)}
             >
               {cancel.isPending ? "Cancelling…" : "Yes, cancel it"}

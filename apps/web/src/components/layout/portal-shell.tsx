@@ -7,6 +7,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { LANDING_PATH, type PortalSide } from "@/features/auth/paths";
 import { cn } from "@/lib/utils";
 import { PortalSidebar } from "./portal-sidebar";
+import { LogoLoader } from "@/components/ui/logo-loader";
 
 /**
  * Buyer / Seller Centre frame: 256 px sidebar on the left, page on the
@@ -81,8 +82,8 @@ export function PortalShell({ side, children }: { side: PortalSide; children: Re
 /** Full-page placeholder while the session is checked (no flash of a protected page). */
 export function PortalLoading() {
   return (
-    <div className="flex min-h-dvh flex-1 items-center justify-center bg-surface font-portal text-sm text-text-muted" role="status">
-      Loading…
+    <div className="flex min-h-dvh flex-1 items-center justify-center bg-surface">
+      <LogoLoader size={156} />
     </div>
   );
 }

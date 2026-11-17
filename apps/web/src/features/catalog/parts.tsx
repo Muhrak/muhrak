@@ -1,5 +1,13 @@
-import { CURRENCY_DECIMALS, formatMoney, UNIT_LABELS, type Money, type ProductStatus, type ProductUnit } from "@/schemas";
+import { CURRENCY_DECIMALS, formatMoney, UNIT_LABELS, type Money, type ProductStatus, type ProductStatusAction, type ProductUnit } from "@/schemas";
 import { StatusChip, type Tone } from "@/features/seller/parts";
+
+/** Toast after a status change (products list and product page). */
+export const STATUS_DONE: Record<ProductStatusAction, string> = {
+  publish: "Product published. Buyers can see it now.",
+  unpublish: "Product unpublished. Buyers no longer see it.",
+  archive: "Product archived.",
+  restore: "Product restored.",
+};
 
 /** Below this many in stock, a live product shows "Low stock" (Figma "Seller – Products"). */
 export const LOW_STOCK = 2;
