@@ -1,0 +1,2031 @@
+{
+  "info": {
+    "name": "Muhrak API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "All Muhrak API endpoints (16 Nov 2026). Use with the 'Muhrak local' environment. Log in first: each login saves its side's token. Buyer, seller and admin tokens are separate (a buyer token gets 403 on seller routes, by design)."
+  },
+  "item": [
+    {
+      "name": "Health & status",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/health",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Ready (database)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/health/ready",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "health",
+                "ready"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Site status (maintenance)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/status",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "status"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/auth/register",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"new@example.com\",\n  \"password\": \"a long password\",\n  \"fullName\": \"Full Name\",\n  \"role\": \"buyer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Answers 202 for new and existing emails alike. A 6-digit code is emailed (printed in the API terminal when RESEND_API_KEY is empty)."
+          }
+        },
+        {
+          "name": "Verify email (code)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/auth/verify-email",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "verify-email"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"new@example.com\",\n  \"code\": \"123456\",\n  \"role\": \"buyer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "A right code signs in. Saves the token as buyerToken (change it for a seller)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); if (j && j.accessToken) pm.environment.set(\"buyerToken\", j.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resend verification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/auth/resend-verification",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "resend-verification"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"new@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Login (buyer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/auth/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"you@example.com\",\n  \"password\": \"your password\",\n  \"role\": \"buyer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Saves the access token in {{buyerToken}}. It lasts 15 minutes: log in again after that."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); if (j && j.accessToken) pm.environment.set(\"buyerToken\", j.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (seller)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/auth/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"you@example.com\",\n  \"password\": \"your password\",\n  \"role\": \"seller\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Saves the access token in {{sellerToken}}. It lasts 15 minutes: log in again after that."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); if (j && j.accessToken) pm.environment.set(\"sellerToken\", j.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/auth/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"you@example.com\",\n  \"password\": \"your password\",\n  \"role\": \"admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Saves the access token in {{adminToken}}. It lasts 15 minutes: log in again after that."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); if (j && j.accessToken) pm.environment.set(\"adminToken\", j.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Me (buyer)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/auth/me",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Me (seller)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/auth/me",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Refresh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/auth/refresh",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"seller\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Uses the refresh cookie, whose path is /api/v1/auth (the web app's proxy). Calling the API directly, Postman does not send it: log in again instead."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/auth/logout",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"seller\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Same cookie note as Refresh."
+          }
+        },
+        {
+          "name": "Forgot password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/auth/forgot-password",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"you@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Always 202."
+          }
+        },
+        {
+          "name": "Reset password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/auth/reset-password",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "reset-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"token from the reset email link\",\n  \"password\": \"a new long password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Uploads (any signed-in user)",
+      "item": [
+        {
+          "name": "1. Start upload (product photo)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/uploads",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "uploads"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purpose\": \"product_photo\",\n  \"contentType\": \"image/jpeg\",\n  \"sizeBytes\": 115548\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "purpose: product_photo | seller_logo | seller_document. sizeBytes = the file's exact size in bytes (Windows: Properties > Size, not Size on disk). Saves uploadId and uploadUrl."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.uploadId) { pm.environment.set(\"uploadId\", j.uploadId); pm.environment.set(\"uploadUrl\", j.uploadUrl); }",
+                  "console.log(\"PUT headers:\", JSON.stringify(j.headers));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. PUT file to storage",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "image/jpeg"
+              }
+            ],
+            "body": {
+              "mode": "file",
+              "file": {}
+            },
+            "url": {
+              "raw": "{{uploadUrl}}"
+            },
+            "description": "No auth (never send a token to storage). Headers exactly as returned by step 1 (see the Postman console). Body > binary > choose the same file. Expect 200."
+          }
+        },
+        {
+          "name": "3. Complete upload",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/uploads/{{uploadId}}/complete",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "uploads",
+                "{{uploadId}}",
+                "complete"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "The API checks the stored file. Expect status ready."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public: catalog, sellers, search",
+      "item": [
+        {
+          "name": "Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/catalog/categories",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "catalog",
+                "categories"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Sellers directory",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/sellers?sort=name&page=1",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "sellers"
+              ],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "name"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Optional q, category=<uuid>, sort name | newest."
+          }
+        },
+        {
+          "name": "Seller profile (public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/sellers/{{sellerId}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "sellers",
+                "{{sellerId}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Seller products (public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/sellers/{{sellerId}}/products?page=1",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "sellers",
+                "{{sellerId}}",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Part search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/parts?q=6020/F4&page=1",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "parts"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "6020/F4"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "By part number, name or machine. Optional category=<uuid>."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Seller: company profile & verification",
+      "item": [
+        {
+          "name": "Get profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/seller/profile",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "profile"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Save profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/seller/profile",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "profile"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyName\": \"Company LLC\",\n  \"country\": \"OM\",\n  \"city\": \"Muscat\",\n  \"phone\": \"+96891234567\",\n  \"website\": null,\n  \"about\": \"\",\n  \"brands\": [\n    \"Komatsu\"\n  ],\n  \"vatRegistered\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "country: OM | AE | SA | QA | KW | BH. Optional logoUploadId (purpose seller_logo)."
+          }
+        },
+        {
+          "name": "Submit document",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/seller/documents/commercial_registration",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "documents",
+                "commercial_registration"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"uploadId\": \"{{uploadId}}\",\n  \"documentNumber\": \"1234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Type in the URL: commercial_registration | vat_certificate | owner_id | bank_proof. The upload must have purpose seller_document."
+          }
+        },
+        {
+          "name": "Document file link",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/seller/documents/{{documentId}}/file",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "documents",
+                "{{documentId}}",
+                "file"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Submit for verification",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/seller/verification/submit",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "verification",
+                "submit"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Seller: products",
+      "item": [
+        {
+          "name": "List products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/seller/products?filter=all&limit=20",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "all"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "filter: all | published | draft | out_of_stock | archived. Optional q, cursor."
+          }
+        },
+        {
+          "name": "Create product (draft)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/seller/products",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "products"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Deep groove ball bearing\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"partNumbers\": [\n    \"6020/F4\"\n  ],\n  \"brand\": null,\n  \"partSource\": null,\n  \"condition\": \"new\",\n  \"price\": \"12.500\",\n  \"unit\": \"piece\",\n  \"stockQuantity\": 10,\n  \"availability\": \"in_stock\",\n  \"leadTimeDays\": null,\n  \"description\": null,\n  \"fitments\": [],\n  \"photoUploadIds\": [\n    \"{{uploadId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "price: OMR text with up to 3 decimals, or null for price on request. Saves productId."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); if (j && j.product && j.product.id) pm.environment.set(\"productId\", j.product && j.product.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get product",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/seller/products/{{productId}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update product",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/seller/products/{{productId}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": 1,\n  \"product\": {\n    \"name\": \"Deep groove ball bearing\",\n    \"categoryId\": \"{{categoryId}}\",\n    \"partNumbers\": [\n      \"6020/F4\"\n    ],\n    \"brand\": null,\n    \"partSource\": null,\n    \"condition\": \"new\",\n    \"price\": \"12.500\",\n    \"unit\": \"piece\",\n    \"stockQuantity\": 10,\n    \"availability\": \"in_stock\",\n    \"leadTimeDays\": null,\n    \"description\": null,\n    \"fitments\": [],\n    \"photoUploadIds\": [\n      \"{{uploadId}}\"\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "version = the product's current version (a stale version gets 409)."
+          }
+        },
+        {
+          "name": "Change status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/seller/products/{{productId}}/status",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "products",
+                "{{productId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"publish\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "publish | unpublish | archive | restore. Publishing needs a verified seller and a photo."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Seller: AI (photo identification)",
+      "item": [
+        {
+          "name": "AI status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/seller/ai/status",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "ai",
+                "status"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Identify photo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/seller/ai/identifications",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "ai",
+                "identifications"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"uploadId\": \"{{uploadId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "REAL Gemini call: one photo at a time. The upload must be a ready product_photo of this seller. Same uploadId again = same result, no new call. Saves identificationId."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); if (j && j.identification && j.identification.id) pm.environment.set(\"identificationId\", j.identification && j.identification.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get identification (poll)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/seller/ai/identifications/{{identificationId}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "ai",
+                "identifications",
+                "{{identificationId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Send again every few seconds until status is done or failed."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Seller: quote requests (RFQ inbox)",
+      "item": [
+        {
+          "name": "List RFQs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/seller/rfqs?filter=all&limit=20",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "rfqs"
+              ],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "all"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "filter: all | open | quoted | closed."
+          }
+        },
+        {
+          "name": "Get RFQ",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/seller/rfqs/{{rfqId}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "rfqs",
+                "{{rfqId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Decline RFQ",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/seller/rfqs/{{rfqId}}/decline",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "seller",
+                "rfqs",
+                "{{rfqId}}",
+                "decline"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Out of stock\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Buyer: quote requests",
+      "item": [
+        {
+          "name": "List my RFQs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/buyer/rfqs?filter=all&limit=20",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "buyer",
+                "rfqs"
+              ],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "all"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Send RFQ",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/buyer/rfqs",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "buyer",
+                "rfqs"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"requestKey\": \"{{$guid}}\",\n  \"partName\": \"Deep groove ball bearing\",\n  \"partNumber\": \"6020/F4\",\n  \"fitment\": null,\n  \"quantity\": 2,\n  \"neededBy\": \"one_week\",\n  \"deliveryCountry\": \"OM\",\n  \"deliveryCity\": \"Muscat\",\n  \"note\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "neededBy: asap | one_week | two_weeks | one_month | flexible. requestKey: a new uuid per request ({{$guid}}); the same key again returns the first request."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); if (j && j.rfq && j.rfq.id) pm.environment.set(\"rfqId\", j.rfq && j.rfq.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get RFQ",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/buyer/rfqs/{{rfqId}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "buyer",
+                "rfqs",
+                "{{rfqId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel RFQ",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/buyer/rfqs/{{rfqId}}/cancel",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "buyer",
+                "rfqs",
+                "{{rfqId}}",
+                "cancel"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Seller stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/admin/sellers/stats",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "sellers",
+                "stats"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List sellers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/admin/sellers?status=pending&limit=20",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "sellers"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "status (optional): draft | pending | approved | rejected."
+          }
+        },
+        {
+          "name": "Get seller",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/admin/sellers/{{sellerId}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "sellers",
+                "{{sellerId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Seller document file",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/admin/sellers/{{sellerId}}/documents/{{documentId}}/file",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "sellers",
+                "{{sellerId}}",
+                "documents",
+                "{{documentId}}",
+                "file"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Review seller",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/admin/sellers/{{sellerId}}/review",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "sellers",
+                "{{sellerId}}",
+                "review"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approve\",\n  \"documents\": [\n    {\n      \"id\": \"{{documentId}}\",\n      \"status\": \"approved\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "decision: approve | reject (reason required when rejecting). Each document: approved | rejected (with reason)."
+          }
+        },
+        {
+          "name": "Maintenance (current)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/admin/maintenance",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "maintenance"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Maintenance history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/admin/maintenance/history?limit=10",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "maintenance",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Start maintenance now",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/admin/maintenance/start",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "maintenance",
+                "start"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scope\": \"whole_site\",\n  \"message\": \"We are updating Muhrak.\",\n  \"endsAt\": null,\n  \"password\": \"admin password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "TAKES THE SITE DOWN. scope: whole_site | buyer | seller."
+          }
+        },
+        {
+          "name": "Schedule maintenance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/admin/maintenance/schedule",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "maintenance",
+                "schedule"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scope\": \"whole_site\",\n  \"message\": \"Planned update.\",\n  \"startsAt\": \"2026-11-20T22:00:00.000Z\",\n  \"endsAt\": \"2026-11-20T23:00:00.000Z\",\n  \"password\": \"admin password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "End maintenance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/admin/maintenance/{{windowId}}/end",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "maintenance",
+                "{{windowId}}",
+                "end"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"admin password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel maintenance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/admin/maintenance/{{windowId}}/cancel",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "maintenance",
+                "{{windowId}}",
+                "cancel"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"admin password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

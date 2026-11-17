@@ -6,10 +6,14 @@ import { closeWorkers, startWorkers } from "./worker";
 
 const app = createApp();
 
+
+
 const server = app.listen(env.PORT, () => {
   logger.info(`Muhrak API listening on http://localhost:${env.PORT}`);
   startWorkers();
 });
+
+
 
 /** Finish in-flight requests and running jobs, then close the database pool. */
 function shutdown(signal: string) {

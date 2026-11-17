@@ -91,8 +91,8 @@ function Hero() {
       <div className="relative flex flex-1 flex-col items-center justify-center px-4 pb-[10svh] text-center lg:flex-none lg:justify-start lg:pt-[106px] lg:pb-0">
         <p className="text-[13px] leading-[1.3] tracking-[0.06em] text-[rgba(74,77,89,0.9)]">AI-POWERED SPARE PARTS MARKETPLACE</p>
         <h1 className="mt-10 bg-linear-to-b from-ink via-[#292b36] via-55% to-[#737585] bg-clip-text pb-2 text-[64px] leading-[0.84] font-medium tracking-[-0.05em] text-transparent sm:text-[96px] lg:text-[150px]">
-          <span className="block">Source Any Part,</span>
-          <span className="block">Instantly.</span>
+          <span className="block">find any</span>
+          <span className="block">Spares.</span>
         </h1>
         <GlowButton href={FIND_A_PART} className="mt-10">
           Find a part
