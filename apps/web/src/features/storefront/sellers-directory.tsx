@@ -49,21 +49,25 @@ export function SellersDirectory() {
 
   return (
     <main className="flex flex-1 flex-col bg-canvas text-ink">
-      {/* Title on the left, search on the right (developer request, 17 Nov 2026,
-          arranged like a shop listing page); same styles as the Figma hero. */}
+      {/* Shop-listing header (developer request, 17 Nov 2026): small label and
+          title with the count on the left, compact search on the right, in
+          the short aurora band used by the seller profile. */}
       <AuroraBand>
         <SiteNav side="buyer" current="Sellers" />
-        <div className="relative flex flex-col gap-8 px-4 pt-10 pb-12 sm:px-10 lg:flex-row lg:items-end lg:justify-between lg:gap-10 lg:pt-16 lg:pb-14 xl:px-[60px]">
-          <div className="flex flex-col">
-            <p className="text-[13px] leading-[normal] tracking-[0.06em] text-[rgba(74,77,89,0.9)]">VERIFIED SELLERS</p>
-            <h1 className="mt-5 bg-linear-to-b from-ink via-[#292b36] via-55% to-[#737585] bg-clip-text pb-2 text-[64px] leading-[0.9] font-medium tracking-[-0.05em] text-transparent sm:text-[96px] lg:mt-7 lg:text-[120px]">
+        {/* Fade the shortened aurora into the page so it has no hard edge. */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-linear-to-b from-transparent to-canvas" />
+        <div className="relative flex flex-col gap-6 px-4 pt-10 pb-8 sm:px-10 md:flex-row md:items-end md:justify-between md:gap-10 lg:pt-14 lg:pb-10 xl:px-[60px]">
+          <div className="flex flex-col gap-3 leading-[normal]">
+            <p className="text-[13px] tracking-[0.06em] text-[rgba(74,77,89,0.9)]">VERIFIED SELLERS</p>
+            <h1 className="flex items-baseline gap-2.5 text-[34px] font-medium tracking-[-0.03em] text-ink sm:text-[44px]">
               Sellers
+              {data ? <span className="text-[15px] font-normal tracking-normal text-ink-tertiary">({data.allCount})</span> : null}
             </h1>
           </div>
           <form
             role="search"
             onSubmit={onSearch}
-            className="flex w-full items-center gap-3 rounded-full border border-black/22 bg-white/60 py-1.5 pr-1.5 pl-[22px] backdrop-blur-[15px] focus-within:ring-3 focus-within:ring-ring/40 lg:mb-4 lg:max-w-[480px]"
+            className="flex w-full items-center gap-2.5 rounded-full border border-black/22 bg-white/60 py-1 pr-1 pl-[18px] backdrop-blur-[15px] focus-within:ring-3 focus-within:ring-ring/40 md:mb-1 md:max-w-[400px]"
           >
             <Search aria-hidden className="size-4 shrink-0 text-ink-tertiary" />
             <label htmlFor="seller-search" className="sr-only">
@@ -75,10 +79,10 @@ export function SellersDirectory() {
               value={draft}
               maxLength={60}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="Company name, brand, model or part number"
-              className="h-[42px] min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-placeholder"
+              placeholder="Company, brand, model or part no."
+              className="h-9 min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-placeholder"
             />
-            <button type="submit" className={cn("rounded-full bg-ink px-[22px] py-[11px] text-sm leading-[normal] font-medium text-white hover:opacity-90", focus)}>
+            <button type="submit" className={cn("rounded-full bg-ink px-[18px] py-[9px] text-[13px] leading-[normal] font-medium text-white hover:opacity-90", focus)}>
               Search
             </button>
           </form>

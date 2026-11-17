@@ -577,11 +577,12 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   parent would misplace them); keep it that way or revisit.
 
 ### Sellers page arranged like a shop listing (Tue 17 Nov, developer request)
-- `/sellers`: the title ("VERIFIED SELLERS" + "Sellers") on the left, the
-  search on the right (stacked on phones), then the tabs and a grid of 4
-  cards per row from `lg` with a 10 px gap. Styles unchanged; it departs
-  from the centred Figma hero on purpose. Checked on screen with no
-  sellers in the local DB (cards not seen yet).
+- `/sellers`: compact header like the seller profile (short aurora band
+  with a fade): small "VERIFIED SELLERS" label, "Sellers" at 44 px (34 px
+  on phones) with the seller count, a compact search (400 px) on the right
+  (stacked below `md`), then the tabs and 4 cards per row from `lg` with
+  a 10 px gap. Replaces the 470 px centred Figma hero on purpose. Checked
+  on screen with no sellers in the local DB (cards not seen yet).
 
 ## Decisions and rules (the developer set these; do not change without asking)
 
