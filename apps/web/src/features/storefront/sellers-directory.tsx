@@ -49,18 +49,21 @@ export function SellersDirectory() {
 
   return (
     <main className="flex flex-1 flex-col bg-canvas text-ink">
-      {/* Figma Hero: 470 px, copy from 170 px. */}
-      <AuroraBand className="lg:h-[470px]">
+      {/* Title on the left, search on the right (developer request, 17 Nov 2026,
+          arranged like a shop listing page); same styles as the Figma hero. */}
+      <AuroraBand>
         <SiteNav side="buyer" current="Sellers" />
-        <div className="relative flex flex-col items-center px-4 pt-10 pb-14 text-center lg:pt-[86px] lg:pb-0">
-          <p className="text-[13px] leading-[normal] tracking-[0.06em] text-[rgba(74,77,89,0.9)]">VERIFIED SELLERS</p>
-          <h1 className="mt-5 bg-linear-to-b from-ink via-[#292b36] via-55% to-[#737585] bg-clip-text pb-2 text-[64px] leading-[0.9] font-medium tracking-[-0.05em] text-transparent sm:text-[96px] lg:mt-7 lg:text-[120px]">
-            Sellers
-          </h1>
+        <div className="relative flex flex-col gap-8 px-4 pt-10 pb-12 sm:px-10 lg:flex-row lg:items-end lg:justify-between lg:gap-10 lg:pt-16 lg:pb-14 xl:px-[60px]">
+          <div className="flex flex-col">
+            <p className="text-[13px] leading-[normal] tracking-[0.06em] text-[rgba(74,77,89,0.9)]">VERIFIED SELLERS</p>
+            <h1 className="mt-5 bg-linear-to-b from-ink via-[#292b36] via-55% to-[#737585] bg-clip-text pb-2 text-[64px] leading-[0.9] font-medium tracking-[-0.05em] text-transparent sm:text-[96px] lg:mt-7 lg:text-[120px]">
+              Sellers
+            </h1>
+          </div>
           <form
             role="search"
             onSubmit={onSearch}
-            className="mt-8 flex w-full max-w-[560px] items-center gap-3 rounded-full border border-black/22 bg-white/60 py-1.5 pr-1.5 pl-[22px] backdrop-blur-[15px] focus-within:ring-3 focus-within:ring-ring/40 lg:mt-10"
+            className="flex w-full items-center gap-3 rounded-full border border-black/22 bg-white/60 py-1.5 pr-1.5 pl-[22px] backdrop-blur-[15px] focus-within:ring-3 focus-within:ring-ring/40 lg:mb-4 lg:max-w-[480px]"
           >
             <Search aria-hidden className="size-4 shrink-0 text-ink-tertiary" />
             <label htmlFor="seller-search" className="sr-only">
@@ -82,7 +85,7 @@ export function SellersDirectory() {
         </div>
       </AuroraBand>
 
-      <section aria-label="Sellers" className="flex flex-col px-4 pt-12 pb-[110px] sm:px-10 xl:px-[60px]">
+      <section aria-label="Sellers" className="flex flex-col px-4 pt-4 pb-[110px] sm:px-10 xl:px-[60px]">
         <CategoryTabs
           tabs={tabs}
           active={category}
@@ -104,7 +107,7 @@ export function SellersDirectory() {
           </p>
         ) : data && data.items.length > 0 ? (
           <>
-            <ul className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <ul className="grid grid-cols-1 gap-x-2.5 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
               {data.items.map((seller) => (
                 <li key={seller.id}>
                   <SellerCardView seller={seller} />
