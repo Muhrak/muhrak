@@ -10,7 +10,7 @@ import { useSellerRfqsPreview } from "@/features/rfq/api";
 import { quantityLabel, RfqChip, sellerStatus, Thumb } from "@/features/rfq/parts";
 import { useSellerAccount } from "@/features/seller/api";
 import { cn } from "@/lib/utils";
-import { AccountBadge, EmptyPanel, OutlinePillLink, PageHeader, PanelRow, SolidPillLink, StatCards } from "./parts";
+import { EmptyPanel, OutlinePillLink, PanelRow, SolidPillLink, StatCards } from "./parts";
 
 /**
  * Figma "Seller – Dashboard (Light)". Real data (developer report, 18 Nov
@@ -34,19 +34,24 @@ export function SellerDashboard() {
 
   return (
     <>
-      <PageHeader
-        title={`Welcome, ${user.fullName}`}
-        meta={user.email}
-        badge={<AccountBadge label="Seller account" dotClass="bg-success" />}
-        actions={
-          <>
-            <OutlinePillLink href="/seller/store">View my store</OutlinePillLink>
-            <SolidPillLink href="/seller/products/new" icon="plus">
-              Add product
-            </SolidPillLink>
-          </>
-        }
-      />
+      {/* The seller's details in a black card, like the Buyer Centre welcome card (developer request, 18 Nov 2026). */}
+      <section
+        aria-label="Your account"
+        className="flex flex-col gap-6 rounded-[24px] bg-feature px-5 py-6 sm:px-7 xl:flex-row xl:items-center xl:gap-4"
+      >
+        <div className="flex min-w-0 flex-1 flex-col gap-2.5 leading-[normal]">
+          <h1 className="text-[24px] font-medium tracking-[-0.02em] break-words text-white sm:text-[32px]">Welcome, {user.fullName}</h1>
+          <p className="truncate text-base text-feature-muted">{user.email}</p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <OutlinePillLink href="/seller/store" onDark>
+            View my store
+          </OutlinePillLink>
+          <SolidPillLink href="/seller/products/new" icon="plus">
+            Add product
+          </SolidPillLink>
+        </div>
+      </section>
       {/* Shown only while something is left to do; gone once all steps are done. */}
       {steps && steps.some((step) => !step.done) ? <FinishSetup steps={steps} /> : null}
       <StatCards

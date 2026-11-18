@@ -34,9 +34,18 @@ export function AccountBadge({ label, dotClass }: { label: string; dotClass: str
 
 const pillBase = "flex h-[52px] items-center justify-center gap-2 rounded-full px-7 text-base leading-[normal] font-semibold whitespace-nowrap transition-opacity";
 
-export function OutlinePillLink({ href, children }: { href: string; children: ReactNode }) {
+/** `onDark`: white outline, for the black cards. */
+export function OutlinePillLink({ href, onDark = false, children }: { href: string; onDark?: boolean; children: ReactNode }) {
   return (
-    <Link href={href} className={cn(pillBase, focusRing, "border-[1.5px] border-text-strong text-text-strong hover:bg-black/4")}>
+    <Link
+      href={href}
+      className={cn(
+        pillBase,
+        onDark
+          ? "border-[1.5px] border-white/45 text-white outline-none hover:bg-white/10 focus-visible:ring-3 focus-visible:ring-white/40"
+          : cn(focusRing, "border-[1.5px] border-text-strong text-text-strong hover:bg-black/4"),
+      )}
+    >
       {children}
     </Link>
   );

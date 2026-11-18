@@ -321,6 +321,9 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   `useProductsPreview`, cached under the list keys so changes refresh them).
 - Seller Centre pages at 85% on `lg`+ like the Buyer Centre (`portal-shell.tsx`).
   Neither Centre may get pop-up dialogs inside the zoomed page.
+- The seller's name and email sit in a black welcome card with "View my
+  store" and "Add product"; the "Seller account" tag is gone (like the
+  Buyer Centre welcome card).
 
 ### Day 9: quote requests (Sun 15 Nov)
 - Developer decisions (15 Nov): **one seller per request** (Figma "Request
