@@ -3,8 +3,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { BUYER_FAQ } from "./faq-accordion";
-import { MobileGlow } from "./mobile-glow";
-import { AiFeature, Benefits, Cta, Faq, Footer, heroUnit, onCanvas, SiteNav, StatsStrip } from "./sections";
+import { SoftGlow } from "./soft-glow";
+import { AiFeature, Benefits, Cta, Faq, Footer, heroUnit, SiteNav, StatsStrip } from "./sections";
 
 /**
  * Buyer landing page: Figma "Buyer – Landing v2 (Light)" (node 423:1138),
@@ -18,9 +18,10 @@ const FIND_A_PART = "/ai";
 
 export function LandingPage() {
   return (
-    <div className="relative flex flex-1 flex-col bg-canvas font-sans text-ink">
+    <div className="relative flex flex-1 flex-col bg-white font-sans text-ink">
       <Hero />
       <StatsStrip
+        soft
         stats={[
           { label: "COVERAGE", value: "6 GCC countries" },
           { label: "MANUFACTURERS", value: "2,481+ verified" },
@@ -46,9 +47,11 @@ export function LandingPage() {
         aurora="/landing/benefits-aurora.svg"
         dome="/landing/benefits-dome.svg"
         cardEdge="border-glass-edge"
+        soft
       />
       <AiFeature
         side="buyer"
+        soft
         card={{ label: "Quotes received", value: "38.500 OMR", note: "Best price from 5 sellers", button: "Compare" }}
         glow="/landing/ai-glow.svg"
         cardEdge="border-glass-edge"
@@ -56,15 +59,16 @@ export function LandingPage() {
         text="Upload one photo. Muhrak AI identifies the part and sends your request to sellers who stock it."
         cta={{ href: "/ai", label: "Try Muhrak AI" }}
       />
-      <Faq items={BUYER_FAQ} contact="Have another question? Contact our team." />
+      <Faq items={BUYER_FAQ} contact="Have another question? Contact our team." soft />
       <Cta
         heading={["Your next part is", "one photo away."]}
         text="Verified sellers, real prices and quotes in hours, not days."
         button={{ href: FIND_A_PART, label: "Find a part" }}
         aurora="/landing/cta-aurora.svg"
         cardEdge="border-glass-edge"
+        soft
       />
-      <Footer side="buyer" />
+      <Footer side="buyer" soft />
     </div>
   );
 }
@@ -75,16 +79,10 @@ function Hero() {
   return (
     // Phones and tablets: a full-screen hero in the style of the developer reference
     // (refs/mobile view ref.jpg). Desktop (lg+): the Figma frame, 720 px high.
-    <section className="relative flex h-[100svh] min-h-[620px] flex-col bg-canvas lg:block lg:h-[720px] lg:min-h-0" style={heroUnit}>
-      <MobileGlow edge="top" className="h-[44%]" />
-      <MobileGlow edge="bottom" className="h-[30%]" />
-      {/* Desktop decoration layer, clipped, so the mobile menu can open past the hero. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 hidden overflow-hidden lg:block">
-        {/* Aurora 2300×1000 at (-430,-520); the SVG adds a 90 px blur margin on each side. */}
-        <Image src="/landing/hero-aurora.svg" alt="" width={2480} height={1180} priority className="absolute max-w-none" style={onCanvas(-520, -610, 2480, 1180)} />
-        {/* Light dome 1750×1200 at (-155,70) with a 110 px blur margin. */}
-        <Image src="/landing/hero-dome.svg" alt="" width={1970} height={1420} priority className="absolute max-w-none" style={onCanvas(-265, -40, 1970, 1420)} />
-      </div>
+    <section className="relative flex h-[100svh] min-h-[620px] flex-col bg-white lg:block lg:h-[max(720px,100svh)] lg:min-h-0" style={heroUnit}>
+      {/* The Muhrak AI soft glow (developer request, 18 Nov 2026) instead of the aurora arc: pale blue rising from the bottom.
+          Desktop: the hero fills the whole window (at least the Figma 720 px), so the glow reaches the bottom edge. */}
+      <SoftGlow strength={1.3} fill />
 
       <SiteNav side="buyer" />
 
@@ -116,7 +114,7 @@ function GlowButton({ href, className, children }: { href: string; className?: s
     >
       <span aria-hidden className="glow-halo" />
       <span aria-hidden className="glow-ring" />
-      <span className="relative rounded-full bg-canvas px-[26px] py-[13px] text-sm leading-[1.3] text-ink transition-colors">{children}</span>
+      <span className="relative rounded-full bg-white px-[26px] py-[13px] text-sm leading-[1.3] text-ink transition-colors">{children}</span>
     </Link>
   );
 }

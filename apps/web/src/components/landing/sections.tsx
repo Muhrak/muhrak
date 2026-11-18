@@ -4,6 +4,8 @@ import { Suspense, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { FaqAccordion, type FaqItem } from "./faq-accordion";
 import { MobileGlow } from "./mobile-glow";
+import { SoftGlow } from "./soft-glow";
+import { Twinkles } from "./twinkles";
 import { NavActions, SignedOutActions, type LandingSide } from "./nav-actions";
 import { NAV_LINKS, SELLER_NAV_LINKS } from "./nav-links";
 
@@ -86,10 +88,10 @@ export function SiteNav({ side, current, search }: { side: LandingSide; current?
 
 // ---------------------------------------------------------------- stats strip
 
-export function StatsStrip({ stats }: { stats: { label: string; value: string }[] }) {
+export function StatsStrip({ stats, soft = false }: { stats: { label: string; value: string }[]; soft?: boolean }) {
   return (
     // Mobile: semi-transparent so the colour glow carries through; desktop: solid white as in Figma.
-    <section aria-label="Muhrak in numbers" className="relative grid grid-cols-2 bg-white/60 lg:grid-cols-4 lg:bg-white">
+    <section aria-label="Muhrak in numbers" className={cn("relative grid grid-cols-2 bg-white/60 lg:grid-cols-4 lg:bg-white", soft && "border-y border-black/8")}>
       {stats.map((stat, index) => (
         <div
           key={stat.label}
@@ -123,20 +125,32 @@ export interface BenefitsContent {
   dome: string;
   /** Card border colour class. */
   cardEdge: string;
+  /** Buyer landing (developer request, 18 Nov 2026): white page and the Muhrak AI soft glow instead of the aurora. */
+  soft?: boolean;
 }
 
-export function Benefits({ id, chip, intro, cards, glass, aurora, dome, cardEdge }: BenefitsContent) {
+export function Benefits({ id, chip, intro, cards, glass, aurora, dome, cardEdge, soft = false }: BenefitsContent) {
   return (
     <section
       id={id}
-      className="relative overflow-hidden bg-canvas pt-[110px] pb-[120px] min-[1360px]:h-[1380px] min-[1360px]:pt-[150px] min-[1360px]:pb-0"
+      className={cn(
+        "relative overflow-hidden pt-[110px] pb-[120px] min-[1360px]:h-[1380px] min-[1360px]:pt-[150px] min-[1360px]:pb-0",
+        soft ? "bg-white" : "bg-canvas",
+      )}
     >
       {/* Desktop: aurora 2300×720 at (-430,880), 100 px blur margin; light dome 1700×560 at (-130,500), 120 px margin. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 hidden min-[1360px]:block">
-        <Image src={aurora} alt="" width={2500} height={920} className="absolute max-w-none" style={onCanvas(-530, 780, 2500, 920)} />
-        <Image src={dome} alt="" width={1940} height={800} className="absolute max-w-none" style={onCanvas(-250, 380, 1940, 800)} />
-      </div>
+      {soft ? (
+        // Stronger than the AI page so the glass parts (screen-blended) still show.
+        <SoftGlow className="top-[620px] hidden min-[1360px]:block" strength={2.2} />
+      ) : (
+        <div aria-hidden className="pointer-events-none absolute inset-0 hidden min-[1360px]:block">
+          <Image src={aurora} alt="" width={2500} height={920} className="absolute max-w-none" style={onCanvas(-530, 780, 2500, 920)} />
+          <Image src={dome} alt="" width={1940} height={800} className="absolute max-w-none" style={onCanvas(-250, 380, 1940, 800)} />
+        </div>
+      )}
 
+      {/* Buyer landing: copies of the sparkle twinkle around the heading (above the cards). */}
+      {soft ? <Twinkles className="inset-x-0 top-0 h-[520px] min-[1360px]:h-[740px]" /> : null}
       <div className="relative flex flex-col items-center px-4 text-center">
         <Image src="/landing/sparkle.svg" alt="" width={18} height={18} />
         <p className="mt-[72px] flex items-center gap-1.5 rounded-full bg-black/9 py-1.5 pr-3 pl-2.5 text-[13px] leading-[1.3] font-medium text-ink">
@@ -152,15 +166,19 @@ export function Benefits({ id, chip, intro, cards, glass, aurora, dome, cardEdge
         // glass objects can still blend with the aurora behind (a transform would isolate them).
         className="relative mx-auto mt-16 max-w-[760px] px-4 min-[1360px]:absolute min-[1360px]:top-[760px] min-[1360px]:left-[calc(50%-662px)] min-[1360px]:mt-0 min-[1360px]:w-[1324px] min-[1360px]:max-w-none min-[1360px]:px-0"
       >
-        {/* Phones and tablets: the same aurora behind the stacked cards, cropped like desktop. */}
-        <Image
-          src={aurora}
-          alt=""
-          aria-hidden
-          width={2500}
-          height={920}
-          className="pointer-events-none absolute top-[4%] left-[calc(50%-50vw-36.8vw)] h-[calc(96%+120px)] w-[173.6vw] max-w-none min-[1360px]:hidden"
-        />
+        {/* Phones and tablets: the same aurora (or soft glow) behind the stacked cards, cropped like desktop. */}
+        {soft ? (
+          <SoftGlow className="inset-auto top-[4%] left-[calc(50%-50vw)] h-[calc(96%+120px)] w-screen min-[1360px]:hidden" strength={2.2} />
+        ) : (
+          <Image
+            src={aurora}
+            alt=""
+            aria-hidden
+            width={2500}
+            height={920}
+            className="pointer-events-none absolute top-[4%] left-[calc(50%-50vw-36.8vw)] h-[calc(96%+120px)] w-[173.6vw] max-w-none min-[1360px]:hidden"
+          />
+        )}
         <ol className="relative grid gap-5 sm:max-[1359px]:grid-cols-2 min-[1360px]:grid-cols-4">
           {cards.map((card, index) => {
             const object = glass[index];
@@ -178,7 +196,7 @@ export function Benefits({ id, chip, intro, cards, glass, aurora, dome, cardEdge
                     {String(index + 1).padStart(2, "0")}
                   </span>
                 </div>
-                {object ? <GlassPart {...object} /> : null}
+                {object ? <GlassPart {...object} soft={soft} /> : null}
               </li>
             );
           })}
@@ -189,7 +207,7 @@ export function Benefits({ id, chip, intro, cards, glass, aurora, dome, cardEdge
 }
 
 /** Full Figma size from `sm` up; 72% on phones, where the cards are shorter. */
-function GlassPart({ src, x, y, size }: GlassObject) {
+function GlassPart({ src, x, y, size, soft = false }: GlassObject & { soft?: boolean }) {
   const g = (n: number) => `calc(${n} * var(--g))`;
   return (
     <Image
@@ -198,7 +216,12 @@ function GlassPart({ src, x, y, size }: GlassObject) {
       width={size}
       height={size}
       sizes={`${size}px`}
-      className="pointer-events-none absolute max-w-none object-cover mix-blend-screen [--g:0.72px] sm:[--g:1px]"
+      className={cn(
+        "pointer-events-none absolute max-w-none object-cover [--g:0.72px] sm:[--g:1px]",
+        // The parts are white glass on black. On the aurora they are screened in; on the white
+        // soft page they are inverted and multiplied, which reads as clear glass on white.
+        soft ? "opacity-70 mix-blend-multiply [filter:invert(1)_hue-rotate(180deg)_brightness(1.35)]" : "mix-blend-screen",
+      )}
       style={{ left: g(x), top: g(y), width: g(size), height: g(size) }}
     />
   );
@@ -225,15 +248,20 @@ export interface AiFeatureContent {
   text: string;
   cta: { href: string; label: string };
   side: LandingSide;
+  /** Buyer landing: white page, no coloured top glow. */
+  soft?: boolean;
 }
 
-export function AiFeature({ card, glow, cardEdge, heading, text, cta, side }: AiFeatureContent) {
+export function AiFeature({ card, glow, cardEdge, heading, text, cta, side, soft = false }: AiFeatureContent) {
   return (
     <section
       id="muhrak-ai"
-      className="relative flex flex-col items-center gap-14 overflow-hidden bg-canvas px-4 pt-[120px] pb-[100px] [--bar-unit:0.8px] sm:[--bar-unit:1px] lg:h-[740px] lg:flex-row lg:justify-center lg:gap-[110px] lg:px-0 lg:pt-[160px] lg:pb-[140px]"
+      className={cn(
+        "relative flex flex-col items-center gap-14 overflow-hidden px-4 pt-[120px] pb-[100px] [--bar-unit:0.8px] sm:[--bar-unit:1px] lg:h-[740px] lg:flex-row lg:justify-center lg:gap-[110px] lg:px-0 lg:pt-[160px] lg:pb-[140px]",
+        soft ? "bg-white" : "bg-canvas",
+      )}
     >
-      <MobileGlow edge="top" className="h-[320px]" strength={0.45} palette={side} />
+      {soft ? null : <MobileGlow edge="top" className="h-[320px]" strength={0.45} palette={side} />}
       {/*
         Figma 540×440 card, laid out with flex so it keeps its proportions on
         phones; at 540 px every element lands on its Figma position (text at
@@ -285,9 +313,9 @@ export function AiFeature({ card, glow, cardEdge, heading, text, cta, side }: Ai
 
 // ---------------------------------------------------------------- FAQ
 
-export function Faq({ items, contact }: { items: FaqItem[]; contact: string }) {
+export function Faq({ items, contact, soft = false }: { items: FaqItem[]; contact: string; soft?: boolean }) {
   return (
-    <section id="faq" className="flex flex-col items-center bg-canvas px-4 pt-[60px] pb-[140px]">
+    <section id="faq" className={cn("flex flex-col items-center px-4 pt-[60px] pb-[140px]", soft ? "bg-white" : "bg-canvas")}>
       <h2 className="text-center text-[40px] leading-[1.12] tracking-[-0.02em] sm:text-[48px]">
         <span className="block text-ink">Frequently Asked</span>
         <span className="block text-ink-tertiary">Questions</span>
@@ -308,21 +336,27 @@ export interface CtaContent {
   button: { href: string; label: string };
   aurora: string;
   cardEdge: string;
+  /** Buyer landing: white page and the Muhrak AI soft glow in the card instead of the aurora. */
+  soft?: boolean;
 }
 
-export function Cta({ heading, text, button, aurora, cardEdge }: CtaContent) {
+export function Cta({ heading, text, button, aurora, cardEdge, soft = false }: CtaContent) {
   return (
-    <section className="flex flex-col items-center bg-canvas px-4 pb-[120px]">
+    <section className={cn("flex flex-col items-center px-4 pb-[120px]", soft ? "bg-white" : "bg-canvas")}>
       <div className={cn("relative h-[360px] w-full max-w-[1160px] overflow-hidden rounded-[24px] border bg-linear-to-b from-white/78 to-white/50", cardEdge)}>
         <Image src="/landing/cta-grid.svg" alt="" width={1160} height={360} className="pointer-events-none absolute top-[-1px] left-[-1px] max-w-none" />
-        <Image
-          src={aurora}
-          alt=""
-          width={1100}
-          height={460}
-          // Figma: 1100×460 at (29,199) in the 1160 px card, sized as a share of the card so phones see every colour.
-          className="pointer-events-none absolute top-[55%] left-1/2 h-auto w-[94.8%] max-w-none -translate-x-1/2"
-        />
+        {soft ? (
+          <SoftGlow strength={1.6} />
+        ) : (
+          <Image
+            src={aurora}
+            alt=""
+            width={1100}
+            height={460}
+            // Figma: 1100×460 at (29,199) in the 1160 px card, sized as a share of the card so phones see every colour.
+            className="pointer-events-none absolute top-[55%] left-1/2 h-auto w-[94.8%] max-w-none -translate-x-1/2"
+          />
+        )}
         <div className="relative flex flex-col items-center px-4 pt-[71px] text-center">
           <h2 className="text-[34px] leading-[1.12] tracking-[-0.02em] sm:text-[44px]">
             <span className="block text-ink">{heading[0]}</span>
@@ -366,9 +400,9 @@ const FOOTER_COLUMNS: { title: string; links: FooterLink[] }[] = [
   },
 ];
 
-export function Footer({ side }: { side: LandingSide }) {
+export function Footer({ side, soft = false }: { side: LandingSide; soft?: boolean }) {
   return (
-    <footer className="relative flex flex-col gap-14 overflow-hidden border-t border-black/7 bg-canvas px-4 pt-16 pb-10 sm:px-10 xl:px-[140px]">
+    <footer className={cn("relative flex flex-col gap-14 overflow-hidden border-t border-black/7 px-4 pt-16 pb-10 sm:px-10 xl:px-[140px]", soft ? "bg-white" : "bg-canvas")}>
       {/* Mobile: the page closes with the same band as the hero's bottom edge. */}
       <MobileGlow edge="bottom" className="h-[75%]" palette={side} />
       <div className="relative flex flex-col gap-10 lg:flex-row lg:gap-6">

@@ -1,0 +1,74 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
+
+/**
+ * Twinkling sparkles (developer request, 18 Nov 2026): copies of the
+ * section's sparkle star appear two to four at a time at random spots, fade
+ * in and out, and new ones keep coming. Kept off the middle column where the
+ * heading and text sit. Nothing for visitors who ask for reduced motion.
+ * Decorative only (aria-hidden), and drawn in the browser only.
+ */
+
+type Star = { id: number; left: number; top: number; size: number; delay: number; born: number };
+
+const LIFE_MS = 2600;
+const EVERY_MS = 1800;
+
+function randomSpot(): { left: number; top: number } {
+  // Left or right band most of the time; now and then the gap under the text.
+  const roll = Math.random();
+  if (roll < 0.42) return { left: 4 + Math.random() * 24, top: 6 + Math.random() * 86 };
+  if (roll < 0.84) return { left: 72 + Math.random() * 24, top: 6 + Math.random() * 86 };
+  return { left: 30 + Math.random() * 40, top: 82 + Math.random() * 14 };
+}
+
+export function Twinkles({ className }: { className?: string }) {
+  const [stars, setStars] = useState<Star[]>([]);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let next = 0;
+    const spawn = () => {
+      const count = 2 + Math.floor(Math.random() * 3);
+      const born = Date.now();
+      setStars((current) => [
+        // Each star lives LIFE_MS plus its delay; drop the ones that are done.
+        ...current.filter((star) => born - star.born < LIFE_MS + 800),
+        ...Array.from({ length: count }, () => ({
+          id: ++next,
+          ...randomSpot(),
+          size: 10 + Math.random() * 10,
+          delay: Math.random() * 700,
+          born,
+        })),
+      ]);
+    };
+    const first = window.setTimeout(spawn, 400);
+    const timer = window.setInterval(spawn, EVERY_MS);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  return (
+    <div aria-hidden className={cn("pointer-events-none absolute", className)}>
+      {stars.map((star) => (
+        <span
+          key={star.id}
+          className="twinkle absolute block bg-[url(/landing/sparkle.svg)] bg-contain bg-center bg-no-repeat"
+          style={{
+            left: `${star.left}%`,
+            top: `${star.top}%`,
+            width: star.size,
+            height: star.size,
+            animationDuration: `${LIFE_MS}ms`,
+            animationDelay: `${star.delay}ms`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}

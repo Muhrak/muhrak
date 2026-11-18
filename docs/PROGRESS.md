@@ -3,7 +3,7 @@
 Read this first in every new session, then `CLAUDE.md`, `docs/PLAN.md` and
 `docs/ARCHITECTURE.md`. Update it whenever a piece of work is committed.
 
-Last updated: Wed 18 Nov 2026 (Day 8 photo search done: Muhrak AI page). Branch `develop`.
+Last updated: Wed 18 Nov 2026 (buyer landing in the Muhrak AI theme). Branch `develop`.
 
 ## Status
 
@@ -283,6 +283,23 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
 - Two small test files from the abuse check stay in the staging bucket
   (`pending/b6531a02…` and `files/part_photo/b6531a02….webp`; the API
   cannot delete). Remove in the AWS console if wanted.
+
+### Buyer landing in the Muhrak AI theme (Wed 18 Nov, developer request)
+- `/` (buyer landing only) now looks like the Muhrak AI page: white page
+  (not grey) and the soft blue glow (`components/landing/soft-glow.tsx`)
+  rising from the lower edges, instead of the aurora arcs, in the hero,
+  under the "What's in it for you?" cards and in the bottom banner. Buyer
+  blues only. The seller landing (`/sell`) and other pages are unchanged:
+  the shared sections take a `soft` prop that only the buyer landing sets.
+- Desktop hero fills the window (`max(720px, 100svh)`), so the glow
+  reaches the bottom edge; the stats strip has thin lines above and below.
+- Glass parts (white on black) are inverted and multiplied on the white
+  page, so they read as clear glass.
+- Sparkles twinkle around "What's in it for you?" (`twinkles.tsx`): 2 to 4
+  copies of the star at random spots every 1.8 s, fading in and out; none
+  for reduced motion.
+- This departs from the Figma "Buyer – Landing v2 (Light)" frame on
+  purpose (developer request).
 
 ### Day 9: quote requests (Sun 15 Nov)
 - Developer decisions (15 Nov): **one seller per request** (Figma "Request
