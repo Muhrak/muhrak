@@ -66,10 +66,11 @@ export function PortalShell({ side, children }: { side: PortalSide; children: Re
         <main
           className={cn(
             "flex flex-1 flex-col gap-5 px-4 pt-6 pb-7 sm:px-6 lg:px-10 lg:pt-[30px]",
-            // Buyer Centre on laptops and desktops: everything in the page at 85%,
-            // like a zoomed-out browser (developer request, 16 Nov 2026). Pages
-            // here have no pop-up dialogs, which a zoomed parent would misplace.
-            side === "buyer" && "lg:[zoom:0.85]",
+            // Buyer and Seller Centres on laptops and desktops: everything in the
+            // page at 85%, like a zoomed-out browser (developer requests, 16 Nov
+            // for buyers, 18 Nov 2026 for sellers). Pages here have no pop-up
+            // dialogs, which a zoomed parent would misplace; keep it that way.
+            "lg:[zoom:0.85]",
           )}
         >
           {children}

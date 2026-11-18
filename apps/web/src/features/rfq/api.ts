@@ -96,6 +96,17 @@ export function useSellerRfqs(filter: RfqListFilter) {
   });
 }
 
+/** Dashboard: the newest few quote requests and the count per tab (refreshed with the lists). */
+export function useSellerRfqsPreview(limit = 4) {
+  const session = useSession(SELLER);
+  return useQuery({
+    queryKey: [...sellerKey(session?.user.id), "list", "preview", limit],
+    queryFn: () => authedRequest(SELLER, `/v1/seller/rfqs?${new URLSearchParams({ filter: "all", limit: String(limit) })}`, sellerRfqListResponseSchema),
+    enabled: Boolean(session),
+    refetchInterval: 60_000,
+  });
+}
+
 /** Unread requests, for the sidebar badge (first page of the list carries the count). */
 export function useSellerUnseenRfqs(): number {
   const session = useSession(SELLER);

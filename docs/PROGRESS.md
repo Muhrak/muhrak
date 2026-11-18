@@ -311,6 +311,17 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   the page show through): white with the soft glow on the buyer side,
   solid canvas with the orange bands on the seller side.
 
+### Seller dashboard with real data (Wed 18 Nov, developer report)
+- The "Finish setting up your store" checklist now ticks "Add your first
+  product" when the seller has any product (draft included) and is hidden
+  once all three steps are done.
+- Stat cards: live (published) products and open quote requests from the
+  API ("Store views" stays 0 until views are counted). The two panels list
+  the newest 4 quote requests and products (`useSellerRfqsPreview`,
+  `useProductsPreview`, cached under the list keys so changes refresh them).
+- Seller Centre pages at 85% on `lg`+ like the Buyer Centre (`portal-shell.tsx`).
+  Neither Centre may get pop-up dialogs inside the zoomed page.
+
 ### Day 9: quote requests (Sun 15 Nov)
 - Developer decisions (15 Nov): **one seller per request** (Figma "Request
   sent to Korvex Hydraulics"; to ask three sellers the buyer sends three

@@ -50,6 +50,19 @@ export function useProductList(filter: ProductListFilter, q: string) {
   });
 }
 
+/**
+ * Dashboard: the newest few products and the count per tab. Kept under the
+ * "list" key, so saving or changing a product refreshes it too.
+ */
+export function useProductsPreview(limit = 4) {
+  const session = useSession(SIDE);
+  return useQuery({
+    queryKey: [...productsKey(session?.user.id), "list", "preview", limit],
+    queryFn: () => authedRequest(SIDE, `/v1/seller/products?${new URLSearchParams({ filter: "all", limit: String(limit) })}`, productListResponseSchema),
+    enabled: Boolean(session),
+  });
+}
+
 export function useProduct(id: string) {
   const session = useSession(SIDE);
   return useQuery({

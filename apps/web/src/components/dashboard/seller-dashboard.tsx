@@ -1,20 +1,36 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Icon } from "@/components/layout/icon";
 import { useCurrentUser } from "@/features/auth/hooks";
+import { useProductsPreview } from "@/features/catalog/api";
+import { priceLabel, ProductStatusChip } from "@/features/catalog/parts";
+import { useSellerRfqsPreview } from "@/features/rfq/api";
+import { quantityLabel, RfqChip, sellerStatus, Thumb } from "@/features/rfq/parts";
 import { useSellerAccount } from "@/features/seller/api";
 import { cn } from "@/lib/utils";
 import { AccountBadge, EmptyPanel, OutlinePillLink, PageHeader, PanelRow, SolidPillLink, StatCards } from "./parts";
 
 /**
- * Figma "Seller – Dashboard (Light)" for a new seller: everything empty,
- * with the "Finish setting up your store" checklist. Counts are zero until
- * products (Day 5) and RFQs (Day 10) exist.
+ * Figma "Seller – Dashboard (Light)". Real data (developer report, 18 Nov
+ * 2026): the setup checklist ticks off from the seller's own products and
+ * profile and disappears once every step is done; the numbers and the two
+ * panels show the seller's live products and quote requests.
  */
 export function SellerDashboard() {
   const user = useCurrentUser("seller");
+  const account = useSellerAccount();
+  const products = useProductsPreview();
+  const rfqs = useSellerRfqsPreview();
   if (!user) return null;
+
+  const productCounts = products.data?.counts;
+  const totalProducts = productCounts ? productCounts.all + productCounts.archived : 0;
+  const live = productCounts?.published ?? 0;
+  const openRfqs = rfqs.data?.counts.open ?? 0;
+  const ready = account.isSuccess && products.isSuccess;
+  const steps = ready ? setupSteps({ hasProduct: totalProducts > 0, hasProfile: Boolean(account.data?.profile) }) : null;
 
   return (
     <>
@@ -31,31 +47,103 @@ export function SellerDashboard() {
           </>
         }
       />
-      <FinishSetup />
+      {/* Shown only while something is left to do; gone once all steps are done. */}
+      {steps && steps.some((step) => !step.done) ? <FinishSetup steps={steps} /> : null}
       <StatCards
         stats={[
-          { label: "Live products", value: 0, note: "Add a product to go live" },
-          { label: "Quote requests", value: 0, note: "New requests from buyers" },
+          {
+            label: "Live products",
+            value: live,
+            note: live > 0 ? "Buyers can find these" : totalProducts > 0 ? "Publish a product to go live" : "Add a product to go live",
+          },
+          { label: "Quote requests", value: openRfqs, note: openRfqs > 0 ? "Waiting for your reply" : "New requests from buyers" },
           { label: "Store views", value: 0, note: "Last 30 days" },
         ]}
       />
       <PanelRow>
-        <EmptyPanel
-          title="Quote requests"
-          link={{ href: "/seller/rfq-inbox", label: "View all" }}
-          icon="empty-message"
-          emptyTitle="No quote requests yet"
-          emptyText="When a buyer asks for a price, it shows up here."
-        />
-        <EmptyPanel
-          title="Your products"
-          link={{ href: "/seller/products", label: "Manage" }}
-          icon="empty-box"
-          emptyTitle="No products yet"
-          emptyText="Add your first product to appear in search."
-        />
+        {rfqs.data && rfqs.data.items.length > 0 ? (
+          <ListPanel title="Quote requests" link={{ href: "/seller/rfq-inbox", label: "View all" }}>
+            {rfqs.data.items.map((rfq) => {
+              const status = sellerStatus(rfq.status);
+              return (
+                <ListRow
+                  key={rfq.id}
+                  href={`/seller/rfq-inbox?id=${encodeURIComponent(rfq.id)}`}
+                  photo={rfq.product.photoUrl}
+                  title={rfq.partName}
+                  meta={`${rfq.reference} · ${quantityLabel(rfq.quantity, rfq.unit)} · ${rfq.deliveryCity}`}
+                  side={<RfqChip tone={status.tone}>{status.label}</RfqChip>}
+                />
+              );
+            })}
+          </ListPanel>
+        ) : (
+          <EmptyPanel
+            title="Quote requests"
+            link={{ href: "/seller/rfq-inbox", label: "View all" }}
+            icon="empty-message"
+            emptyTitle="No quote requests yet"
+            emptyText="When a buyer asks for a price, it shows up here."
+          />
+        )}
+        {products.data && products.data.items.length > 0 ? (
+          <ListPanel title="Your products" link={{ href: "/seller/products", label: "Manage" }}>
+            {products.data.items.map((product) => (
+              <ListRow
+                key={product.id}
+                href={`/seller/products/${encodeURIComponent(product.id)}`}
+                photo={product.coverThumbUrl}
+                title={product.name}
+                meta={[product.partNumber, priceLabel(product.price)].filter(Boolean).join(" · ")}
+                side={<ProductStatusChip status={product.status} stock={product.stockQuantity} />}
+              />
+            ))}
+          </ListPanel>
+        ) : (
+          <EmptyPanel
+            title="Your products"
+            link={{ href: "/seller/products", label: "Manage" }}
+            icon="empty-box"
+            emptyTitle="No products yet"
+            emptyText="Add your first product to appear in search."
+          />
+        )}
       </PanelRow>
     </>
+  );
+}
+
+/** A dashboard panel with rows (the filled version of EmptyPanel). */
+function ListPanel({ title, link, children }: { title: string; link: { href: string; label: string }; children: ReactNode }) {
+  return (
+    <section aria-label={title} className="flex min-h-[260px] flex-1 flex-col rounded-[24px] bg-panel px-6 py-[22px]">
+      <div className="flex items-center gap-2">
+        <h2 className="flex-1 text-xl leading-[normal] font-medium tracking-[-0.01em] text-text-strong">{title}</h2>
+        <Link
+          href={link.href}
+          className="flex items-center gap-1.5 rounded-sm text-[15px] leading-[normal] font-medium text-text-strong outline-none hover:underline focus-visible:ring-3 focus-visible:ring-brand-blue/40"
+        >
+          {link.label}
+          <Icon name="arrow-right" className="size-[15px]" />
+        </Link>
+      </div>
+      <ul className="mt-3 flex flex-col">{children}</ul>
+    </section>
+  );
+}
+
+function ListRow({ href, photo, title, meta, side }: { href: string; photo: string | null; title: string; meta: string; side: ReactNode }) {
+  return (
+    <li className="border-b border-line last:border-b-0">
+      <Link href={href} className="flex items-center gap-3.5 rounded-[12px] py-3 outline-none hover:bg-surface/60 focus-visible:ring-3 focus-visible:ring-brand-blue/40">
+        <Thumb src={photo} size="sm" />
+        <span className="flex min-w-0 flex-1 flex-col gap-1 leading-[normal]">
+          <span className="truncate text-[15px] font-medium text-text-strong">{title}</span>
+          <span className="truncate text-[13px] text-text-muted">{meta}</span>
+        </span>
+        {side}
+      </Link>
+    </li>
   );
 }
 
@@ -66,26 +154,27 @@ interface Step {
   action?: { href: string; label: string; tone: "accent" | "white" };
 }
 
-const STEPS: Step[] = [
-  { title: "Account created", text: "Your seller account is ready.", done: true },
-  {
-    title: "Add your first product",
-    text: "Buyers can find you once a product is live.",
-    action: { href: "/seller/products/new", label: "Add product", tone: "accent" as const },
-  },
-  {
-    title: "Complete company profile",
-    text: "Logo, address and what you sell.",
-    action: { href: "/seller/company-profile", label: "Edit profile", tone: "white" as const },
-  },
-];
+function setupSteps({ hasProduct, hasProfile }: { hasProduct: boolean; hasProfile: boolean }): Step[] {
+  return [
+    { title: "Account created", text: "Your seller account is ready.", done: true },
+    hasProduct
+      ? { title: "Add your first product", text: "Your first product is in your catalogue.", done: true }
+      : {
+          title: "Add your first product",
+          text: "Buyers can find you once a product is live.",
+          action: { href: "/seller/products/new", label: "Add product", tone: "accent" },
+        },
+    hasProfile
+      ? { title: "Complete company profile", text: "Logo, address and what you sell.", done: true }
+      : {
+          title: "Complete company profile",
+          text: "Logo, address and what you sell.",
+          action: { href: "/seller/company-profile", label: "Edit profile", tone: "white" },
+        },
+  ];
+}
 
-function FinishSetup() {
-  const account = useSellerAccount();
-  const hasProfile = Boolean(account.data?.profile);
-  const steps = STEPS.map((step) =>
-    step.title === "Complete company profile" && hasProfile ? { ...step, done: true, action: undefined } : step,
-  );
+function FinishSetup({ steps }: { steps: Step[] }) {
   const done = steps.filter((step) => step.done).length;
   return (
     <section aria-label="Finish setting up your store" className="flex flex-col gap-4 rounded-[24px] bg-feature px-5 py-[22px] sm:px-7">
