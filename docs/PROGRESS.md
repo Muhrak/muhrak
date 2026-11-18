@@ -325,6 +325,22 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   store" and "Add product"; the "Seller account" tag is gone (like the
   Buyer Centre welcome card).
 
+### Sellers pages in the Muhrak AI style (Wed 18 Nov, developer request)
+- `/sellers` and `/sellers/[id]` redesigned (replaces the Figma
+  "Manufacturers v2" / "Manufacturer Profile v2" layouts): white page, soft
+  glow, Gloock headings, Manrope text, grey chips, white rounded cards
+  (`features/storefront/soft.tsx`). The nav is the landing nav (the search
+  box moved from the nav into the page, the AI page's search pill).
+- Seller cards lead with the company logo (initials without one), not a
+  product photo; verified mark, place, main category, product count.
+- Seller page: identity card (logo, serif name, verified mark, about,
+  live products / verified since / on Muhrak since), Products and About
+  chips; product cards show the product photo.
+- Landing: headline is now "Any part. Found." (was "find any Spares.");
+  nav links are centred on the page (they sat ~70 px right because the
+  logo is wider than the account button), except when the nav carries a
+  search box.
+
 ### Day 9: quote requests (Sun 15 Nov)
 - Developer decisions (15 Nov): **one seller per request** (Figma "Request
   sent to Korvex Hydraulics"; to ask three sellers the buyer sends three

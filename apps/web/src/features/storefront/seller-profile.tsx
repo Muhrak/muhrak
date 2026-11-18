@@ -1,22 +1,23 @@
 "use client";
 
-import { BadgeCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import type { ReactNode } from "react";
 import { CONDITION_LABELS, formatMoney, UNIT_LABELS, type PublicProductCard, type PublicSeller } from "@/schemas";
 import { Footer, SiteNav } from "@/components/landing/sections";
+import { LogoLoader } from "@/components/ui/logo-loader";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { usePublicSeller, useSellerProducts } from "./api";
-import { AuroraBand, CardImage, CategoryTabs, focus, initials, Pagination } from "./parts";
-import { LogoLoader } from "@/components/ui/logo-loader";
+import { Pagination } from "./parts";
+import { Chip, LogoTile, softCard, softFocus, SoftHero, VerifiedMark } from "./soft";
 
 /**
- * /sellers/[id]: Figma "Buyer – Manufacturer Profile v2" (245:6812),
- * converted to light. Developer decisions (14 Nov 2026): only the Overview
- * and Products tabs (no Data Room / Distributors / Models yet), no
- * "Established" or "Replies within" lines (no real data), no "Send inquiry"
- * / "How to order" until quote requests exist. Verified sellers only.
+ * /sellers/[id]: a verified seller's page in the Muhrak AI style (developer
+ * request, 18 Nov 2026): the landing nav, an identity card on the soft glow
+ * (logo, serif name, verified mark, place, about, key facts), then Products
+ * and About as chips. Product cards show the product's own photo. Only the
+ * facts Muhrak really has (no "Established" or "Replies within").
  */
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" });
@@ -35,9 +36,10 @@ export function SellerProfile({ id }: { id: string }) {
     const missing = seller.error instanceof ApiError && seller.error.status === 404;
     return (
       <Shell>
-        <div className="flex flex-col items-center gap-3 py-32 text-center">
+        <div className="flex flex-col items-center gap-4 px-4 py-32 text-center font-ai">
+          <p className="font-ai-serif text-[28px] text-[#8b8d96]">{missing ? "Seller not found" : "Something went wrong"}</p>
           <p className="text-[15px] text-ink-tertiary">{missing ? "This seller is not on Muhrak, or is not verified yet." : "Could not load this seller. Please try again."}</p>
-          <Link href="/sellers" className={cn("text-sm font-medium text-ink underline", focus)}>
+          <Link href="/sellers" className={cn("rounded-full bg-black/[0.055] px-4 py-2.5 text-[15px] text-ink-secondary hover:bg-black/[0.09]", softFocus)}>
             See all sellers
           </Link>
         </div>
@@ -47,14 +49,15 @@ export function SellerProfile({ id }: { id: string }) {
   return <Profile seller={seller.data} />;
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children }: { children: ReactNode }) {
   return (
-    <main className="flex flex-1 flex-col bg-canvas text-ink">
-      <AuroraBand>
+    <main className="flex flex-1 flex-col bg-white text-ink">
+      <SoftHero>
         <SiteNav side="buyer" current="Sellers" />
-      </AuroraBand>
+        <div className="h-24" />
+      </SoftHero>
       {children}
-      <Footer side="buyer" />
+      <Footer side="buyer" soft />
     </main>
   );
 }
@@ -75,63 +78,69 @@ function Profile({ seller }: { seller: PublicSeller }) {
     router.push(search.size ? `/sellers/${seller.id}?${search}` : `/sellers/${seller.id}`, { scroll: false });
   }
 
-  const location = [seller.city, seller.countryName].filter(Boolean).join(", ");
-  const facts = [location, seller.verifiedSince ? `Verified since ${dateFormat.format(new Date(seller.verifiedSince))}` : null].filter(Boolean);
+  const place = [seller.city, seller.countryName].filter(Boolean).join(", ");
+  const facts: { label: string; value: string }[] = [
+    { label: "Live products", value: seller.productCount.toLocaleString("en-US") },
+    { label: "Verified since", value: seller.verifiedSince ? dateFormat.format(new Date(seller.verifiedSince)) : "Verified" },
+    { label: "On Muhrak since", value: dateFormat.format(new Date(seller.memberSince)) },
+  ];
 
   return (
-    <main className="flex flex-1 flex-col bg-canvas text-ink">
-      {/* Compact top (developer, 16 Nov 2026): the identity block follows the
-          nav instead of the Figma 600 px band, which left ~300 px empty. */}
-      <AuroraBand>
+    <main className="flex flex-1 flex-col bg-white text-ink">
+      <SoftHero>
         <SiteNav side="buyer" current="Sellers" />
-        {/* Fade the shortened aurora into the page so it has no hard edge. */}
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-linear-to-b from-transparent to-canvas" />
-        <div className="relative flex flex-col gap-6 px-4 pt-12 pb-10 sm:flex-row sm:items-center sm:gap-7 sm:px-10 lg:pt-16 lg:pb-14 xl:px-[60px]">
-          <div className="flex h-[112px] w-[200px] shrink-0 items-center justify-center overflow-hidden rounded-[18px] border border-black/9 bg-linear-to-b from-white to-white/80 p-4">
-            {seller.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- public logo from storage
-              <img src={seller.logoUrl} alt={`${seller.companyName} logo`} className="max-h-full max-w-full object-contain" />
-            ) : (
-              <span className="text-2xl font-bold tracking-[0.12em] text-ink">{initials(seller.companyName)}</span>
-            )}
-          </div>
-          <div className="flex min-w-0 flex-col gap-2.5 leading-[normal]">
-            <h1 className="flex flex-wrap items-center gap-2.5 text-[26px] tracking-[-0.02em] text-ink sm:text-[30px]">
-              {seller.companyName}
-              <BadgeCheck aria-label="Verified seller" className="size-5 shrink-0 fill-ink text-white" />
-            </h1>
-            {seller.about ? <p className="line-clamp-2 max-w-[760px] text-[15px] text-ink-tertiary">{seller.about}</p> : null}
-            <p className="text-[13px] text-ink-secondary">{facts.join("  ·  ")}</p>
-          </div>
+        <div className="mx-auto w-full max-w-[1100px] px-4 pt-6 pb-14 font-ai sm:px-8 lg:pt-12 lg:pb-20">
+          <Link href="/sellers" className={cn("inline-flex items-center gap-1.5 rounded-sm text-sm text-ink-tertiary hover:text-ink", softFocus)}>
+            <span aria-hidden>←</span> All sellers
+          </Link>
+          {/* Identity card. */}
+          <section aria-label={seller.companyName} className={cn("mt-5 flex flex-col gap-7 p-6 sm:p-9", softCard)}>
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+              <LogoTile name={seller.companyName} logoUrl={seller.logoUrl} className="size-[104px] rounded-[26px] shadow-sm sm:size-[120px]" initialsClass="text-[40px]" />
+              <div className="flex min-w-0 flex-col gap-2">
+                <h1 className="font-ai-serif text-[34px] leading-[1.08] tracking-[-0.01em] break-words text-ink sm:text-[46px]">
+                  {seller.companyName}
+                  {/* Inline, so it stays next to the last word when the name wraps. */}
+                  <VerifiedMark className="ml-2 inline size-6 align-[-0.08em] sm:size-7" />
+                </h1>
+                <p className="text-[15px] text-ink-tertiary">
+                  {place}
+                  {seller.verifiedSince ? <span> · Verified by Muhrak</span> : null}
+                </p>
+                {seller.about ? <p className="mt-1 line-clamp-3 max-w-[680px] text-[15px] leading-relaxed text-ink-secondary">{seller.about}</p> : null}
+              </div>
+            </div>
+            <dl className="grid grid-cols-3 gap-2 sm:gap-3">
+              {facts.map((fact) => (
+                <div key={fact.label} className="flex min-w-0 flex-col gap-1 rounded-[16px] bg-[#f5f8fc] px-3 py-3 sm:rounded-[20px] sm:px-5 sm:py-4">
+                  <dt className="text-[10px] tracking-[0.06em] text-ink-tertiary uppercase sm:text-[12px]">{fact.label}</dt>
+                  <dd className="text-[14px] text-ink sm:text-lg">{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
         </div>
-      </AuroraBand>
+      </SoftHero>
 
-      {/* Figma "Tabs": 16 px labels, 2 px underline on the active one. */}
-      <nav aria-label="Seller sections" className="flex items-end gap-9 overflow-x-auto border-b border-black/8 bg-canvas px-4 sm:px-10 xl:px-[60px]">
-        {(["overview", "products"] as const).map((key) => (
-          <button
-            key={key}
-            type="button"
-            aria-current={tab === key ? "page" : undefined}
-            onClick={() => go({ tab: key })}
-            className={cn(
-              "border-b-2 py-[18px] text-base leading-[normal] whitespace-nowrap",
-              tab === key ? "border-ink font-medium text-ink" : "border-transparent text-ink-tertiary hover:text-ink",
-              focus,
-            )}
-          >
-            {key === "overview" ? "Overview" : "Products"}
-          </button>
-        ))}
-      </nav>
+      <section className="mx-auto w-full max-w-[1100px] px-4 pt-8 pb-24 font-ai sm:px-8 lg:pb-[120px]">
+        <nav aria-label="Seller sections" className="flex gap-2">
+          <Chip active={tab === "products"} count={seller.productCount} onClick={() => go({ tab: "products" })}>
+            Products
+          </Chip>
+          <Chip active={tab === "overview"} onClick={() => go({ tab: "overview" })}>
+            About
+          </Chip>
+        </nav>
+        <div className="mt-8">
+          {tab === "overview" ? (
+            <Overview seller={seller} onCategory={(id) => go({ tab: "products", category: id })} />
+          ) : (
+            <Products seller={seller} category={category} page={page} onCategory={(id) => go({ category: id })} onPage={(next) => go({ page: next })} />
+          )}
+        </div>
+      </section>
 
-      {tab === "overview" ? (
-        <Overview seller={seller} onCategory={(id) => go({ tab: "products", category: id })} />
-      ) : (
-        <Products seller={seller} category={category} page={page} onCategory={(id) => go({ category: id })} onPage={(next) => go({ page: next })} />
-      )}
-
-      <Footer side="buyer" />
+      <Footer side="buyer" soft />
     </main>
   );
 }
@@ -150,79 +159,86 @@ function Products({
   onPage: (page: number) => void;
 }) {
   const products = useSellerProducts(seller.id, { category: category || undefined, page });
-  const tabs = [{ key: "", label: "All", count: seller.productCount }, ...seller.categories.map((item) => ({ key: item.id, label: item.name, count: item.count }))];
   const data = products.data;
 
   return (
-    <section aria-label="Products" className="flex flex-col px-4 pt-12 pb-[110px] sm:px-10 xl:px-[60px]">
-      <CategoryTabs tabs={tabs} active={category} onSelect={onCategory} />
-      <div className="h-10" />
+    <div className="flex flex-col gap-8">
+      {seller.categories.length > 1 ? (
+        <div aria-label="Categories" className="-mx-1 flex gap-2 overflow-x-auto px-1 py-1">
+          <Chip active={!category} count={seller.productCount} onClick={() => onCategory("")}>
+            All
+          </Chip>
+          {seller.categories.map((item) => (
+            <Chip key={item.id} active={category === item.id} count={item.count} onClick={() => onCategory(item.id)}>
+              {item.name}
+            </Chip>
+          ))}
+        </div>
+      ) : null}
       {products.isPending ? (
-<LogoLoader label="Loading products" className="py-20" />
+        <LogoLoader label="Loading products" className="py-20" />
       ) : products.isError ? (
         <p role="alert" className="py-20 text-center text-sm text-destructive">
           Could not load products. Please try again.
         </p>
       ) : data && data.items.length > 0 ? (
         <>
-          <ul className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <ul className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-3">
             {data.items.map((product) => (
               <li key={product.id}>
                 <ProductCardView product={product} />
               </li>
             ))}
           </ul>
-          <div className="mt-[60px]">
-            <Pagination page={data.page} pageSize={data.pageSize} total={data.total} noun="products" onPage={onPage} />
-          </div>
+          <Pagination page={data.page} pageSize={data.pageSize} total={data.total} noun="products" onPage={onPage} />
         </>
       ) : (
-        <p className="py-20 text-center text-[15px] text-ink-tertiary">This seller has no live products here yet.</p>
+        <p className="py-16 text-center text-[15px] text-ink-tertiary">This seller has no live products here yet.</p>
       )}
-    </section>
+    </div>
   );
 }
 
-/** Figma product card: label line, square photo, name + price, subtitle. (Product pages come with buyer search, Day 8.) */
+/** A product: its own photo, name, price, part number, category and condition. */
 function ProductCardView({ product }: { product: PublicProductCard }) {
   const unit = product.unit === "piece" ? "" : ` / ${UNIT_LABELS[product.unit].one}`;
   return (
-    <article className="flex flex-col">
-      <p className="h-[14px] text-[11px] leading-[normal] tracking-[0.06em] text-ink-secondary">{product.isNew ? "NEW" : ""}</p>
-      <div className="h-2.5" />
-      <CardImage src={product.photoUrl} />
-      <div className="h-3.5" />
-      <div className="flex items-start gap-2 text-[13px] leading-[normal] text-ink">
-        <h3 className="min-w-0 flex-1 font-medium tracking-[0.04em]">{product.name}</h3>
-        <p className="shrink-0 whitespace-nowrap">{product.price ? `${formatMoney(product.price)}${unit}` : "Price on request"}</p>
+    <article className={cn("flex h-full flex-col p-3", softCard)}>
+      <div className="relative aspect-square overflow-hidden rounded-[20px] bg-linear-to-b from-white to-[#eef3f8]">
+        {product.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- public product photo from storage, sized by CSS
+          <img src={product.photoUrl} alt={product.name} loading="lazy" className="absolute inset-[6%] size-[88%] object-contain" />
+        ) : (
+          <span className="absolute inset-0 flex items-center justify-center text-[13px] text-ink-placeholder">No photo yet</span>
+        )}
       </div>
-      <p className="mt-1 text-xs leading-[normal] text-ink-tertiary">
-        {[product.partNumber ? `Part no. ${product.partNumber}` : null, product.categoryName, CONDITION_LABELS[product.condition]].filter(Boolean).join(" · ")}
-      </p>
+      <div className="flex flex-1 flex-col gap-1.5 px-2 pt-4 pb-2">
+        <h3 className="line-clamp-2 text-base leading-snug font-medium text-ink">{product.name}</h3>
+        <p className="text-[15px] text-ink">{product.price ? `${formatMoney(product.price)}${unit}` : "Price on request"}</p>
+        <p className="truncate text-[13px] text-ink-tertiary">{product.partNumber ? `Part no. ${product.partNumber}` : product.categoryName}</p>
+        <div className="mt-auto flex flex-wrap gap-1.5 pt-3">
+          <span className="rounded-full bg-black/[0.055] px-2.5 py-1 text-[12px] text-ink-secondary">{CONDITION_LABELS[product.condition]}</span>
+          {product.partNumber ? <span className="rounded-full bg-black/[0.055] px-2.5 py-1 text-[12px] text-ink-secondary">{product.categoryName}</span> : null}
+        </div>
+      </div>
     </article>
   );
 }
 
 function Overview({ seller, onCategory }: { seller: PublicSeller; onCategory: (id: string) => void }) {
-  const rows: { label: string; value: React.ReactNode }[] = [
-    { label: "Location", value: [seller.city, seller.countryName].filter(Boolean).join(", ") },
-    { label: "Verified by Muhrak", value: seller.verifiedSince ? `Since ${dateFormat.format(new Date(seller.verifiedSince))}` : "Yes" },
-    { label: "On Muhrak since", value: dateFormat.format(new Date(seller.memberSince)) },
-    { label: "Live products", value: seller.productCount.toLocaleString("en-US") },
-  ];
   return (
-    <section aria-label="Overview" className="grid gap-10 px-4 pt-12 pb-[110px] sm:px-10 lg:grid-cols-[1fr_380px] xl:px-[60px]">
-      <div className="flex flex-col gap-8">
+    <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
+      <div className={cn("flex flex-col gap-8 p-6 sm:p-8", softCard)}>
         <div className="flex flex-col gap-3">
-          <h2 className="text-xl leading-[normal] font-medium text-ink">About {seller.companyName}</h2>
-          <p className="max-w-[760px] text-[15px] leading-relaxed whitespace-pre-line text-ink-secondary">{seller.about || "This seller has not written an introduction yet."}</p>
+          <h2 className="font-ai-serif text-[28px] leading-tight text-ink">About {seller.companyName}</h2>
+          <p className="max-w-[680px] text-[15px] leading-relaxed whitespace-pre-line text-ink-secondary">{seller.about || "This seller has not written an introduction yet."}</p>
         </div>
         {seller.brands.length > 0 ? (
           <div className="flex flex-col gap-3">
-            <h2 className="text-sm leading-[normal] font-medium text-ink">Brands they carry</h2>
+            <h3 className="text-sm font-medium text-ink">Brands they carry</h3>
             <ul className="flex flex-wrap gap-2">
               {seller.brands.map((brand) => (
-                <li key={brand} className="rounded-full border border-black/10 bg-white/70 px-3.5 py-[7px] text-[13px] leading-[normal] text-ink">
+                <li key={brand} className="rounded-full bg-black/[0.055] px-3.5 py-2 text-[14px] text-ink-secondary">
                   {brand}
                 </li>
               ))}
@@ -231,31 +247,30 @@ function Overview({ seller, onCategory }: { seller: PublicSeller; onCategory: (i
         ) : null}
         {seller.categories.length > 0 ? (
           <div className="flex flex-col gap-3">
-            <h2 className="text-sm leading-[normal] font-medium text-ink">What they sell</h2>
-            <ul className="flex flex-wrap gap-2">
-              {seller.categories.map((category) => (
-                <li key={category.id}>
-                  <button
-                    type="button"
-                    onClick={() => onCategory(category.id)}
-                    className={cn("rounded-full border border-black/10 bg-white/70 px-3.5 py-[7px] text-[13px] leading-[normal] text-ink hover:bg-white", focus)}
-                  >
-                    {category.name} <span className="text-ink-tertiary">{category.count}</span>
-                  </button>
-                </li>
+            <h3 className="text-sm font-medium text-ink">What they sell</h3>
+            <div className="flex flex-wrap gap-2">
+              {seller.categories.map((item) => (
+                <Chip key={item.id} count={item.count} onClick={() => onCategory(item.id)}>
+                  {item.name}
+                </Chip>
               ))}
-            </ul>
+            </div>
           </div>
         ) : null}
       </div>
-      <dl className="flex h-fit flex-col divide-y divide-black/8 rounded-[18px] border border-black/8 bg-white px-6">
-        {rows.map((row) => (
-          <div key={row.label} className="flex items-center justify-between gap-4 py-4 text-sm leading-[normal]">
+      <dl className={cn("flex h-fit flex-col divide-y divide-black/8 px-6", softCard)}>
+        {[
+          { label: "Location", value: [seller.city, seller.countryName].filter(Boolean).join(", ") },
+          { label: "Verified by Muhrak", value: seller.verifiedSince ? `Since ${dateFormat.format(new Date(seller.verifiedSince))}` : "Yes" },
+          { label: "On Muhrak since", value: dateFormat.format(new Date(seller.memberSince)) },
+          { label: "Live products", value: seller.productCount.toLocaleString("en-US") },
+        ].map((row) => (
+          <div key={row.label} className="flex items-center justify-between gap-4 py-4 text-sm">
             <dt className="text-ink-tertiary">{row.label}</dt>
             <dd className="text-right text-ink">{row.value}</dd>
           </div>
         ))}
       </dl>
-    </section>
+    </div>
   );
 }

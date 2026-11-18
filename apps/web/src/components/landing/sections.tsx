@@ -61,7 +61,15 @@ export function SiteNav({ side, current, search }: { side: LandingSide; current?
         <Image src="/auth/muhrak-logo.svg" alt="Muhrak" width={156.357} height={29.8588} priority />
       </Link>
       <div className="flex-1" />
-      <nav aria-label="Main" className="hidden gap-10 text-sm leading-[1.3] text-[rgba(10,11,18,0.78)] lg:flex">
+      {/* Links centred on the page, not between logo and account button (their widths differ, which pushed
+          the links ~70 px right; developer report, 18 Nov 2026). With a search box (Sellers page) they stay in the flow. */}
+      <nav
+        aria-label="Main"
+        className={cn(
+          "hidden gap-10 text-sm leading-[1.3] text-[rgba(10,11,18,0.78)] lg:flex",
+          !search && "lg:absolute lg:left-1/2 lg:-translate-x-1/2",
+        )}
+      >
         {links.map((link) =>
           link.href ? (
             <a

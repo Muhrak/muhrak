@@ -1,20 +1,23 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { ArrowUpDown } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, type FormEvent } from "react";
 import type { SellerCard } from "@/schemas";
 import { Footer, SiteNav } from "@/components/landing/sections";
+import { LogoLoader } from "@/components/ui/logo-loader";
 import { cn } from "@/lib/utils";
 import { useSellerDirectory } from "./api";
-import { AuroraBand, CardImage, CategoryTabs, focus, initials, Pagination } from "./parts";
-import { LogoLoader } from "@/components/ui/logo-loader";
+import { Pagination } from "./parts";
+import { Chip, LogoTile, SearchPill, softCard, softFocus, SoftHero, VerifiedMark } from "./soft";
 
 /**
- * /sellers: Figma "Buyer – Manufacturers v2" (244:6812), renamed Sellers,
- * converted to light. Only verified sellers. Search, tab, sort and page
- * live in the URL, so Back and shared links work.
+ * /sellers: the directory of verified sellers, in the Muhrak AI style
+ * (developer request, 18 Nov 2026; replaces the Figma "Buyer – Manufacturers
+ * v2" layout): the landing nav exactly, a serif heading with the AI page's
+ * search pill on the soft glow, category chips, and seller cards that lead
+ * with the company logo (not a product photo). Only verified sellers.
+ * Search, category, sort and page live in the URL, so Back and shared links work.
  */
 export function SellersDirectory() {
   const router = useRouter();
@@ -23,7 +26,6 @@ export function SellersDirectory() {
   const category = params.get("category") ?? "";
   const sort = params.get("sort") === "newest" ? "newest" : "name";
   const page = Math.max(1, Math.min(1000, Number(params.get("page")) || 1));
-  const [draft, setDraft] = useState(q);
 
   const directory = useSellerDirectory({ q: q || undefined, category: category || undefined, sort, page });
   const data = directory.data;
@@ -38,132 +40,125 @@ export function SellersDirectory() {
     router.push(search.size ? `/sellers?${search}` : "/sellers", { scroll: false });
   }
 
-  function onSearch(event: FormEvent) {
-    event.preventDefault();
-    go({ q: draft.trim() });
-  }
-
-  // Rectangular search like a shop header; one copy in the nav (lg+), one in the page below lg.
-  const searchBox = (id: string) => (
-    <form
-      role="search"
-      onSubmit={onSearch}
-      className="flex h-11 w-full items-center rounded-[10px] border border-black/14 bg-white/70 pl-4 backdrop-blur-[15px] focus-within:ring-3 focus-within:ring-ring/40 lg:w-[300px]"
-    >
-      <label htmlFor={id} className="sr-only">
-        Search sellers
-      </label>
-      <input
-        id={id}
-        type="search"
-        value={draft}
-        maxLength={60}
-        onChange={(event) => setDraft(event.target.value)}
-        placeholder="Search sellers, brands, part no."
-        className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-placeholder"
-      />
-      <button type="submit" aria-label="Search" className={cn("flex h-full w-11 shrink-0 items-center justify-center rounded-r-[10px] text-ink hover:bg-black/4", focus)}>
-        <Search aria-hidden className="size-[18px]" />
-      </button>
-    </form>
-  );
-
-  const tabs = [
-    { key: "", label: "All", count: data?.allCount ?? 0 },
-    ...(data?.categories ?? []).map((item) => ({ key: item.id, label: item.name, count: item.count })),
-  ];
-
   return (
-    <main className="flex flex-1 flex-col bg-canvas text-ink">
-      {/* Figma Hero (470 px aurora band) with the title centred; the search
-          sits in the nav on desktop and under the title below lg
-          (developer request, 17 Nov 2026). */}
-      {/* Shorter band (developer request, 17 Nov 2026): the aurora is squashed
-          to 68% height so the whole signature shape still fits. */}
-      <AuroraBand className="lg:h-[320px]" decorClassName="lg:scale-y-[0.68]">
-        <SiteNav side="buyer" current="Sellers" search={searchBox("seller-search")} />
-        <div className="relative flex flex-col items-center px-4 pt-8 pb-12 text-center sm:px-12 lg:pt-[52px] lg:pb-0">
-          <h1 className="bg-linear-to-b from-ink via-[#292b36] via-55% to-[#737585] bg-clip-text pb-2 text-[56px] leading-[0.9] font-medium tracking-[-0.05em] text-transparent sm:text-[72px] lg:text-[88px]">
-            Sellers
-          </h1>
-          <div className="mt-8 w-full max-w-[560px] lg:hidden">{searchBox("seller-search-mobile")}</div>
-        </div>
-      </AuroraBand>
-
-      <section aria-label="Sellers" className="flex flex-col px-4 pt-6 pb-[110px] sm:px-12">
-        <CategoryTabs
-          tabs={tabs}
-          active={category}
-          onSelect={(key) => go({ category: key })}
-          sort={{
-            label: sort === "name" ? "Sorted A to Z. Show newest first" : "Newest first. Sort A to Z",
-            onToggle: () => go({ sort: sort === "name" ? "newest" : "name", page: 1 }),
-          }}
-        />
-        <div className="h-10" />
-
-        {directory.isPending ? (
-          <LogoLoader label="Loading sellers" className="py-20" />
-        ) : directory.isError ? (
-          <p role="alert" className="py-20 text-center text-sm text-destructive">
-            Could not load sellers. Please try again.
+    <main className="flex flex-1 flex-col bg-white text-ink">
+      <SoftHero>
+        <SiteNav side="buyer" current="Sellers" />
+        <div className="mx-auto flex w-full max-w-[760px] flex-col items-center px-4 pt-10 pb-16 text-center font-ai lg:pt-16 lg:pb-24">
+          <p className="text-[13px] font-medium tracking-[0.08em] text-ink-tertiary">VERIFIED SELLERS · GCC</p>
+          <h1 className="mt-4 font-ai-serif text-[44px] leading-[1.05] tracking-[-0.02em] text-[#8b8d96] sm:text-[64px]">Find a trusted seller</h1>
+          <p className="mt-4 max-w-[520px] text-base leading-normal text-ink-tertiary sm:text-[17px]">
+            Every seller here is checked by Muhrak before they can sell. Search by name, brand or part number.
           </p>
-        ) : data && data.items.length > 0 ? (
-          <>
-            <ul className="grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 min-[1600px]:grid-cols-6">
-              {data.items.map((seller) => (
-                <li key={seller.id}>
-                  <SellerCardView seller={seller} />
-                </li>
-              ))}
-            </ul>
-            <div className="mt-[60px]">
-              <Pagination page={data.page} pageSize={data.pageSize} total={data.total} noun="sellers" onPage={(next) => go({ page: next })} />
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col items-center gap-3 py-20 text-center">
-            <p className="text-[15px] text-ink-tertiary">{q ? `No seller matches “${q}”.` : "No sellers here yet."}</p>
-            {q || category ? (
-              <button type="button" onClick={() => router.push("/sellers")} className={cn("text-sm font-medium text-ink underline", focus)}>
-                Show all sellers
-              </button>
-            ) : null}
+          <div className="mt-8 w-full max-w-[640px]">
+            <SearchPill
+              key={q}
+              id="seller-search"
+              label="Search sellers"
+              placeholder="Seller, brand or part number…"
+              initial={q}
+              maxLength={60}
+              onSearch={(text) => go({ q: text })}
+            />
           </div>
-        )}
+        </div>
+      </SoftHero>
+
+      <section aria-label="Sellers" className="mx-auto flex w-full max-w-[1320px] flex-col px-4 pt-10 pb-24 font-ai sm:px-8 lg:pb-[120px]">
+        <div className="flex items-center gap-3">
+          <nav aria-label="Categories" className="-mx-1 flex min-w-0 flex-1 gap-2 overflow-x-auto px-1 py-1">
+            <Chip active={!category} count={data?.allCount} onClick={() => go({ category: "" })}>
+              All
+            </Chip>
+            {(data?.categories ?? []).map((item) => (
+              <Chip key={item.id} active={category === item.id} count={item.count} onClick={() => go({ category: item.id })}>
+                {item.name}
+              </Chip>
+            ))}
+          </nav>
+          <button
+            type="button"
+            onClick={() => go({ sort: sort === "name" ? "newest" : "name" })}
+            aria-label={sort === "name" ? "Sorted A to Z. Show newest first" : "Newest first. Sort A to Z"}
+            className={cn(
+              "inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-black/[0.055] px-4 text-[15px] leading-none text-ink-secondary hover:bg-black/[0.09]",
+              softFocus,
+            )}
+          >
+            <ArrowUpDown aria-hidden className="size-4" strokeWidth={1.8} />
+            <span className="hidden sm:inline">{sort === "name" ? "A to Z" : "Newest"}</span>
+          </button>
+        </div>
+        {q ? (
+          <p className="mt-5 text-[15px] text-ink-tertiary">
+            Results for “<span className="text-ink">{q}</span>”.{" "}
+            <button type="button" onClick={() => go({ q: "" })} className={cn("rounded-sm text-ink underline underline-offset-2", softFocus)}>
+              Clear
+            </button>
+          </p>
+        ) : null}
+
+        <div className="mt-8">
+          {directory.isPending ? (
+            <LogoLoader label="Loading sellers" className="py-20" />
+          ) : directory.isError ? (
+            <p role="alert" className="py-20 text-center text-sm text-destructive">
+              Could not load sellers. Please try again.
+            </p>
+          ) : data && data.items.length > 0 ? (
+            <>
+              <ul className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {data.items.map((seller) => (
+                  <li key={seller.id}>
+                    <SellerCardView seller={seller} />
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-14">
+                <Pagination page={data.page} pageSize={data.pageSize} total={data.total} noun="sellers" onPage={(next) => go({ page: next })} />
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center gap-4 py-20 text-center">
+              <p className="font-ai-serif text-[28px] text-[#8b8d96]">{q ? "No seller matches that" : "No sellers here yet"}</p>
+              <p className="text-[15px] text-ink-tertiary">{q ? `Nothing found for “${q}”. Try a brand or a part number.` : "Verified sellers will appear here."}</p>
+              {q || category ? (
+                <Chip onClick={() => router.push("/sellers")}>Show all sellers</Chip>
+              ) : null}
+            </div>
+          )}
+        </div>
       </section>
 
-      <Footer side="buyer" />
+      <Footer side="buyer" soft />
     </main>
   );
 }
 
-/** Figma "Manufacturer Grid Card": label line, square image with the logo badge, name + products, category · country. */
+/** A seller: their logo on a pale tile, name with the verified mark, place, main category and product count. */
 function SellerCardView({ seller }: { seller: SellerCard }) {
+  const place = [seller.city, seller.countryName].filter(Boolean).join(", ");
   return (
-    <Link href={`/sellers/${seller.id}`} className={cn("group flex flex-col rounded-[14px]", focus)}>
-      <p className="h-[14px] text-[11px] leading-[normal] tracking-[0.06em] text-ink-secondary">{seller.isNew ? "NEW" : ""}</p>
-      <div className="h-2.5" />
-      <CardImage src={seller.coverPhotoUrl}>
-        <span className="absolute bottom-[15px] left-[13px] flex h-[30px] max-w-[60%] min-w-[92px] items-center justify-center overflow-hidden rounded-[8px] border border-black/8 bg-white px-2">
-          {seller.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- public logo from storage
-            <img src={seller.logoUrl} alt="" className="max-h-[22px] max-w-full object-contain" />
-          ) : (
-            <span className="text-[11px] font-semibold tracking-[0.08em] text-ink">{initials(seller.companyName)}</span>
-          )}
-        </span>
-      </CardImage>
-      <div className="h-3.5" />
-      <div className="flex items-start gap-2 text-[13px] leading-[normal] text-ink">
-        <p className="min-w-0 flex-1 font-medium tracking-[0.04em] uppercase group-hover:underline">{seller.companyName}</p>
-        <p className="shrink-0 whitespace-nowrap">
-          {seller.productCount} {seller.productCount === 1 ? "product" : "products"}
-        </p>
+    <Link href={`/sellers/${seller.id}`} className={cn("group flex h-full flex-col p-3 transition-shadow hover:shadow-[0_18px_44px_-22px_rgba(10,11,18,0.35),inset_0_0_0_1px_rgba(10,11,18,0.08)]", softCard, softFocus)}>
+      <div className="relative flex aspect-[4/3] items-center justify-center rounded-[20px] bg-linear-to-b from-[#f5f8fc] to-[#e9f1f9]">
+        <LogoTile name={seller.companyName} logoUrl={seller.logoUrl} className="size-[42%] rounded-[22px] shadow-sm" initialsClass="text-[32px]" />
+        {seller.isNew ? (
+          <span className="absolute top-3 left-3 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium tracking-[0.06em] text-ink">NEW</span>
+        ) : null}
       </div>
-      <p className="mt-1 text-xs leading-[normal] text-ink-tertiary">
-        {[seller.mainCategory, seller.city ? `${seller.city}, ${seller.countryName}` : seller.countryName].filter(Boolean).join(" · ")}
-      </p>
+      <div className="flex flex-1 flex-col gap-1.5 px-2 pt-4 pb-2">
+        <p className="flex items-center gap-1.5 text-base leading-tight font-medium text-ink">
+          <span className="min-w-0 truncate group-hover:underline">{seller.companyName}</span>
+          <VerifiedMark className="size-[18px]" />
+        </p>
+        <p className="truncate text-[13px] text-ink-tertiary">{place}</p>
+        <div className="mt-auto flex flex-wrap gap-1.5 pt-3">
+          {seller.mainCategory ? <span className="rounded-full bg-black/[0.055] px-2.5 py-1 text-[12px] text-ink-secondary">{seller.mainCategory}</span> : null}
+          <span className="rounded-full bg-black/[0.055] px-2.5 py-1 text-[12px] text-ink-secondary">
+            {seller.productCount} {seller.productCount === 1 ? "product" : "products"}
+          </span>
+        </div>
+      </div>
     </Link>
   );
 }
