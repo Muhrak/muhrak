@@ -112,7 +112,8 @@ export function StatsStrip({ stats, soft = false }: { stats: { label: string; va
 
 // ---------------------------------------------------------------- "What's in it for you?"
 
-export type GlassObject = { src: string; x: number; y: number; size: number };
+/** `phone`: another spot below `sm`, where the cards are wider and the part would sit on the text. */
+export type GlassObject = { src: string; x: number; y: number; size: number; phone?: { x: number; y: number } };
 
 export interface BenefitsContent {
   id: string;
@@ -134,7 +135,8 @@ export function Benefits({ id, chip, intro, cards, glass, aurora, dome, cardEdge
     <section
       id={id}
       className={cn(
-        "relative overflow-hidden pt-[110px] pb-[120px] min-[1360px]:h-[1380px] min-[1360px]:pt-[150px] min-[1360px]:pb-0",
+        "relative overflow-hidden pt-[110px] min-[1360px]:h-[1380px] min-[1360px]:pt-[150px] min-[1360px]:pb-0",
+        soft ? "pb-[96px]" : "pb-[120px]",
         soft ? "bg-white" : "bg-canvas",
       )}
     >
@@ -168,7 +170,7 @@ export function Benefits({ id, chip, intro, cards, glass, aurora, dome, cardEdge
       >
         {/* Phones and tablets: the same aurora (or soft glow) behind the stacked cards, cropped like desktop. */}
         {soft ? (
-          <SoftGlow className="inset-auto top-[4%] left-[calc(50%-50vw)] h-[calc(96%+120px)] w-screen min-[1360px]:hidden" strength={2.2} />
+          <SoftGlow className="inset-auto top-[4%] left-[calc(50%-50vw)] h-[calc(96%+96px)] w-screen min-[1360px]:hidden" strength={2.2} fadeBottom />
         ) : (
           <Image
             src={aurora}
@@ -207,7 +209,8 @@ export function Benefits({ id, chip, intro, cards, glass, aurora, dome, cardEdge
 }
 
 /** Full Figma size from `sm` up; 72% on phones, where the cards are shorter. */
-function GlassPart({ src, x, y, size, soft = false }: GlassObject & { soft?: boolean }) {
+function GlassPart({ src: aurora, x, y, size, phone, soft = false }: GlassObject & { soft?: boolean }) {
+  const src = soft ? aurora.replace(/\.png$/, "-light.png") : aurora;
   const g = (n: number) => `calc(${n} * var(--g))`;
   return (
     <Image
@@ -218,11 +221,12 @@ function GlassPart({ src, x, y, size, soft = false }: GlassObject & { soft?: boo
       sizes={`${size}px`}
       className={cn(
         "pointer-events-none absolute max-w-none object-cover [--g:0.72px] sm:[--g:1px]",
-        // The parts are white glass on black. On the aurora they are screened in; on the white
-        // soft page they are inverted and multiplied, which reads as clear glass on white.
-        soft ? "opacity-70 mix-blend-multiply [filter:invert(1)_hue-rotate(180deg)_brightness(1.35)]" : "mix-blend-screen",
+        "top-[calc(var(--py)*var(--g))] left-[calc(var(--px)*var(--g))] sm:top-[calc(var(--y)*var(--g))] sm:left-[calc(var(--x)*var(--g))]",
+        // The parts are white glass on black, screened onto the aurora. The white soft page uses
+        // ready-made "clear glass on white" copies with real transparency (*-light.png), no blending.
+        soft ? null : "mix-blend-screen",
       )}
-      style={{ left: g(x), top: g(y), width: g(size), height: g(size) }}
+      style={{ "--x": x, "--y": y, "--px": phone?.x ?? x, "--py": phone?.y ?? y, width: g(size), height: g(size) } as CSSProperties}
     />
   );
 }
@@ -257,8 +261,8 @@ export function AiFeature({ card, glow, cardEdge, heading, text, cta, side, soft
     <section
       id="muhrak-ai"
       className={cn(
-        "relative flex flex-col items-center gap-14 overflow-hidden px-4 pt-[120px] pb-[100px] [--bar-unit:0.8px] sm:[--bar-unit:1px] lg:h-[740px] lg:flex-row lg:justify-center lg:gap-[110px] lg:px-0 lg:pt-[160px] lg:pb-[140px]",
-        soft ? "bg-white" : "bg-canvas",
+        "relative flex flex-col items-center gap-14 overflow-hidden px-4 [--bar-unit:0.8px] sm:[--bar-unit:1px] lg:h-[740px] lg:flex-row lg:justify-center lg:gap-[110px] lg:px-0 lg:pt-[160px] lg:pb-[140px]",
+        soft ? "bg-white pt-[96px] pb-[72px]" : "bg-canvas pt-[120px] pb-[100px]",
       )}
     >
       {soft ? null : <MobileGlow edge="top" className="h-[320px]" strength={0.45} palette={side} />}
@@ -315,7 +319,7 @@ export function AiFeature({ card, glow, cardEdge, heading, text, cta, side, soft
 
 export function Faq({ items, contact, soft = false }: { items: FaqItem[]; contact: string; soft?: boolean }) {
   return (
-    <section id="faq" className={cn("flex flex-col items-center px-4 pt-[60px] pb-[140px]", soft ? "bg-white" : "bg-canvas")}>
+    <section id="faq" className={cn("flex flex-col items-center px-4", soft ? "bg-white pt-[72px] pb-[120px] lg:pt-[60px] lg:pb-[140px]" : "bg-canvas pt-[60px] pb-[140px]")}>
       <h2 className="text-center text-[40px] leading-[1.12] tracking-[-0.02em] sm:text-[48px]">
         <span className="block text-ink">Frequently Asked</span>
         <span className="block text-ink-tertiary">Questions</span>
@@ -403,8 +407,8 @@ const FOOTER_COLUMNS: { title: string; links: FooterLink[] }[] = [
 export function Footer({ side, soft = false }: { side: LandingSide; soft?: boolean }) {
   return (
     <footer className={cn("relative flex flex-col gap-14 overflow-hidden border-t border-black/7 px-4 pt-16 pb-10 sm:px-10 xl:px-[140px]", soft ? "bg-white" : "bg-canvas")}>
-      {/* Mobile: the page closes with the same band as the hero's bottom edge. */}
-      <MobileGlow edge="bottom" className="h-[75%]" palette={side} />
+      {/* Mobile: the page closes with the same band as the hero's bottom edge (the soft glow on the buyer landing). */}
+      {soft ? <SoftGlow className="top-auto h-[55%] lg:hidden" fill /> : <MobileGlow edge="bottom" className="h-[75%]" palette={side} />}
       <div className="relative flex flex-col gap-10 lg:flex-row lg:gap-6">
         <Link href={side === "seller" ? "/sell" : "/"} aria-label="Muhrak home" className={cn("flex self-start rounded-sm", focus)}>
           <Image src="/auth/muhrak-logo.svg" alt="Muhrak" width={156.357} height={29.8588} />
@@ -429,7 +433,7 @@ export function Footer({ side, soft = false }: { side: LandingSide; soft?: boole
           ))}
         </div>
       </div>
-      <div className="relative flex min-h-[100px] flex-wrap items-center gap-4">
+      <div className={cn("relative flex min-h-[100px] flex-wrap items-center gap-4", soft && "max-sm:min-h-0 max-sm:flex-col max-sm:items-start max-sm:gap-3")}>
         <div className="flex items-center gap-[18px]" aria-label="Social media">
           <Image src="/landing/instagram.svg" alt="Instagram" width={16} height={16} />
           <Image src="/landing/x.svg" alt="X" width={16} height={16} />

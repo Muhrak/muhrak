@@ -300,6 +300,13 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   for reduced motion.
 - This departs from the Figma "Buyer – Landing v2 (Light)" frame on
   purpose (developer request).
+- Phone fixes (same day): footer uses the soft glow (the strong mobile
+  band drew a grey edge on white) and stacks icons + copyright on the
+  left; glass parts use ready-made see-through copies
+  (`public/landing/glass-*-light.png`, no CSS blend modes, which failed on
+  phones); the bearing has its own phone spot (`GlassObject.phone`); the
+  glow under the cards fades out; even phone spacing between sections;
+  stars on phones only above the heading and at the edges.
 
 ### Day 9: quote requests (Sun 15 Nov)
 - Developer decisions (15 Nov): **one seller per request** (Figma "Request

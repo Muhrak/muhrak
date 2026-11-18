@@ -8,7 +8,18 @@ import { cn } from "@/lib/utils";
  * positioned parent; `strength` scales the colour (glass parts need more);
  * `fill` adds an even band along the bottom (no white gap in the middle).
  */
-export function SoftGlow({ className, strength = 1, fill = false }: { className?: string; strength?: number; fill?: boolean }) {
+export function SoftGlow({
+  className,
+  strength = 1,
+  fill = false,
+  fadeBottom = false,
+}: {
+  className?: string;
+  strength?: number;
+  fill?: boolean;
+  /** Fade into white at the bottom too, so the next section starts on white without a hard line. */
+  fadeBottom?: boolean;
+}) {
   const a = (alpha: number) => Math.min(1, alpha * strength).toFixed(3);
   return (
     <div aria-hidden className={cn("pointer-events-none absolute inset-0 overflow-hidden", className)}>
@@ -26,6 +37,7 @@ export function SoftGlow({ className, strength = 1, fill = false }: { className?
       />
       {/* White at the top, as in the reference. */}
       <div className="absolute inset-x-0 top-0 h-[42%] bg-linear-to-b from-white to-transparent" />
+      {fadeBottom ? <div className="absolute inset-x-0 bottom-0 h-[14%] bg-linear-to-t from-white to-transparent" /> : null}
     </div>
   );
 }

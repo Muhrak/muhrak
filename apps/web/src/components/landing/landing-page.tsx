@@ -42,7 +42,8 @@ export function LandingPage() {
         glass={{
           0: { src: "/landing/glass-piston.png", x: -70, y: 220, size: 250 },
           2: { src: "/landing/glass-gear.png", x: 30, y: 290, size: 240 },
-          3: { src: "/landing/glass-bearing.png", x: 140, y: 120, size: 230 },
+          // Phones: lower right, clear of the card text.
+          3: { src: "/landing/glass-bearing.png", x: 140, y: 120, size: 230, phone: { x: 250, y: 165 } },
         }}
         aurora="/landing/benefits-aurora.svg"
         dome="/landing/benefits-dome.svg"
