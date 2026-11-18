@@ -5,7 +5,7 @@
  */
 export const NAV_LINKS: { label: string; href?: string }[] = [
   { label: "Sellers", href: "/sellers" },
-  { label: "Muhrak AI", href: "/#muhrak-ai" },
+  { label: "Muhrak AI", href: "/ai" },
   { label: "Garage" },
 ];
 

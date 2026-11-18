@@ -93,7 +93,7 @@ export const PORTAL_NAV: Record<PortalSide, NavEntry[]> = { buyer: BUYER_NAV, se
 
 /** Pages linked from dashboards that are not in the menu. */
 const EXTRA_SECTIONS: Record<PortalSide, Record<string, string>> = {
-  buyer: { "find-part": "Find a part" },
+  buyer: {},
   seller: { store: "My store" },
 };
 

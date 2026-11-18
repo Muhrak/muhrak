@@ -26,7 +26,7 @@ export function BuyerDashboard() {
           </div>
           <div className="flex flex-wrap gap-3">
             <OutlinePillLink href="/search">Browse parts</OutlinePillLink>
-            <SolidPillLink href="/buyer/find-part">Ask Muhrak AI</SolidPillLink>
+            <SolidPillLink href="/ai">Ask Muhrak AI</SolidPillLink>
           </div>
         </section>
         <MuhrakAiCard />
@@ -72,7 +72,7 @@ function MuhrakAiCard() {
         <p className="text-sm leading-[normal] text-feature-muted">No searches yet</p>
       </div>
       <Link
-        href="/buyer/find-part"
+        href="/ai"
         className="flex items-center gap-4 rounded-[16px] border border-dashed border-white/14 bg-white/6 px-6 py-[22px] text-white outline-none transition-colors hover:bg-white/10 focus-visible:ring-3 focus-visible:ring-white/40"
       >
         <Icon name="upload" className="size-[22px]" />

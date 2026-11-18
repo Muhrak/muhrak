@@ -3,7 +3,7 @@
 Read this first in every new session, then `CLAUDE.md`, `docs/PLAN.md` and
 `docs/ARCHITECTURE.md`. Update it whenever a piece of work is committed.
 
-Last updated: Wed 18 Nov 2026 (Days 6 and 7 tested with a real Gemini photo). Branch `develop`.
+Last updated: Wed 18 Nov 2026 (Day 8 photo search done: Muhrak AI page). Branch `develop`.
 
 ## Status
 
@@ -235,6 +235,54 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   still opens the Coming soon page (photo route, after the AI module).
 - Fixed in passing: the Sellers directory's brand search escaped `%` and
   `_` wrongly (it searched for a literal placeholder text instead).
+
+### Day 8 (photo half): Muhrak AI photo search (Wed 18 Nov)
+- **API.** New upload purpose `part_photo` (buyer only; JPG/PNG/WebP up to
+  10 MB). Re-encoded like product photos (GPS and other metadata dropped)
+  but kept PRIVATE at `files/part_photo/<id>.webp`, never under `public/`.
+  Migration `0013` only adds the enum value.
+- `/v1/buyer/ai` router (buyer role): `status`, `POST identifications`,
+  `GET identifications/:id`, and `GET identifications/:id/photo` (a
+  10-minute signed link to the buyer's own photo, `no-store`). Each side
+  can only send its own photo kind (`getOwnedPhotoForAi(user, upload,
+  purpose)`); limits and budget are shared with the seller side.
+- Part search (`GET /v1/parts`) also takes `partNumber` and `machine`
+  (photo search: each matched only as itself; a machine match then also
+  needs the part name). `category` now narrows name and machine matches
+  only: a part-number match shows whatever its category.
+- **Web `/ai` (Muhrak AI), redesigned the same day at the developer's
+  request** from `refs/muhrak ai/muhrak ai design .jpeg` (the dark Figma
+  "Muhrak AI – Upload/Results v2" frames are no longer used). A standalone
+  full-screen page: no site nav or footer; its own slim bar (logo → `/`,
+  Home / Sellers / My requests, account button, phone menu). Serif question
+  (Gloock), Manrope text, chips, a bottom input pill + round camera button,
+  soft glow in the buyer blues only (the reference's pink/green were not used).
+- Chat-like flow on one page: the buyer's photo (or typed text) on the
+  right; one status line under it with the Muhrak mark turning like a
+  ratchet (`public/ai/muhrak-mark.svg`, `.ai-mark` / `.ai-shimmer` in
+  globals.css) whose text changes: Uploading your photo → Identifying the
+  part → Finding matching sellers. Then the identified part (name,
+  confidence, part no. / fits / category), "Edit details" in a modal, and
+  the matching parts; a part opens the quote request modal. AI guesses
+  marked "low" are left out, as on Add product.
+- State in the URL (`?id=` photo search, `?q=` typed search, edited
+  details, page, `quote`), so reload, Back and "log in, then come back"
+  work (`afterLoginPath` allows `/ai`). `/buyer/find-part` redirects to
+  `/ai`. Landing "Find a part" (hero and bottom banner), "Try Muhrak AI",
+  the nav/footer "Muhrak AI" and the dashboard "Ask Muhrak AI" open `/ai`.
+- No "sellers notified" (one seller per quote request, 15 Nov decision).
+- Tested: 275 API tests (new: buyer photo kind, private storage, photo
+  link ownership, search field mapping, query schema); live abuse checks
+  with temporary accounts (seller on buyer routes 403 and back; wrong
+  photo kind or someone else's photo 404; cleaned photo not publicly
+  readable); one real photo by the developer (AC compressor, high
+  confidence). Result, edit modal and progress checked on screen, desktop
+  and phone.
+- Not checked on screen: a result list with real matches (the local
+  database has no published products of verified sellers).
+- Two small test files from the abuse check stay in the staging bucket
+  (`pending/b6531a02…` and `files/part_photo/b6531a02….webp`; the API
+  cannot delete). Remove in the AWS console if wanted.
 
 ### Day 9: quote requests (Sun 15 Nov)
 - Developer decisions (15 Nov): **one seller per request** (Figma "Request
@@ -780,11 +828,11 @@ Still open (Day 4 admin):
 
 ## Next up, see `docs/PLAN.md`
 
-- Day 6: put a Gemini key in `apps/api/.env`, your user id in
-  `AI_TEST_USER_IDS`, then (with your OK) `pnpm ai:try --yes <photos>` on
-  real part photos and adjust `src/modules/ai/prompt.ts`. Then Day 7 (AI
-  fill on Add product) and the photo half of Day 8 (buyer photo purpose
-  and a `/v1/buyer/ai` router).
+- Day 8 is done (text and photo search). Next: Day 10 (Stream Chat; needs
+  a Stream account) or Day 11 (Send quote; no outside service, the `quote`
+  transition already exists in `RFQ_TRANSITIONS`).
+- Staging: migration `0013` runs on the next deploy (start command runs
+  migrations).
 - Before launch: a PAID Gemini key (`GEMINI_TIER=paid`); set the AI
   variables on Railway.
 - Without the key, Day 11 (Send quote; the `quote` transition already

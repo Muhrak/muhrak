@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Albert_Sans, Geist, Geist_Mono } from "next/font/google";
+import { Albert_Sans, Geist, Geist_Mono, Gloock, Manrope } from "next/font/google";
 import { Suspense } from "react";
 import { MaintenanceOverlay, SITE_CONTENT_ID } from "@/features/maintenance/gate";
 import { Providers } from "./providers";
@@ -23,6 +23,18 @@ const albertSans = Albert_Sans({
   style: ["normal", "italic"],
 });
 
+/** Muhrak AI page (developer reference refs/muhrak ai, 18 Nov 2026): Manrope text, a serif for the question. */
+const manrope = Manrope({
+  variable: "--font-manrope",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
+const gloock = Gloock({
+  variable: "--font-gloock",
+  subsets: ["latin"],
+  weight: "400",
+});
+
 export const metadata: Metadata = {
   title: "Muhrak",
   description: "Find heavy equipment and vehicle spare parts across the GCC.",
@@ -33,7 +45,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${albertSans.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${albertSans.variable} ${manrope.variable} ${gloock.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <Providers>

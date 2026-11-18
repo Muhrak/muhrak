@@ -10,12 +10,38 @@ import { moneySchema } from "./money-schema";
 
 export const PART_SEARCH_PAGE_SIZE = 20;
 
-export const partSearchQuerySchema = z.object({
-  /** Part number ("6020/F4"), part name ("breaker bushing") or machine ("Kobelco SK380"). */
-  q: z.string().trim().min(2, "Type at least 2 characters").max(80),
-  category: z.string().uuid().optional(),
-  page: z.coerce.number().int().min(1).max(50).default(1),
-});
+/** Optional text: blank counts as not given. */
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((value) => (value ? value : undefined))
+    .optional();
+
+/**
+ * Two ways to search:
+ * - `q` alone (the search box): a part number, part name or machine; it is
+ *   tried as all three.
+ * - Separate fields (photo search, Day 8: the details Muhrak AI read from
+ *   the buyer's photo, which the buyer can edit): `partNumber`, `machine`
+ *   and `q` as the part name. Each is matched only as what it is.
+ * `category` narrows name and machine matches; a part-number match is shown
+ * whatever its category (the number is the stronger evidence).
+ */
+export const partSearchQuerySchema = z
+  .object({
+    /** Part number ("6020/F4"), part name ("breaker bushing") or machine ("Kobelco SK380"). */
+    q: optionalText(80),
+    partNumber: optionalText(40),
+    machine: optionalText(80),
+    category: z.string().uuid().optional(),
+    page: z.coerce.number().int().min(1).max(50).default(1),
+  })
+  .refine((query) => [query.q, query.partNumber, query.machine].some((value) => value !== undefined && value.length >= 2), {
+    message: "Type at least 2 characters",
+    path: ["q"],
+  });
 export type PartSearchQuery = z.infer<typeof partSearchQuerySchema>;
 
 /**

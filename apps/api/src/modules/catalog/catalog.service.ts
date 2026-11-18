@@ -414,21 +414,32 @@ export interface LiveProductMatch extends Omit<PartSearchResult, "seller"> {
  * Live products of the given (verified) sellers matching a buyer's search:
  * by part number (ignoring punctuation), machine, or every word in the
  * name, brand or machines. Strongest match first.
+ *
+ * `text` alone is tried as a part number, a machine and words. With
+ * `partNumber` or `machine` given (photo search), each field is matched only
+ * as itself and `text` is the part name; a machine match then also needs
+ * the name to match, so "Fits your machine" means this kind of part for
+ * this machine, not any part of it.
  */
 export async function searchLiveProducts(input: {
-  text: string;
+  text?: string;
+  partNumber?: string;
+  machine?: string;
   categoryId: string | null;
   sellerIds: string[];
   page: number;
   pageSize: number;
 }): Promise<{ items: LiveProductMatch[]; total: number }> {
-  const text = input.text.trim();
+  const text = input.text?.trim() ?? "";
+  const fields = input.partNumber !== undefined || input.machine !== undefined;
   const words = [...new Set(text.toLowerCase().split(/\s+/).filter((word) => word.length >= 2))].slice(0, 6);
+  const machine = fields ? (input.machine ?? "") : text;
   const { rows, total } = await repo.searchPublishedProducts({
     sellerIds: input.sellerIds,
     categoryId: input.categoryId,
-    partNumber: normalizePartNumber(text),
-    fitment: text.toLowerCase().replace(/[^a-z0-9]/g, ""),
+    partNumber: normalizePartNumber(fields ? (input.partNumber ?? "") : text),
+    fitment: machine.toLowerCase().replace(/[^a-z0-9]/g, ""),
+    fitsNeedsWords: fields && words.length > 0,
     wordPatterns: words.map(likeContains),
     // Shorter fragments ("50") would match inside too many model names.
     wordFitments: words.map((word) => {

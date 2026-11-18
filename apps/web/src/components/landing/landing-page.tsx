@@ -13,7 +13,8 @@ import { AiFeature, Benefits, Cta, Faq, Footer, heroUnit, onCanvas, SiteNav, Sta
  */
 
 /** Text search (Day 8). The photo route (Muhrak AI) comes with the AI module. */
-const FIND_A_PART = "/search";
+/** "Find a part" opens Muhrak AI photo search (developer request, 18 Nov 2026). */
+const FIND_A_PART = "/ai";
 
 export function LandingPage() {
   return (
@@ -53,7 +54,7 @@ export function LandingPage() {
         cardEdge="border-glass-edge"
         heading={["Snap a part,", "get quotes in hours."]}
         text="Upload one photo. Muhrak AI identifies the part and sends your request to sellers who stock it."
-        cta={{ href: FIND_A_PART, label: "Try Muhrak AI" }}
+        cta={{ href: "/ai", label: "Try Muhrak AI" }}
       />
       <Faq items={BUYER_FAQ} contact="Have another question? Contact our team." />
       <Cta

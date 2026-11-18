@@ -124,6 +124,8 @@ export async function searchParts(query: PartSearchQuery): Promise<PartSearchRes
   const verifiedIds = await listVerifiedSellerIds();
   const { items, total } = await searchLiveProducts({
     text: query.q,
+    partNumber: query.partNumber,
+    machine: query.machine,
     categoryId: query.category ?? null,
     sellerIds: verifiedIds,
     page: query.page,

@@ -3,7 +3,7 @@ import express, { Router } from "express";
 import helmet from "helmet";
 import { env } from "./config/env";
 import { adminRouter } from "./modules/admin";
-import { sellerAiRouter } from "./modules/ai";
+import { buyerAiRouter, sellerAiRouter } from "./modules/ai";
 import { authRouter } from "./modules/auth";
 import { catalogRouter, sellerProductsRouter } from "./modules/catalog";
 import { healthRouter } from "./modules/health/health.routes";
@@ -49,6 +49,7 @@ export function createApp() {
   v1.use("/seller/products", sellerProductsRouter);
   v1.use("/seller/rfqs", sellerRfqRouter);
   v1.use("/seller/ai", sellerAiRouter);
+  v1.use("/buyer/ai", buyerAiRouter);
   v1.use("/seller", sellerRouter);
   v1.use("/admin", adminRouter);
   app.use("/v1", v1);

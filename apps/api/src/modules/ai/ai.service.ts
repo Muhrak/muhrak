@@ -2,6 +2,7 @@ import { z } from "zod";
 import { env } from "../../config/env";
 import {
   AI_QUEUE,
+  type FileLink,
   AI_UNAVAILABLE_CODE,
   aiModelOutputSchema,
   type AiIdentification,
@@ -13,7 +14,7 @@ import { AppError, notFound } from "../../shared/errors";
 import { enqueueJob, wakeWorker } from "../../shared/jobs";
 import { logger } from "../../shared/logger";
 import { listCategories } from "../catalog";
-import { getOwnedPhotoForAi, readPhotoForAi } from "../upload";
+import { getOwnedPartPhotoLink, getOwnedPhotoForAi, readPhotoForAi, type AiPhotoPurpose } from "../upload";
 import { AiProviderError, type AiProvider, type ModelUsage } from "./ai-provider";
 import { MAX_INPUT_TOKENS_ESTIMATE, MAX_OUTPUT_TOKENS } from "./prompt";
 import { createGeminiProvider } from "./providers/gemini";
@@ -145,14 +146,23 @@ export function toSuggestion(output: AiModelOutput, categories: { id: string; sl
 
 // ---------------------------------------------------------------- requests
 
-/** Start identifying the caller's photo, or return the identification it already has. */
-export async function requestIdentification(userId: string, uploadId: string, now = new Date()): Promise<AiIdentification> {
+/**
+ * Start identifying the caller's photo, or return the identification it
+ * already has. `purpose` is fixed by the route: sellers send product
+ * photos, buyers their private part photos; nobody can send the other kind.
+ */
+export async function requestIdentification(
+  userId: string,
+  uploadId: string,
+  purpose: AiPhotoPurpose,
+  now = new Date(),
+): Promise<AiIdentification> {
   const reason = blockedReason(userId);
   if (reason) {
     logger.info({ userId, reason }, "AI identification refused");
     throw unavailable(503, OFF_MESSAGE);
   }
-  await getOwnedPhotoForAi(userId, uploadId);
+  await getOwnedPhotoForAi(userId, uploadId, purpose);
 
   const existing = await repo.findByUpload(uploadId);
   if (existing) return toDto(existing);
@@ -183,6 +193,16 @@ export async function getIdentification(userId: string, id: string): Promise<AiI
   const row = await repo.findById(id);
   if (!row || row.userId !== userId) throw notFound("Not found");
   return toDto(row);
+}
+
+/** How long the buyer's link to their own photo works. */
+export const PHOTO_LINK_SECONDS = 10 * 60;
+
+/** Buyer photo search: a short-lived link to the caller's own photo of their own identification. */
+export async function getIdentificationPhoto(userId: string, id: string, now = new Date()): Promise<FileLink> {
+  const row = await repo.findById(id);
+  if (!row || row.userId !== userId) throw notFound("Not found");
+  return getOwnedPartPhotoLink(userId, row.uploadId, PHOTO_LINK_SECONDS, now);
 }
 
 // ---------------------------------------------------------------- background job

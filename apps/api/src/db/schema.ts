@@ -129,10 +129,11 @@ export const jobs = pgTable(
 
 /**
  * "seller_cover" is no longer used (store cover photos were dropped on
- * 12 Nov 2026). It stays in the database enum because removing an enum
+ * 12 Nov 2026). "part_photo" (Day 8) is a buyer's private photo for
+ * Muhrak AI photo search. "seller_cover" stays in the database enum because removing an enum
  * value means rebuilding the type; nothing can create one any more.
  */
-export const uploadPurpose = pgEnum("upload_purpose", ["seller_logo", "seller_cover", "seller_document", "product_photo"]);
+export const uploadPurpose = pgEnum("upload_purpose", ["seller_logo", "seller_cover", "seller_document", "product_photo", "part_photo"]);
 export const uploadStatus = pgEnum("upload_status", ["pending", "ready", "rejected"]);
 
 /**

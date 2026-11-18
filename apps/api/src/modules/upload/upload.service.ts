@@ -26,6 +26,14 @@ export function logoKey(uploadId: string): string {
   return `public/logos/${uploadId}.webp`;
 }
 
+/** Where a buyer's part photo's cleaned copy lives: private (`files/`), never public. */
+export function partPhotoKey(uploadId: string): string {
+  return `files/part_photo/${uploadId}.webp`;
+}
+
+/** Private files the API wrote itself: never cached by browsers or proxies. */
+const PRIVATE_FILE_CACHE = "private, no-store";
+
 /** Where a product photo's cleaned copies live. Random upload id only: nothing the user typed. */
 export function productPhotoKeys(uploadId: string): { large: string; thumb: string } {
   return { large: `public/products/${uploadId}.webp`, thumb: `public/products/${uploadId}-thumb.webp` };
@@ -44,6 +52,7 @@ const PURPOSE_ROLES: Record<UploadPurpose, Role[]> = {
   seller_logo: ["seller"],
   seller_document: ["seller"],
   product_photo: ["seller"],
+  part_photo: ["buyer"],
 };
 
 const EXTENSION: Record<UploadContentType, string> = {
@@ -109,9 +118,11 @@ export async function createUpload(
     storageKey:
       input.purpose === "product_photo"
         ? productPhotoKeys(id).large
-        : input.purpose === "seller_logo"
+        : input.purpose === "part_photo"
+          ? partPhotoKey(id)
+          : input.purpose === "seller_logo"
           ? logoKey(id)
-          : `files/${input.purpose}/${id}.${EXTENSION[input.contentType]}`,
+            : `files/${input.purpose}/${id}.${EXTENSION[input.contentType]}`,
   });
   const link = await storage.createUploadUrl(
     pendingKey(row.id),
@@ -184,6 +195,16 @@ export async function completeUpload(userId: string, uploadId: string, now = new
       if (error instanceof PhotoRejected) throw await reject(error.message, error.userMessage);
       throw error;
     }
+  } else if (row.purpose === "part_photo") {
+    // A buyer's photo for photo search: cleaned the same way (GPS and other
+    // metadata gone), but written to the PRIVATE folder only.
+    try {
+      const photo = await processProductPhoto(await storage.read(source, stored.etag));
+      await storage.put(partPhotoKey(row.id), photo.large, { contentType: "image/webp", cacheControl: PRIVATE_FILE_CACHE });
+    } catch (error) {
+      if (error instanceof PhotoRejected) throw await reject(error.message, error.userMessage);
+      throw error;
+    }
   } else {
     // Copy exactly the version we checked: if the file was replaced in the
     // meantime, the copy fails instead of accepting unchecked content.
@@ -252,19 +273,39 @@ export async function getPublicLogoUrls(uploadIds: string[]): Promise<Map<string
   return result;
 }
 
-/** Upload purposes whose photos may be sent to the AI. Buyer part photos join on Day 8. */
-const AI_PHOTO_PURPOSES: UploadPurpose[] = ["product_photo"];
+/** Upload purposes whose photos may be sent to the AI: sellers' product photos, buyers' part photos (Day 8). */
+export type AiPhotoPurpose = "product_photo" | "part_photo";
+const AI_PHOTO_PURPOSES: UploadPurpose[] = ["product_photo", "part_photo"];
+
+/** The cleaned copy the AI reads (and the buyer sees): never the raw upload. */
+function cleanedPhotoKey(row: UploadRow): string {
+  return row.purpose === "part_photo" ? partPhotoKey(row.id) : productPhotoKeys(row.id).large;
+}
 
 /**
- * For the AI module: the caller's own ready photo. Someone else's upload,
- * a document or a file still being checked looks like one that does not exist.
+ * For the AI module: the caller's own ready photo of the given purpose
+ * (each side may only send its own kind). Someone else's upload, another
+ * purpose or a file still being checked looks like one that does not exist.
  */
-export async function getOwnedPhotoForAi(userId: string, uploadId: string): Promise<Upload> {
+export async function getOwnedPhotoForAi(userId: string, uploadId: string, purpose: AiPhotoPurpose): Promise<Upload> {
   const row = await repo.findUpload(uploadId);
-  if (!row || row.ownerUserId !== userId || row.status !== "ready" || !AI_PHOTO_PURPOSES.includes(row.purpose as UploadPurpose)) {
+  if (!row || row.ownerUserId !== userId || row.status !== "ready" || row.purpose !== purpose) {
     throw notFound("Photo not found");
   }
   return toUpload(row);
+}
+
+/**
+ * For the AI module, AFTER it checked the caller owns the identification:
+ * a short-lived link to the cleaned copy of the caller's own part photo.
+ */
+export async function getOwnedPartPhotoLink(userId: string, uploadId: string, expiresInSeconds: number, now = new Date()): Promise<FileLink> {
+  const row = await repo.findUpload(uploadId);
+  if (!row || row.ownerUserId !== userId || row.status !== "ready" || row.purpose !== "part_photo") {
+    throw notFound("Photo not found");
+  }
+  const url = await getStorage().createDownloadUrl(partPhotoKey(row.id), { contentType: "image/webp", fileName: "part-photo.webp" }, expiresInSeconds);
+  return { url, expiresAt: new Date(now.getTime() + expiresInSeconds * 1000).toISOString() };
 }
 
 /**
@@ -277,7 +318,7 @@ export async function readPhotoForAi(uploadId: string): Promise<{ bytes: Uint8Ar
     throw new Error(`Upload ${uploadId} is not a ready photo`);
   }
   const storage = getStorage();
-  const key = productPhotoKeys(row.id).large;
+  const key = cleanedPhotoKey(row);
   const stored = await storage.stat(key);
   if (!stored) throw new Error(`Cleaned photo for upload ${uploadId} is missing`);
   return { bytes: await storage.read(key, stored.etag), contentType: "image/webp" };

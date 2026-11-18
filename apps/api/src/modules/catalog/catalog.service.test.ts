@@ -23,6 +23,8 @@ vi.mock("./catalog.repository", () => ({
   findPhotosUsedElsewhere: vi.fn(),
   listSellerProducts: vi.fn(),
   countSellerProducts: vi.fn(),
+  searchPublishedProducts: vi.fn(async () => ({ rows: [], total: 0 })),
+  findProductsByIds: vi.fn(async () => []),
 }));
 vi.mock("../seller", () => ({ isSellerVerified: vi.fn() }));
 vi.mock("../upload", () => ({ attachUpload: vi.fn(), getProductPhotoUrls: vi.fn() }));
@@ -30,7 +32,7 @@ vi.mock("../upload", () => ({ attachUpload: vi.fn(), getProductPhotoUrls: vi.fn(
 const repo = await import("./catalog.repository");
 const { isSellerVerified } = await import("../seller");
 const { attachUpload, getProductPhotoUrls } = await import("../upload");
-const { createProduct, updateProduct, changeProductStatus, getProduct, listProducts, STATUS_TRANSITIONS } = await import("./catalog.service");
+const { createProduct, updateProduct, changeProductStatus, getProduct, listProducts, searchLiveProducts, STATUS_TRANSITIONS } = await import("./catalog.service");
 
 const SELLER = "11111111-1111-4111-8111-111111111111";
 const OTHER_SELLER = "22222222-2222-4222-8222-222222222222";
@@ -267,3 +269,33 @@ describe("listProducts", () => {
     expect(vi.mocked(repo.listSellerProducts).mock.calls[0]?.[0].q).toEqual({ text: "6020/f4", partNumber: "6020F4" });
   });
 });
+
+describe("searchLiveProducts (what is matched as what)", () => {
+  const base = { categoryId: null, sellerIds: [SELLER], page: 1, pageSize: 20 };
+  const sent = () => vi.mocked(repo.searchPublishedProducts).mock.calls.at(-1)![0];
+
+  it("tries the search box text as a part number, a machine and words", async () => {
+    await searchLiveProducts({ ...base, text: "Kobelco SK380" });
+    expect(sent()).toMatchObject({ partNumber: "KOBELCOSK380", fitment: "kobelcosk380", fitsNeedsWords: false });
+    expect(sent().wordPatterns).toEqual(["%kobelco%", "%sk380%"]);
+  });
+
+  it("photo search: each field only as itself, and a machine match needs the part name too", async () => {
+    await searchLiveProducts({ ...base, text: "Front bushing", partNumber: "15-FB-02", machine: "Korvex KHB-1550" });
+    expect(sent()).toMatchObject({ partNumber: "15FB02", fitment: "korvexkhb1550", fitsNeedsWords: true });
+    expect(sent().wordPatterns).toEqual(["%front%", "%bushing%"]);
+  });
+
+  it("photo search without a name: the machine alone, the part number not taken from the name", async () => {
+    await searchLiveProducts({ ...base, machine: "Kobelco SK380" });
+    expect(sent()).toMatchObject({ partNumber: "", fitment: "kobelcosk380", fitsNeedsWords: false, wordPatterns: [] });
+    await searchLiveProducts({ ...base, text: "Hydraulic filter", partNumber: "6020/F4" });
+    expect(sent()).toMatchObject({ partNumber: "6020F4", fitment: "" });
+  });
+
+  it("escapes LIKE wildcards in words", async () => {
+    await searchLiveProducts({ ...base, text: "50%_off" });
+    expect(sent().wordPatterns).toEqual(["%50\\%\\_off%"]);
+  });
+});
+

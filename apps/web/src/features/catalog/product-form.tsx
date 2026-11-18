@@ -155,7 +155,7 @@ export function ProductForm({ product }: { product: Product | null }) {
   const [listError, setListError] = useState<string>();
   /** Fields the AI filled in, with how sure it was (shown under the field). */
   const [aiFilled, setAiFilled] = useState<Partial<Record<AiField, AiConfidence>>>({});
-  const aiAvailable = useAiAvailable(!product);
+  const aiAvailable = useAiAvailable("seller", !product);
 
   const verified = account.data?.verification.status === "approved";
   const archived = product?.status === "archived";

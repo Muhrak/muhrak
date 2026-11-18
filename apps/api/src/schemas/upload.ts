@@ -14,7 +14,12 @@ import { z } from "zod";
  * module that owns that record. It can be attached once, by its owner only.
  */
 
-export const uploadPurposeSchema = z.enum(["seller_logo", "seller_document", "product_photo"]);
+/**
+ * part_photo (Day 8): a BUYER's photo of the part they need, for Muhrak AI
+ * photo search. Private: re-encoded (metadata dropped) and kept under
+ * `files/`, seen only by its owner through short-lived links.
+ */
+export const uploadPurposeSchema = z.enum(["seller_logo", "seller_document", "product_photo", "part_photo"]);
 export type UploadPurpose = z.infer<typeof uploadPurposeSchema>;
 
 export const uploadContentTypeSchema = z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
@@ -28,6 +33,8 @@ export const UPLOAD_RULES: Record<UploadPurpose, { types: UploadContentType[]; m
   seller_document: { types: ["application/pdf", "image/png", "image/jpeg"], maxBytes: 10 * MB },
   // Re-encoded by the API (metadata stripped, resized) before buyers can see it.
   product_photo: { types: ["image/jpeg", "image/png", "image/webp"], maxBytes: 10 * MB },
+  // Re-encoded too, but kept private (only the buyer who took it sees it).
+  part_photo: { types: ["image/jpeg", "image/png", "image/webp"], maxBytes: 10 * MB },
 };
 
 export const createUploadSchema = z.object({

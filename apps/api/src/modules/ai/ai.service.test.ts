@@ -31,7 +31,7 @@ vi.mock("./ai.repository", () => ({
   addUsage: vi.fn(),
   finish: vi.fn(),
 }));
-vi.mock("../upload", () => ({ getOwnedPhotoForAi: vi.fn(), readPhotoForAi: vi.fn() }));
+vi.mock("../upload", () => ({ getOwnedPhotoForAi: vi.fn(), getOwnedPartPhotoLink: vi.fn(), readPhotoForAi: vi.fn() }));
 vi.mock("../catalog", () => ({ listCategories: vi.fn() }));
 vi.mock("../../shared/jobs", () => ({ enqueueJob: vi.fn(async () => true), wakeWorker: vi.fn() }));
 
@@ -105,57 +105,57 @@ describe("costs", () => {
 
 describe("requestIdentification", () => {
   it("records the request and queues the job in the same transaction", async () => {
-    const result = await service.requestIdentification(SELLER, UPLOAD, now);
+    const result = await service.requestIdentification(SELLER, UPLOAD, "product_photo", now);
     expect(result).toMatchObject({ id: IDENT, status: "pending", suggestion: null });
-    expect(upload.getOwnedPhotoForAi).toHaveBeenCalledWith(SELLER, UPLOAD);
+    expect(upload.getOwnedPhotoForAi).toHaveBeenCalledWith(SELLER, UPLOAD, "product_photo");
     expect(jobs.enqueueJob).toHaveBeenCalledWith("ai", "identify-part", { identificationId: IDENT }, expect.objectContaining({ dedupeKey: `ai:${IDENT}`, tx: { tx: true } }));
     expect(jobs.wakeWorker).toHaveBeenCalled();
   });
 
   it("is refused when AI is switched off, before touching the photo", async () => {
     env.AI_ENABLED = false;
-    await expect(service.requestIdentification(SELLER, UPLOAD, now)).rejects.toMatchObject({ status: 503, code: "ai_unavailable" });
+    await expect(service.requestIdentification(SELLER, UPLOAD, "product_photo", now)).rejects.toMatchObject({ status: 503, code: "ai_unavailable" });
     expect(upload.getOwnedPhotoForAi).not.toHaveBeenCalled();
     expect(repo.insert).not.toHaveBeenCalled();
   });
 
   it("is refused without a provider key", async () => {
     service.setAiProvider(null);
-    await expect(service.requestIdentification(SELLER, UPLOAD, now)).rejects.toMatchObject({ code: "ai_unavailable" });
+    await expect(service.requestIdentification(SELLER, UPLOAD, "product_photo", now)).rejects.toMatchObject({ code: "ai_unavailable" });
   });
 
   it("on the free tier, works only for listed test accounts", async () => {
     env.GEMINI_TIER = "free";
     env.AI_TEST_USER_IDS = [OTHER];
-    await expect(service.requestIdentification(SELLER, UPLOAD, now)).rejects.toMatchObject({ code: "ai_unavailable" });
+    await expect(service.requestIdentification(SELLER, UPLOAD, "product_photo", now)).rejects.toMatchObject({ code: "ai_unavailable" });
     expect(repo.insert).not.toHaveBeenCalled();
     env.AI_TEST_USER_IDS = [SELLER];
-    await expect(service.requestIdentification(SELLER, UPLOAD, now)).resolves.toMatchObject({ id: IDENT });
+    await expect(service.requestIdentification(SELLER, UPLOAD, "product_photo", now)).resolves.toMatchObject({ id: IDENT });
   });
 
   it("refuses someone else's photo (404 from the upload module) and records nothing", async () => {
     vi.mocked(upload.getOwnedPhotoForAi).mockRejectedValue(notFound("Photo not found"));
-    await expect(service.requestIdentification(OTHER, UPLOAD, now)).rejects.toMatchObject({ status: 404 });
+    await expect(service.requestIdentification(OTHER, UPLOAD, "product_photo", now)).rejects.toMatchObject({ status: 404 });
     expect(repo.insert).not.toHaveBeenCalled();
     expect(jobs.enqueueJob).not.toHaveBeenCalled();
   });
 
   it("returns the existing identification on a double submit, without paying again", async () => {
     vi.mocked(repo.findByUpload).mockResolvedValue(row({ status: "running" }));
-    await expect(service.requestIdentification(SELLER, UPLOAD, now)).resolves.toMatchObject({ id: IDENT, status: "running" });
+    await expect(service.requestIdentification(SELLER, UPLOAD, "product_photo", now)).resolves.toMatchObject({ id: IDENT, status: "running" });
     expect(repo.insert).not.toHaveBeenCalled();
     expect(jobs.enqueueJob).not.toHaveBeenCalled();
   });
 
   it("returns the winner when a parallel request inserted first (checked inside the lock)", async () => {
     vi.mocked(repo.findByUpload).mockResolvedValueOnce(undefined).mockResolvedValueOnce(row());
-    await service.requestIdentification(SELLER, UPLOAD, now);
+    await service.requestIdentification(SELLER, UPLOAD, "product_photo", now);
     expect(repo.insert).not.toHaveBeenCalled();
   });
 
   it("enforces the per-user daily limit inside the lock", async () => {
     vi.mocked(repo.countByUserSince).mockResolvedValue(3);
-    await expect(service.requestIdentification(SELLER, UPLOAD, now)).rejects.toMatchObject({ status: 429, code: "ai_unavailable" });
+    await expect(service.requestIdentification(SELLER, UPLOAD, "product_photo", now)).rejects.toMatchObject({ status: 429, code: "ai_unavailable" });
     const since = vi.mocked(repo.countByUserSince).mock.calls[0]![2];
     expect(now.getTime() - since.getTime()).toBe(86_400_000);
     expect(repo.insert).not.toHaveBeenCalled();
@@ -163,7 +163,7 @@ describe("requestIdentification", () => {
 
   it("stops at the monthly budget", async () => {
     vi.mocked(repo.spendSince).mockResolvedValue({ spentMicroUsd: 4_999_000, unfinished: 0 });
-    await expect(service.requestIdentification(SELLER, UPLOAD, now)).rejects.toMatchObject({ status: 503, code: "ai_unavailable" });
+    await expect(service.requestIdentification(SELLER, UPLOAD, "product_photo", now)).rejects.toMatchObject({ status: 503, code: "ai_unavailable" });
     expect(repo.insert).not.toHaveBeenCalled();
     // From the first day of this month, UTC.
     expect(vi.mocked(repo.spendSince).mock.calls[0]![0]).toEqual(new Date("2026-11-01T00:00:00Z"));
@@ -173,9 +173,9 @@ describe("requestIdentification", () => {
     const max = service.maxCallCostMicroUsd();
     const room = Math.floor(5_000_000 / max);
     vi.mocked(repo.spendSince).mockResolvedValue({ spentMicroUsd: 0, unfinished: room - 1 });
-    await expect(service.requestIdentification(SELLER, UPLOAD, now)).resolves.toBeDefined();
+    await expect(service.requestIdentification(SELLER, UPLOAD, "product_photo", now)).resolves.toBeDefined();
     vi.mocked(repo.spendSince).mockResolvedValue({ spentMicroUsd: 0, unfinished: room });
-    await expect(service.requestIdentification(SELLER, UPLOAD, now)).rejects.toMatchObject({ code: "ai_unavailable" });
+    await expect(service.requestIdentification(SELLER, UPLOAD, "product_photo", now)).rejects.toMatchObject({ code: "ai_unavailable" });
   });
 });
 
@@ -195,6 +195,28 @@ describe("getIdentification", () => {
     const result = await service.getIdentification(SELLER, IDENT);
     expect(JSON.stringify(result)).not.toContain("Gemini");
     expect(result.suggestion).toBeNull();
+  });
+});
+
+describe("buyer photo search", () => {
+  it("passes the buyer's photo kind to the upload check, so a buyer cannot send a product photo", async () => {
+    await service.requestIdentification(OTHER, UPLOAD, "part_photo", now);
+    expect(upload.getOwnedPhotoForAi).toHaveBeenCalledWith(OTHER, UPLOAD, "part_photo");
+  });
+
+  it("gives the owner a short-lived link to their own photo", async () => {
+    vi.mocked(repo.findById).mockResolvedValue(row({ userId: OTHER }));
+    vi.mocked(upload.getOwnedPartPhotoLink).mockResolvedValue({ url: "https://bucket.example/x", expiresAt: now.toISOString() });
+    await expect(service.getIdentificationPhoto(OTHER, IDENT, now)).resolves.toMatchObject({ url: "https://bucket.example/x" });
+    expect(upload.getOwnedPartPhotoLink).toHaveBeenCalledWith(OTHER, UPLOAD, service.PHOTO_LINK_SECONDS, now);
+  });
+
+  it("hides another user's photo as not found, without signing a link", async () => {
+    vi.mocked(repo.findById).mockResolvedValue(row({ userId: SELLER }));
+    await expect(service.getIdentificationPhoto(OTHER, IDENT, now)).rejects.toMatchObject({ status: 404 });
+    vi.mocked(repo.findById).mockResolvedValue(undefined);
+    await expect(service.getIdentificationPhoto(OTHER, IDENT, now)).rejects.toMatchObject({ status: 404 });
+    expect(upload.getOwnedPartPhotoLink).not.toHaveBeenCalled();
   });
 });
 

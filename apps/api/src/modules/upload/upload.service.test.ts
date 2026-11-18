@@ -18,7 +18,8 @@ vi.mock("./upload.repository", () => ({
 
 const repo = await import("./upload.repository");
 const { setStorage } = await import("./storage");
-const { createUpload, completeUpload, attachUpload, getOwnedPhotoForAi, readPhotoForAi, pendingKey, UPLOAD_COMPLETE_WINDOW_MS } = await import("./upload.service");
+const { createUpload, completeUpload, attachUpload, getOwnedPartPhotoLink, getOwnedPhotoForAi, readPhotoForAi, pendingKey, UPLOAD_COMPLETE_WINDOW_MS } =
+  await import("./upload.service");
 
 const SELLER = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -76,6 +77,32 @@ describe("createUpload", () => {
     await expect(
       createUpload({ userId: SELLER, role: "buyer" }, { purpose: "seller_logo", contentType: "image/png", sizeBytes: 10 }),
     ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("lets only a buyer start a part photo, stored in the private folder", async () => {
+    await expect(
+      createUpload({ userId: SELLER, role: "seller" }, { purpose: "part_photo", contentType: "image/jpeg", sizeBytes: 10 }),
+    ).rejects.toMatchObject({ status: 403 });
+    await createUpload({ userId: OTHER, role: "buyer" }, { purpose: "part_photo", contentType: "image/jpeg", sizeBytes: 10 }, now);
+    const values = vi.mocked(repo.insertUpload).mock.calls[0]![0];
+    expect(values.storageKey).toBe(`files/part_photo/${values.id}.webp`);
+    expect(values.storageKey.startsWith("public/")).toBe(false);
+  });
+
+  it("re-encodes a finished part photo into the private folder only, never public", async () => {
+    const sharp = (await import("sharp")).default;
+    const jpeg = new Uint8Array(await sharp({ create: { width: 300, height: 300, channels: 3, background: "#888" } }).jpeg().toBuffer());
+    vi.mocked(repo.findUpload).mockResolvedValue(
+      row({ ownerUserId: OTHER, purpose: "part_photo", contentType: "image/jpeg", sizeBytes: jpeg.length, storageKey: `files/part_photo/${UPLOAD}.webp` }),
+    );
+    vi.mocked(repo.markReady).mockImplementation(async () => row({ purpose: "part_photo", contentType: "image/jpeg", status: "ready" }));
+    storage.stat.mockResolvedValue({ sizeBytes: jpeg.length, etag: "e1" });
+    storage.readStart.mockResolvedValue(jpeg.slice(0, 4100));
+    storage.read.mockResolvedValue(jpeg);
+    await completeUpload(OTHER, UPLOAD, now);
+    expect(storage.put).toHaveBeenCalledTimes(1);
+    expect(storage.put).toHaveBeenCalledWith(`files/part_photo/${UPLOAD}.webp`, expect.any(Uint8Array), { contentType: "image/webp", cacheControl: "private, no-store" });
+    expect(storage.copy).not.toHaveBeenCalled();
   });
 
   it("refuses a type or size the purpose does not allow", async () => {
@@ -150,16 +177,16 @@ describe("photos for the AI", () => {
 
   it("gives the owner their own ready product photo", async () => {
     vi.mocked(repo.findUpload).mockResolvedValue(photo());
-    await expect(getOwnedPhotoForAi(SELLER, UPLOAD)).resolves.toMatchObject({ id: UPLOAD });
+    await expect(getOwnedPhotoForAi(SELLER, UPLOAD, "product_photo")).resolves.toMatchObject({ id: UPLOAD });
   });
 
   it("hides another user's photo, a document and an unchecked photo as not found", async () => {
     vi.mocked(repo.findUpload).mockResolvedValue(photo());
-    await expect(getOwnedPhotoForAi(OTHER, UPLOAD)).rejects.toMatchObject({ status: 404 });
+    await expect(getOwnedPhotoForAi(OTHER, UPLOAD, "product_photo")).rejects.toMatchObject({ status: 404 });
     vi.mocked(repo.findUpload).mockResolvedValue(photo({ purpose: "seller_document" }));
-    await expect(getOwnedPhotoForAi(SELLER, UPLOAD)).rejects.toMatchObject({ status: 404 });
+    await expect(getOwnedPhotoForAi(SELLER, UPLOAD, "product_photo")).rejects.toMatchObject({ status: 404 });
     vi.mocked(repo.findUpload).mockResolvedValue(photo({ status: "pending" }));
-    await expect(getOwnedPhotoForAi(SELLER, UPLOAD)).rejects.toMatchObject({ status: 404 });
+    await expect(getOwnedPhotoForAi(SELLER, UPLOAD, "product_photo")).rejects.toMatchObject({ status: 404 });
   });
 
   it("reads the cleaned WebP copy, never the raw upload", async () => {
@@ -169,5 +196,34 @@ describe("photos for the AI", () => {
     await expect(readPhotoForAi(UPLOAD)).resolves.toEqual({ bytes: new Uint8Array([1, 2, 3]), contentType: "image/webp" });
     expect(storage.stat).toHaveBeenCalledWith(`public/products/${UPLOAD}.webp`);
     expect(storage.read).toHaveBeenCalledWith(`public/products/${UPLOAD}.webp`, "e1");
+  });
+
+  it("keeps each side to its own photo kind", async () => {
+    vi.mocked(repo.findUpload).mockResolvedValue(photo());
+    await expect(getOwnedPhotoForAi(SELLER, UPLOAD, "part_photo")).rejects.toMatchObject({ status: 404 });
+    vi.mocked(repo.findUpload).mockResolvedValue(photo({ purpose: "part_photo", storageKey: `files/part_photo/${UPLOAD}.webp` }));
+    await expect(getOwnedPhotoForAi(SELLER, UPLOAD, "product_photo")).rejects.toMatchObject({ status: 404 });
+    await expect(getOwnedPhotoForAi(SELLER, UPLOAD, "part_photo")).resolves.toMatchObject({ id: UPLOAD });
+  });
+
+  it("reads a buyer's part photo from the private folder", async () => {
+    vi.mocked(repo.findUpload).mockResolvedValue(photo({ purpose: "part_photo", storageKey: `files/part_photo/${UPLOAD}.webp` }));
+    storage.stat.mockResolvedValue({ sizeBytes: 3, etag: "e1" });
+    storage.read.mockResolvedValue(new Uint8Array([1, 2, 3]));
+    await readPhotoForAi(UPLOAD);
+    expect(storage.stat).toHaveBeenCalledWith(`files/part_photo/${UPLOAD}.webp`);
+  });
+
+  it("signs a link to a part photo for its owner only", async () => {
+    const part = photo({ purpose: "part_photo", storageKey: `files/part_photo/${UPLOAD}.webp` });
+    vi.mocked(repo.findUpload).mockResolvedValue(part);
+    storage.createDownloadUrl.mockResolvedValue("https://bucket.example/signed");
+    await expect(getOwnedPartPhotoLink(SELLER, UPLOAD, 600, now)).resolves.toMatchObject({ url: "https://bucket.example/signed" });
+    expect(storage.createDownloadUrl).toHaveBeenCalledWith(`files/part_photo/${UPLOAD}.webp`, expect.anything(), 600);
+    storage.createDownloadUrl.mockClear();
+    await expect(getOwnedPartPhotoLink(OTHER, UPLOAD, 600, now)).rejects.toMatchObject({ status: 404 });
+    vi.mocked(repo.findUpload).mockResolvedValue(photo());
+    await expect(getOwnedPartPhotoLink(SELLER, UPLOAD, 600, now)).rejects.toMatchObject({ status: 404 });
+    expect(storage.createDownloadUrl).not.toHaveBeenCalled();
   });
 });

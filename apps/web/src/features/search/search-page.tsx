@@ -158,7 +158,7 @@ function Intro({ text, action }: { text: string; action?: { label: string; href:
 }
 
 /** Figma seller row: photo 64, name + seller · place, match tag, price + availability, "Request quote". */
-function ResultRow({ result, onRequest }: { result: PartSearchResult; onRequest: () => void }) {
+export function ResultRow({ result, onRequest }: { result: PartSearchResult; onRequest: () => void }) {
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-[18px] border border-black/8 bg-linear-to-b from-white/90 to-white/60 py-4 pr-5 pl-4 backdrop-blur-[15px] md:flex-nowrap">
       <ProductPhoto src={result.photoUrl} className="size-16" />

@@ -61,7 +61,7 @@ export function BuyerRequestsPage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <OutlinePillLink href="/search">Browse parts</OutlinePillLink>
-          <SolidPillLink href="/buyer/find-part">Ask Muhrak AI</SolidPillLink>
+          <SolidPillLink href="/ai">Ask Muhrak AI</SolidPillLink>
         </div>
       </div>
 

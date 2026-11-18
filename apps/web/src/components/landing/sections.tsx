@@ -347,7 +347,7 @@ const FOOTER_COLUMNS: { title: string; links: FooterLink[] }[] = [
     title: "Buy",
     links: [
       { label: "Sellers", href: "/sellers" },
-      { label: "Muhrak AI", href: "/#muhrak-ai" },
+      { label: "Muhrak AI", href: "/ai" },
       { label: "Garage" },
     ],
   },
