@@ -307,6 +307,9 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   phones); the bearing has its own phone spot (`GlassObject.phone`); the
   glow under the cards fades out; even phone spacing between sections;
   stars on phones only above the heading and at the edges.
+- Phone menu (`nav-actions.tsx`) is opaque now (a see-through panel let
+  the page show through): white with the soft glow on the buyer side,
+  solid canvas with the orange bands on the seller side.
 
 ### Day 9: quote requests (Sun 15 Nov)
 - Developer decisions (15 Nov): **one seller per request** (Figma "Request

@@ -13,6 +13,7 @@ import { initials } from "@/features/auth/user-display";
 import { cn } from "@/lib/utils";
 import { MobileGlow } from "./mobile-glow";
 import { NAV_LINKS, SELLER_NAV_LINKS } from "./nav-links";
+import { SoftGlow } from "./soft-glow";
 
 export type LandingSide = "buyer" | "seller";
 
@@ -150,11 +151,19 @@ function MobileMenu({ user, side }: { user: PublicUser | null; side: LandingSide
           role="dialog"
           aria-modal="true"
           aria-label="Menu"
-          className="fixed inset-0 z-50 flex h-dvh flex-col overflow-y-auto bg-canvas/90 backdrop-blur-[24px]"
+          // Opaque (developer report, 18 Nov 2026): a see-through panel let the page behind show as grey smudges.
+          className={cn("fixed inset-0 z-50 flex h-dvh flex-col overflow-y-auto", side === "buyer" ? "bg-white" : "bg-canvas")}
         >
-          {/* Same colour bands as the mobile hero, so the menu feels like part of the page. */}
-          <MobileGlow edge="top" className="h-[40%]" strength={0.8} palette={side} />
-          <MobileGlow edge="bottom" className="h-[28%]" strength={0.8} palette={side} />
+          {side === "buyer" ? (
+            // Buyer side: the Muhrak AI soft glow, like the buyer landing.
+            <SoftGlow className="top-auto h-[45%]" fill />
+          ) : (
+            <>
+              {/* Same colour bands as the mobile hero, so the menu feels like part of the page. */}
+              <MobileGlow edge="top" className="h-[40%]" strength={0.8} palette={side} />
+              <MobileGlow edge="bottom" className="h-[28%]" strength={0.8} palette={side} />
+            </>
+          )}
 
           <div className="relative flex items-center px-4 py-5 sm:px-12">
             <Link href={side === "seller" ? "/sell" : "/"} onClick={close} aria-label="Muhrak home" className={cn("flex rounded-sm", focus)}>
@@ -166,7 +175,7 @@ function MobileMenu({ user, side }: { user: PublicUser | null; side: LandingSide
               type="button"
               aria-label="Close menu"
               onClick={close}
-              className={cn("flex size-11 items-center justify-center rounded-full border border-black/22 bg-white/60 text-ink hover:bg-white", focus)}
+              className={cn("flex size-11 items-center justify-center rounded-full border border-black/22 bg-white text-ink hover:bg-black/4", focus)}
             >
               <X aria-hidden className="size-5" strokeWidth={1.6} />
             </button>
@@ -177,7 +186,7 @@ function MobileMenu({ user, side }: { user: PublicUser | null; side: LandingSide
               <Link
                 href={HOME_PATH[side]}
                 onClick={close}
-                className={cn("mb-8 flex items-center gap-3 rounded-[18px] border border-black/10 bg-linear-to-b from-white/78 to-white/50 p-4 hover:from-white", focus)}
+                className={cn("mb-8 flex items-center gap-3 rounded-[18px] border border-black/10 bg-white p-4 hover:bg-black/2", focus)}
               >
                 <Avatar user={user} size={44} textClass="text-sm" />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-[1.3]">
