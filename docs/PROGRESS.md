@@ -3,7 +3,7 @@
 Read this first in every new session, then `CLAUDE.md`, `docs/PLAN.md` and
 `docs/ARCHITECTURE.md`. Update it whenever a piece of work is committed.
 
-Last updated: Mon 16 Nov 2026 (Day 7 AI fill and buyer Centre zoom, untested on screen). Branch `develop`.
+Last updated: Wed 18 Nov 2026 (Days 6 and 7 tested with a real Gemini photo). Branch `develop`.
 
 ## Status
 
@@ -544,10 +544,14 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   daily limit, budget with calls in flight, double submit, bad and hostile
   answers, retries, cost recording), Gemini provider (fake fetch), upload
   ownership for AI. No real call was made.
-- Not done yet: prompt tuning on real photos (needs the key and the
-  developer's OK); the web side is Day 7.
+- **Done Wed 18 Nov (paid tier):** real photo (bearing stamped 6020/F4):
+  name, part number 6020/F4, category Bearings & Bushings, all "high";
+  1.6k in / 0.2k out tokens, **about US$0.004 per photo**, 5 s. Prompt
+  change: the description describes the product, not the condition of the
+  item in the photo (it said "grease residue and surface wear" while the
+  form's Condition was "New").
 
-### Day 7: AI fill on Add product (Mon 16 Nov, NOT tested on screen yet)
+### Day 7: AI fill on Add product (Mon 16 Nov; tested on screen Wed 18 Nov)
 - `/seller/products/new`: a "Fill in from a photo" card above the form,
   shown only when `GET /v1/seller/ai/status` says AI is available. No
   Figma frame exists; built in the Add product card style, seller palette.
@@ -568,7 +572,23 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
 - Real test on 16 Nov did NOT get an answer: `gemini-3.8-flash` on the
   free tier answered 503 "high demand" or timed out. US$0 billed. Retry on
   the paid tier (17 Nov), 1 photo at a time (developer's rule).
-- To do 17 Nov: screenshots desktop + phone, 1 real photo, fix anything.
+- **Tested Wed 18 Nov** (local, headless Chrome, 1 real photo): desktop
+  shows "Browse a photo", phone (touch) "Take photo" + "Choose from
+  gallery"; photo became the cover; 5 fields filled (name, part number,
+  category, description, other part number "6020") with "Filled in from
+  your photo" under each; brand left empty (not on the part); nothing
+  saved. About 20 s from pick to filled (upload, cleaning, queue, model).
+  Logged in `ai_identifications` with its cost.
+- **Gemini budget (developer, 18 Nov): US$5 of credit must last to Day 20.**
+  Caps: local `AI_MONTHLY_BUDGET_USD=1`, staging `2.50` (+ 10 photos per
+  user per day), leaving ~US$1.50 for `pnpm ai:try` (not counted in the
+  in-app cap). At ~US$0.004 a photo that is over 1,000 photos. Real calls
+  stay 1 photo at a time.
+- Railway `muhrak` (staging): AI variables set 18 Nov (`AI_ENABLED`,
+  `GEMINI_API_KEY`, `GEMINI_TIER=paid`, `GEMINI_MODEL`, budget, daily
+  limit); redeployed fine. The prompt change reaches staging with the next push.
+- Railway warns that `railway.json` (Config as Code) stops working on
+  1 Dec 2026; migrate with `railway config migrate` before production.
 
 ### Buyer Centre zoomed out (Mon 16 Nov, developer request, NOT checked on screen yet)
 - On `lg` and up, the buyer Centre page content (not the sidebar) is shown
