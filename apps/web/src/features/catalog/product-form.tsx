@@ -20,7 +20,7 @@ import {
 import { ChevronDown, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { useAiAvailable } from "@/features/ai/api";
@@ -174,6 +174,34 @@ export function ProductForm({ product }: { product: Product | null }) {
   } = useForm<FormValues>({ resolver: zodResolver(formSchema), defaultValues: valuesFrom(product) });
   const [priceOnRequest, availability] = useWatch({ control, name: ["priceOnRequest", "availability"] });
 
+  /** What the AI last put in the form, to tell its values apart from the seller's own. */
+  const aiSet = useRef<{ text: Partial<Record<AiTextField, string>>; extras: string[]; fitments: Fitment[] | null }>({
+    text: {},
+    extras: [],
+    fitments: null,
+  });
+  /** The current lists. The AI answer arrives seconds after the photo was picked, so it must not read them from an old render. */
+  const lists = useRef({ extraPartNumbers, fitments });
+  useEffect(() => {
+    lists.current = { extraPartNumbers, fitments };
+  }, [extraPartNumbers, fitments]);
+
+  /**
+   * A new photo is being read: take out what the AI filled in from the
+   * previous photo, so details of another part never stay in the form.
+   * Values the seller typed or changed are kept.
+   */
+  function clearAiFill() {
+    const previous = aiSet.current;
+    for (const [field, value] of Object.entries(previous.text) as [AiTextField, string][]) {
+      if (getValues(field) === value) setValue(field, "", { shouldDirty: true });
+    }
+    if (previous.extras.length > 0) setExtraPartNumbers((current) => current.filter((value) => !previous.extras.includes(value)));
+    if (previous.fitments && sameFitments(lists.current.fitments, previous.fitments)) setFitments([]);
+    aiSet.current = { text: {}, extras: [], fitments: null };
+    setAiFilled({});
+  }
+
   /**
    * Fill the form from the AI's suggestion. Only empty fields are filled,
    * so nothing the seller typed is overwritten. Guesses ("low") are left
@@ -182,9 +210,11 @@ export function ProductForm({ product }: { product: Product | null }) {
    */
   function applySuggestion(suggestion: AiSuggestion): number {
     const filled: Partial<Record<AiField, AiConfidence>> = {};
-    const fill = (field: "name" | "brand" | "description" | "partNumber" | "categoryId", value: string | null, confidence: AiConfidence) => {
+    const { extraPartNumbers, fitments } = lists.current;
+    const fill = (field: AiTextField, value: string | null, confidence: AiConfidence) => {
       if (!value || getValues(field).trim()) return;
       setValue(field, value, { shouldDirty: true, shouldValidate: true });
+      aiSet.current.text[field] = value;
       filled[field] = confidence;
     };
     const sure = (confidence: AiConfidence) => confidence !== "low";
@@ -201,12 +231,16 @@ export function ProductForm({ product }: { product: Product | null }) {
       const known = [getValues("partNumber"), ...extraPartNumbers].map(normalizePartNumber);
       const extra = others.filter((value) => !known.includes(normalizePartNumber(value)));
       if (extra.length > 0) {
-        setExtraPartNumbers((current) => [...current, ...extra].slice(0, PRODUCT_LIMITS.partNumbers - 1));
+        const added = [...extraPartNumbers, ...extra].slice(0, PRODUCT_LIMITS.partNumbers - 1);
+        setExtraPartNumbers(added);
+        aiSet.current.extras = added.filter((value) => extra.includes(value));
         filled.otherPartNumbers = suggestion.partNumbers.confidence;
       }
     }
     if (sure(suggestion.fitments.confidence) && suggestion.fitments.value.length > 0 && fitments.every((fit) => !fit.make.trim() && !fit.model.trim())) {
-      setFitments(suggestion.fitments.value.slice(0, PRODUCT_LIMITS.fitments));
+      const next = suggestion.fitments.value.slice(0, PRODUCT_LIMITS.fitments);
+      setFitments(next);
+      aiSet.current.fitments = next;
       filled.fitments = suggestion.fitments.confidence;
     }
     setAiFilled((current) => ({ ...current, ...filled }));
@@ -366,7 +400,7 @@ export function ProductForm({ product }: { product: Product | null }) {
       ) : null}
 
       {!product && aiAvailable.data ? (
-        <AiFill onPhoto={(item) => setPhotos((current) => [item, ...current])} onSuggestion={applySuggestion} />
+        <AiFill onStart={clearAiFill} onPhoto={(item) => setPhotos((current) => [item, ...current])} onSuggestion={applySuggestion} />
       ) : null}
 
       <form
@@ -560,7 +594,12 @@ export function ProductForm({ product }: { product: Product | null }) {
   );
 }
 
-type AiField = "name" | "brand" | "description" | "partNumber" | "categoryId" | "otherPartNumbers" | "fitments";
+type AiTextField = "name" | "brand" | "description" | "partNumber" | "categoryId";
+type AiField = AiTextField | "otherPartNumbers" | "fitments";
+
+function sameFitments(a: Fitment[], b: Fitment[]): boolean {
+  return a.length === b.length && a.every((fit, index) => fit.make === b[index]?.make && fit.model === b[index]?.model);
+}
 
 function Row({ children }: { children: ReactNode }) {
   return <div className="flex flex-col gap-[18px] sm:flex-row sm:items-start">{children}</div>;

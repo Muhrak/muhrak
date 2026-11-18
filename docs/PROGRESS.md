@@ -579,6 +579,11 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   your photo" under each; brand left empty (not on the part); nothing
   saved. About 20 s from pick to filled (upload, cleaning, queue, model).
   Logged in `ai_identifications` with its cost.
+- Fix 18 Nov (developer report): a second photo left the first photo's
+  AI details in the form (the "only empty fields" rule). Now picking a new
+  photo first clears what the AI filled in and the seller has not changed
+  (fields, added part numbers, machines); the seller's own typing stays.
+  Tested with two photos in a row (bearing, then relay AUX2024+L).
 - **Gemini budget (developer, 18 Nov): US$5 of credit must last to Day 20.**
   Caps: local `AI_MONTHLY_BUDGET_USD=1`, staging `2.50` (+ 10 photos per
   user per day), leaving ~US$1.50 for `pnpm ai:try` (not counted in the

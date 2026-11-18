@@ -31,9 +31,12 @@ type Phase =
 const FALLBACK = "We could not read this photo. Please fill in the details yourself, or try a clearer photo.";
 
 export function AiFill({
+  onStart,
   onPhoto,
   onSuggestion,
 }: {
+  /** A new photo was picked: clear what the AI filled in from the previous one. */
+  onStart: () => void;
   /** Add the uploaded photo to the product's photos, as the cover. */
   onPhoto: (item: PhotoItem) => void;
   /** Fill the form; returns how many fields were filled. */
@@ -56,6 +59,7 @@ export function AiFill({
       return;
     }
     abortRef.current?.abort();
+    onStart();
     const controller = new AbortController();
     abortRef.current = controller;
 
