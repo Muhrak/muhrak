@@ -323,6 +323,21 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   the reference's legend (no counts); the Statistic card runs to the bottom
   of the table; no heading over the sellers list.
 
+### Buyer messenger in the new Buyer Centre design (Thu 19 Nov, developer request)
+
+- `features/chat/messenger-page.tsx` now has two looks (`LOOK.buyer`,
+  `LOOK.seller`); the seller's is unchanged. Buyer: the dashboard's style
+  and sizes: white rounded panels, grey "Search" pill, dark pill filters,
+  square ink tiles with initials (sky blue when unread), sky-blue unread
+  badge, dark "View request" pill, ink bubbles for the buyer and grey for
+  the seller, round ink photo button, grey message pill and a sky-blue
+  Send. The request card uses the dashboard's status chips.
+- Heights fitted to the new frame (desktop: no page scroll; phone: the
+  message box stays on screen).
+- Checked with two temporary conversations on Stream (card, messages both
+  ways, unread, read on open, sending from the phone); all of it deleted
+  from Stream and the local DB afterwards.
+
 ### Part matching fixed + recommended sellers on a Muhrak AI result (Thu 19 Nov, developer report)
 
 - Report: an air filter photo was identified, but the seller's live "Air
