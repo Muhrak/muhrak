@@ -2,6 +2,7 @@ import { createApp } from "./app";
 import { env } from "./config/env";
 import { pool } from "./db/client";
 import { logger } from "./shared/logger";
+import { prepareChat } from "./modules/chat";
 import { closeWorkers, startWorkers } from "./worker";
 
 const app = createApp();
@@ -11,6 +12,7 @@ const app = createApp();
 const server = app.listen(env.PORT, () => {
   logger.info(`Muhrak API listening on http://localhost:${env.PORT}`);
   startWorkers();
+  prepareChat();
 });
 
 

@@ -3,4 +3,4 @@
  * import only from here.
  */
 export { buyerChatRouter, sellerChatRouter } from "./chat.routes";
-export { PermanentChatJobError, runChatJob } from "./chat.service";
+export { PermanentChatJobError, prepareChat, runChatJob } from "./chat.service";

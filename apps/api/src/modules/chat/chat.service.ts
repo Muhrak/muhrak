@@ -38,6 +38,7 @@ let provider: ChatProvider | null | undefined;
 export function setChatProvider(value: ChatProvider | null | undefined): void {
   provider = value;
   setupDone = undefined;
+  profileSent.clear();
 }
 
 function getProvider(): ChatProvider | null {
@@ -47,6 +48,9 @@ function getProvider(): ChatProvider | null {
 }
 
 let setupDone: Promise<void> | undefined;
+
+/** Users whose chat profile this process already sent (each connect after that skips it: faster connect). */
+const profileSent = new Set<string>();
 
 /** The conversation type and system user, once per process (retried after a failure). */
 function ensureSetup(chat: ChatProvider): Promise<void> {
@@ -59,6 +63,17 @@ function ensureSetup(chat: ChatProvider): Promise<void> {
 
 const UNAVAILABLE = "Chat is not available right now. Please try again later.";
 const NOT_FOUND = "Conversation not found";
+
+/**
+ * Called once when the API starts: set up the chat service in the background,
+ * so the first person to open the messenger does not wait for it. A failure
+ * is only logged (the first connect tries again).
+ */
+export function prepareChat(): void {
+  const chat = getProvider();
+  if (!chat) return;
+  ensureSetup(chat).catch((error) => logger.warn({ err: { message: (error as Error).message } }, "Chat setup at startup failed; retried on first use"));
+}
 
 // ---------------------------------------------------------------- names
 
@@ -87,7 +102,12 @@ export async function issueChatToken(user: { userId: string; role: Role }, now =
 
   try {
     await ensureSetup(chat);
-    await chat.upsertUsers(await chatUsers(side === "buyer" ? { buyers: [user.userId], sellers: [] } : { buyers: [], sellers: [user.userId] }));
+    // Once per process: the user must exist in chat before connecting; names are refreshed by every
+    // conversation job too. Repeating it on each connect cost a round trip (developer report: slow load).
+    if (!profileSent.has(user.userId)) {
+      await chat.upsertUsers(await chatUsers(side === "buyer" ? { buyers: [user.userId], sellers: [] } : { buyers: [], sellers: [user.userId] }));
+      profileSent.add(user.userId);
+    }
   } catch (error) {
     logger.error({ err: { message: (error as Error).message } }, "Chat connect failed");
     throw new AppError(503, "chat_unavailable", UNAVAILABLE);
@@ -104,7 +124,13 @@ export async function issueChatToken(user: { userId: string; role: Role }, now =
   }
 
   const expiresAt = new Date(now.getTime() + CHAT_TOKEN_MS);
-  return { apiKey: chat.apiKey, userId: user.userId, token: await chat.createUserToken(user.userId, now, expiresAt), expiresAt: expiresAt.toISOString() };
+  return {
+    apiKey: chat.apiKey,
+    userId: user.userId,
+    token: await chat.createUserToken(user.userId, now, expiresAt),
+    expiresAt: expiresAt.toISOString(),
+    pending: missing.length,
+  };
 }
 
 // ---------------------------------------------------------------- one conversation

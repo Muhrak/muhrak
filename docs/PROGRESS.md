@@ -427,9 +427,23 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
 - Fixed while testing: Stream's client gives up after 3 s by default (the
   first load timed out); now 15 s. The messenger pages needed
   `instant = false` like the other Centre pages.
-- **Developer action before staging chat works:** add `STREAM_APP_ID`,
-  `STREAM_API_KEY`, `STREAM_API_SECRET` on Railway (service `muhrak`).
-  Without them staging chat answers "not available" (nothing breaks).
+- Railway (service `muhrak`): `STREAM_APP_ID`, `STREAM_API_KEY`,
+  `STREAM_API_SECRET` set on 19 Nov (developer OK); staging redeployed with
+  migrations 0014 and 0015. Not tested end to end on staging yet (no staging
+  buyer/seller accounts while sign-up emails need a verified Resend domain).
+- Fix (19 Nov, developer report from staging: "Could not load your
+  conversations" next to "All 1", conversation only after ~10 s): requests
+  sent before chat existed get their conversation when the user connects,
+  but Stream does not send "added to channel" for conversations created
+  with their members, and a slow first load overwrote the newer result.
+  Now: the token says how many conversations are still being opened
+  (`pending`) and the list checks again every 2 s (up to 30 s); only the
+  newest load counts; the chat profile is sent once per API process (token
+  endpoint ~1.2 s -> ~10 ms); the list loads only the last message per
+  conversation (a thread loads its history when opened); the Stream setup
+  runs at API startup. Local: list ~8 s -> ~4 s; old conversation appears
+  by itself; thread history 0.26 s. The rest is the distance to Stream's
+  servers (see "Open items").
 - Not built: a sidebar unread badge for chat (it would need a chat
   connection on every Centre page); Muhrak support conversations.
 
@@ -970,6 +984,10 @@ Still open (Day 3 files):
   by content), and files are served from the S3 domain, never ours.
 
 Other:
+
+- Stream Chat region: connecting and the first query each take ~1–3 s from
+  here, mostly network distance to the Stream app's region. A region closer
+  to the Gulf would need a new Stream app (new keys); decide before launch.
 
 - Resend has no verified domain, so emails only reach the Resend account
   owner. Needs a domain (for example `muhrak.om`) before real users. With

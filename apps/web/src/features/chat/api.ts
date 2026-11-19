@@ -23,7 +23,7 @@ async function fetchToken(side: PortalSide) {
 
 export type ChatState =
   | { status: "connecting" }
-  | { status: "ready"; client: StreamChat; userId: string }
+  | { status: "ready"; client: StreamChat; userId: string; pending: number }
   | { status: "unavailable"; message: string };
 
 /** This side's chat connection, for as long as the component using it is on screen. */
@@ -58,7 +58,7 @@ export function useChatClient(side: PortalSide): ChatState {
           void client.disconnectUser();
           return;
         }
-        setState({ status: "ready", client, userId: first.userId });
+        setState({ status: "ready", client, userId: first.userId, pending: first.pending });
       } catch {
         if (!cancelled) setState({ status: "unavailable", message: "Chat is not available right now. Please try again later." });
       }

@@ -29,6 +29,8 @@ export const chatTokenResponseSchema = z.object({
   userId: z.string(),
   token: z.string(),
   expiresAt: z.string(),
+  /** Conversations still being opened for this user (older requests); the list checks again until they appear. */
+  pending: z.number().int().min(0),
 });
 export type ChatTokenResponse = z.infer<typeof chatTokenResponseSchema>;
 

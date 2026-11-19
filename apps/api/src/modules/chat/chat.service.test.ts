@@ -79,11 +79,19 @@ describe("chat token", () => {
     await expect(service.issueChatToken({ userId: BUYER, role: "buyer" }, now)).rejects.toMatchObject({ status: 503, code: "chat_unavailable" });
   });
 
+  it("sends the user's chat profile once, not on every connect", async () => {
+    await service.issueChatToken({ userId: BUYER, role: "buyer" }, now);
+    await service.issueChatToken({ userId: BUYER, role: "buyer" }, now);
+    expect(chat.upsertUsers).toHaveBeenCalledTimes(1);
+  });
+
   it("queues the caller's older requests whose chat is not open yet", async () => {
     vi.mocked(rfqModule.listRfqsWithoutChat).mockResolvedValue([RFQ]);
     await service.issueChatToken({ userId: BUYER, role: "buyer" }, now);
     expect(rfqModule.listRfqsWithoutChat).toHaveBeenCalledWith("buyer", BUYER, 50);
     expect(jobs.enqueueJob).toHaveBeenCalledWith("chat", "open-rfq-chat", { rfqId: RFQ }, expect.objectContaining({ dedupeKey: `chat-open-${RFQ}-2026-11-19T10` }));
+    // The browser is told, so it checks again until the conversation appears.
+    await expect(service.issueChatToken({ userId: BUYER, role: "buyer" }, now)).resolves.toMatchObject({ pending: 1 });
   });
 
   it("hides the chat service's error from the user", async () => {

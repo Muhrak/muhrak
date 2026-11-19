@@ -80,13 +80,13 @@ export function MessengerPage({ side }: { side: PortalSide }) {
           {chat.message}
         </p>
       ) : (
-        <Inbox side={side} client={chat.client} userId={chat.userId} />
+        <Inbox side={side} client={chat.client} userId={chat.userId} pending={chat.pending} />
       )}
     </section>
   );
 }
 
-function Inbox({ side, client, userId }: { side: PortalSide; client: StreamChat; userId: string }) {
+function Inbox({ side, client, userId, pending }: { side: PortalSide; client: StreamChat; userId: string; pending: number }) {
   const router = useRouter();
   const params = useSearchParams();
   const activeId = params.get("rfq");
@@ -100,34 +100,61 @@ function Inbox({ side, client, userId }: { side: PortalSide; client: StreamChat;
   // The caller's conversations, live. Only the API can add them to one (see the API chat module).
   useEffect(() => {
     let cancelled = false;
+    // Only the newest load counts: a slow older one never overwrites a newer result or shows an error after a success
+    // (developer report, 19 Nov 2026: "Could not load" next to "All 1" on staging).
+    let latest = 0;
+    let loadedOnce = false;
+    let count = 0;
     const load = async () => {
+      const mine = ++latest;
       try {
+        // The list needs only each conversation's last message; a thread loads its history when opened (faster first load).
         const found = await client.queryChannels({ type: CHAT_CHANNEL_TYPE, members: { $in: [userId] } }, [{ last_message_at: -1 }], {
           watch: true,
           state: true,
           limit: 30,
+          message_limit: 1,
         });
-        if (!cancelled) {
-          setChannels(found);
-          setLoadError(false);
-        }
+        if (cancelled || mine !== latest) return;
+        loadedOnce = true;
+        count = found.length;
+        setChannels(found);
+        setLoadError(false);
       } catch (error) {
         // The reason, for support; no tokens or message text in it.
         console.warn("Chat: could not load conversations", error instanceof Error ? error.message : error);
-        if (!cancelled) setLoadError(true);
+        if (!cancelled && mine === latest && !loadedOnce) setLoadError(true);
       }
     };
     void load();
-    const added = client.on("notification.added_to_channel", () => void load());
+
+    // Conversations the API is still opening for older requests: check again every 2 s (up to 30 s) until they appear.
+    // The "added to channel" event is not sent for conversations created with their members, so this does not rely on it.
+    let checks = 0;
+    const expected = pending;
+    const timer =
+      expected > 0
+        ? window.setInterval(() => {
+            checks += 1;
+            if (cancelled || checks > 15 || (loadedOnce && count >= expected)) {
+              window.clearInterval(timer);
+              return;
+            }
+            void load();
+          }, 2000)
+        : undefined;
+
     const changed = client.on((event) => {
-      if (event.type === "message.new" || event.type === "notification.mark_read" || event.type === "message.read") setTick((n) => n + 1);
+      // A conversation the list does not know yet (new request, or one opened just now): load again.
+      if (event.type === "notification.added_to_channel" || event.type === "notification.message_new" || event.type === "channel.created") void load();
+      else if (event.type === "message.new" || event.type === "notification.mark_read" || event.type === "message.read") setTick((n) => n + 1);
     });
     return () => {
       cancelled = true;
-      added.unsubscribe();
+      if (timer) window.clearInterval(timer);
       changed.unsubscribe();
     };
-  }, [client, userId]);
+  }, [client, userId, pending]);
 
   const sorted = useMemo(() => {
     const list = [...(channels ?? [])].sort(
@@ -256,9 +283,13 @@ function Thread({ side, channel, userId, who, onBack }: { side: PortalSide; chan
   const fileRef = useRef<HTMLInputElement>(null);
   const rfqId = channel.id ?? "";
 
-  // Live: new, edited and deleted messages; read as they arrive while open.
+  // The history (the list loaded only the last message), then live: new, edited and deleted messages; read as they arrive.
   useEffect(() => {
     const sync = () => setMessages([...channel.state.messages]);
+    void channel
+      .query({ messages: { limit: 100 } })
+      .then(sync)
+      .catch(() => {});
     const subs = ["message.new", "message.updated", "message.deleted"].map((type) =>
       channel.on(type as "message.new", () => {
         sync();
