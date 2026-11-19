@@ -355,6 +355,17 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
 - Checked in a real browser, desktop and phone: open → Back → Forward →
   reload: no identification request after the first load, no AI call.
 
+### Buyer dashboard with real data (Thu 19 Nov, Day 9 follow-up)
+- "Open requests" and "Quotes received" come from the buyer's own quote
+  requests; the "My requests" panel lists the newest 4 (part, reference,
+  seller, quantity, status) and opens each in `/buyer/requests`.
+  `useBuyerRfqsPreview`, kept under the buyer request key so sending or
+  cancelling refreshes it. "Orders in progress" stays 0 until orders exist
+  (Day 12). The list panel and row moved to `components/dashboard/parts.tsx`
+  (shared with the seller dashboard).
+- Checked on screen with a temporary buyer, seller and two requests
+  (deleted afterwards).
+
 ### Day 9: quote requests (Sun 15 Nov)
 - Developer decisions (15 Nov): **one seller per request** (Figma "Request
   sent to Korvex Hydraulics"; to ask three sellers the buyer sends three

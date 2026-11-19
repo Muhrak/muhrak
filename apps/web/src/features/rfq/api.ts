@@ -43,6 +43,17 @@ export function useBuyerRfqs(filter: RfqListFilter) {
   });
 }
 
+/** Dashboard: the buyer's newest few requests and the count per tab (refreshed with the lists). */
+export function useBuyerRfqsPreview(limit = 4) {
+  const session = useSession(BUYER);
+  return useQuery({
+    queryKey: [...buyerKey(session?.user.id), "list", "preview", limit],
+    queryFn: () => authedRequest(BUYER, `/v1/buyer/rfqs?${new URLSearchParams({ filter: "all", limit: String(limit) })}`, buyerRfqListResponseSchema),
+    enabled: Boolean(session),
+    refetchInterval: 60_000,
+  });
+}
+
 export function useBuyerRfq(id: string | null) {
   const session = useSession(BUYER);
   return useQuery({

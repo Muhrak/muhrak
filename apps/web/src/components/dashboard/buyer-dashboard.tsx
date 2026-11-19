@@ -3,17 +3,24 @@
 import Link from "next/link";
 import { Icon } from "@/components/layout/icon";
 import { useCurrentUser } from "@/features/auth/hooks";
-import { EmptyPanel, OutlinePillLink, PanelRow, SolidPillLink, StatCards } from "./parts";
+import { useBuyerRfqsPreview } from "@/features/rfq/api";
+import { buyerStatus, quantityLabel, RfqChip } from "@/features/rfq/parts";
+import { EmptyPanel, ListPanel, ListRow, OutlinePillLink, PanelRow, SolidPillLink, StatCards } from "./parts";
 
 /**
  * Figma "Buyer – Dashboard" converted to the light theme of
  * "Seller – Dashboard (Light)": white cards on grey, the Muhrak AI card as
- * the black highlight card. Empty state for a new buyer; the photo search
- * itself arrives on Day 6.
+ * the black highlight card. Open requests, quotes received and the newest
+ * requests come from the buyer's own quote requests (19 Nov 2026); orders
+ * start with payment (Day 12).
  */
 export function BuyerDashboard() {
   const user = useCurrentUser("buyer");
+  const rfqs = useBuyerRfqsPreview();
   if (!user) return null;
+
+  const open = rfqs.data?.counts.open ?? 0;
+  const quoted = rfqs.data?.counts.quoted ?? 0;
 
   return (
     <>
@@ -33,19 +40,38 @@ export function BuyerDashboard() {
       </div>
       <StatCards
         stats={[
-          { label: "Open requests", value: 0, note: "No requests yet" },
+          { label: "Open requests", value: open, note: open > 0 ? "Waiting for a seller's reply" : "No requests waiting" },
+          // Orders start with payment (Day 12); nothing can be in progress before that.
           { label: "Orders in progress", value: 0, note: "Nothing on the way" },
-          { label: "Quotes received", value: 0, note: "Quotes from sellers show here" },
+          { label: "Quotes received", value: quoted, note: quoted > 0 ? "Sellers replied with a price" : "Quotes from sellers show here" },
         ]}
       />
       <PanelRow>
-        <EmptyPanel
-          title="My requests"
-          link={{ href: "/buyer/requests", label: "View all" }}
-          icon="empty-message"
-          emptyTitle="No requests yet"
-          emptyText="Snap a photo of a part to get quotes from sellers."
-        />
+        {rfqs.data && rfqs.data.items.length > 0 ? (
+          <ListPanel title="My requests" link={{ href: "/buyer/requests", label: "View all" }}>
+            {rfqs.data.items.map((rfq) => {
+              const status = buyerStatus(rfq.status);
+              return (
+                <ListRow
+                  key={rfq.id}
+                  href={`/buyer/requests?id=${encodeURIComponent(rfq.id)}`}
+                  photo={rfq.product.photoUrl}
+                  title={rfq.partName}
+                  meta={`${rfq.reference} · ${rfq.seller.companyName} · ${quantityLabel(rfq.quantity, rfq.unit)}`}
+                  side={<RfqChip tone={status.tone}>{status.label}</RfqChip>}
+                />
+              );
+            })}
+          </ListPanel>
+        ) : (
+          <EmptyPanel
+            title="My requests"
+            link={{ href: "/buyer/requests", label: "View all" }}
+            icon="empty-message"
+            emptyTitle="No requests yet"
+            emptyText="Snap a photo of a part to get quotes from sellers."
+          />
+        )}
         <EmptyPanel
           title="My orders"
           link={{ href: "/buyer/orders", label: "View all" }}

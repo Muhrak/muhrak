@@ -1,16 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { Icon } from "@/components/layout/icon";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { useProductsPreview } from "@/features/catalog/api";
 import { priceLabel, ProductStatusChip } from "@/features/catalog/parts";
 import { useSellerRfqsPreview } from "@/features/rfq/api";
-import { quantityLabel, RfqChip, sellerStatus, Thumb } from "@/features/rfq/parts";
+import { quantityLabel, RfqChip, sellerStatus } from "@/features/rfq/parts";
 import { useSellerAccount } from "@/features/seller/api";
 import { cn } from "@/lib/utils";
-import { EmptyPanel, OutlinePillLink, PanelRow, SolidPillLink, StatCards } from "./parts";
+import { EmptyPanel, ListPanel, ListRow, OutlinePillLink, PanelRow, SolidPillLink, StatCards } from "./parts";
 
 /**
  * Figma "Seller – Dashboard (Light)". Real data (developer report, 18 Nov
@@ -115,40 +114,6 @@ export function SellerDashboard() {
         )}
       </PanelRow>
     </>
-  );
-}
-
-/** A dashboard panel with rows (the filled version of EmptyPanel). */
-function ListPanel({ title, link, children }: { title: string; link: { href: string; label: string }; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="flex min-h-[260px] flex-1 flex-col rounded-[24px] bg-panel px-6 py-[22px]">
-      <div className="flex items-center gap-2">
-        <h2 className="flex-1 text-xl leading-[normal] font-medium tracking-[-0.01em] text-text-strong">{title}</h2>
-        <Link
-          href={link.href}
-          className="flex items-center gap-1.5 rounded-sm text-[15px] leading-[normal] font-medium text-text-strong outline-none hover:underline focus-visible:ring-3 focus-visible:ring-brand-blue/40"
-        >
-          {link.label}
-          <Icon name="arrow-right" className="size-[15px]" />
-        </Link>
-      </div>
-      <ul className="mt-3 flex flex-col">{children}</ul>
-    </section>
-  );
-}
-
-function ListRow({ href, photo, title, meta, side }: { href: string; photo: string | null; title: string; meta: string; side: ReactNode }) {
-  return (
-    <li className="border-b border-line last:border-b-0">
-      <Link href={href} className="flex items-center gap-3.5 rounded-[12px] py-3 outline-none hover:bg-surface/60 focus-visible:ring-3 focus-visible:ring-brand-blue/40">
-        <Thumb src={photo} size="sm" />
-        <span className="flex min-w-0 flex-1 flex-col gap-1 leading-[normal]">
-          <span className="truncate text-[15px] font-medium text-text-strong">{title}</span>
-          <span className="truncate text-[13px] text-text-muted">{meta}</span>
-        </span>
-        {side}
-      </Link>
-    </li>
   );
 }
 
