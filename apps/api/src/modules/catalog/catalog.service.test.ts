@@ -33,7 +33,7 @@ vi.mock("../upload", () => ({ attachUpload: vi.fn(), getProductPhotoUrls: vi.fn(
 const repo = await import("./catalog.repository");
 const { isSellerVerified } = await import("../seller");
 const { attachUpload, getProductPhotoUrls } = await import("../upload");
-const { createProduct, updateProduct, changeProductStatus, getProduct, listProducts, listPublishedProducts, searchLiveProducts, STATUS_TRANSITIONS } = await import("./catalog.service");
+const { createProduct, updateProduct, changeProductStatus, getProduct, listProducts, listPublishedProducts, searchLiveProducts, searchWords, minWordsFor, STATUS_TRANSITIONS } = await import("./catalog.service");
 
 const SELLER = "11111111-1111-4111-8111-111111111111";
 const OTHER_SELLER = "22222222-2222-4222-8222-222222222222";
@@ -297,6 +297,30 @@ describe("searchLiveProducts (what is matched as what)", () => {
   it("escapes LIKE wildcards in words", async () => {
     await searchLiveProducts({ ...base, text: "50%_off" });
     expect(sent().wordPatterns).toEqual(["%50\\%\\_off%"]);
+  });
+
+  it("a longer part name needs only half its words; plurals and small words do not block a match", async () => {
+    // Developer report, 19 Nov 2026: the AI said "Air filter element" and the seller's "Air Filter" was not found.
+    await searchLiveProducts({ ...base, text: "Air filter element", partNumber: "", machine: "" });
+    expect(sent()).toMatchObject({ wordPatterns: ["%air%", "%filter%", "%element%"], minWords: 2 });
+    await searchLiveProducts({ ...base, text: "Filters for the engine" });
+    expect(sent()).toMatchObject({ wordPatterns: ["%filter%", "%engine%"], minWords: 2 });
+    await searchLiveProducts({ ...base, text: "Bushing" });
+    expect(sent().minWords).toBe(1);
+  });
+
+  it("keeps the searched category as a preference, not a filter", async () => {
+    await searchLiveProducts({ ...base, categoryId: "c0000000-0000-4000-8000-000000000001", text: "Air filter" });
+    expect(sent().categoryId).toBe("c0000000-0000-4000-8000-000000000001");
+  });
+});
+
+describe("search words", () => {
+  it("drops a plural s but not from short words or -ss", () => {
+    expect(searchWords("Bolts, gas, glass, Seals")).toEqual(["bolt", "gas", "glass", "seal"]);
+  });
+  it("needs all of 1-2 words, half of 3 or more", () => {
+    expect([1, 2, 3, 4, 5, 6].map(minWordsFor)).toEqual([1, 2, 2, 2, 3, 3]);
   });
 });
 

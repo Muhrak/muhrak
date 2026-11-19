@@ -405,6 +405,31 @@ export async function listPublishedProducts(input: {
 
 const MATCH_BY_RANK: Record<repo.SearchMatchRank, PartMatch> = { 4: "exact", 3: "alternative", 2: "fits", 1: "related" };
 
+/** Small words that say nothing about the part. */
+const STOP_WORDS = new Set(["a", "an", "and", "or", "of", "for", "with", "the", "to", "in", "on", "by", "per"]);
+
+/**
+ * The words of a search: lower case, no small words, plural "s" dropped
+ * ("filters" finds "filter"), at most 6.
+ */
+export function searchWords(text: string): string[] {
+  const words = text
+    .toLowerCase()
+    .split(/[\s,/()]+/)
+    .filter((word) => word.length >= 2 && !STOP_WORDS.has(word))
+    .map((word) => (word.length > 3 && word.endsWith("s") && !word.endsWith("ss") ? word.slice(0, -1) : word));
+  return [...new Set(words)].slice(0, 6);
+}
+
+/**
+ * How many words a "related" part must have: all of one or two words; at
+ * least half of three or more ("Air filter element" finds "Air Filter";
+ * "Hydraulic oil filter" does not).
+ */
+export function minWordsFor(count: number): number {
+  return count <= 2 ? count : Math.ceil(count / 2);
+}
+
 /** Escape LIKE wildcards so "50%" searches for the text "50%". */
 function likeContains(text: string): string {
   return `%${text.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
@@ -436,7 +461,7 @@ export async function searchLiveProducts(input: {
 }): Promise<{ items: LiveProductMatch[]; total: number }> {
   const text = input.text?.trim() ?? "";
   const fields = input.partNumber !== undefined || input.machine !== undefined;
-  const words = [...new Set(text.toLowerCase().split(/\s+/).filter((word) => word.length >= 2))].slice(0, 6);
+  const words = searchWords(text);
   const machine = fields ? (input.machine ?? "") : text;
   const { rows, total } = await repo.searchPublishedProducts({
     sellerIds: input.sellerIds,
@@ -445,6 +470,7 @@ export async function searchLiveProducts(input: {
     fitment: machine.toLowerCase().replace(/[^a-z0-9]/g, ""),
     fitsNeedsWords: fields && words.length > 0,
     wordPatterns: words.map(likeContains),
+    minWords: minWordsFor(words.length),
     // Shorter fragments ("50") would match inside too many model names.
     wordFitments: words.map((word) => {
       const fit = word.replace(/[^a-z0-9]/g, "");

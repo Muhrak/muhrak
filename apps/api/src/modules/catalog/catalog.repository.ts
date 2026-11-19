@@ -311,12 +311,14 @@ export type SearchMatchRank = 1 | 2 | 3 | 4;
 
 /**
  * One page of live products of the given sellers matching a buyer's search,
- * strongest match first, then newest. Rank: 4 = main part number equal,
- * 3 = another part number equal or a part number starting with it,
- * 2 = a machine it fits contains it, 1 = every word in the name, brand or
- * machines. The category narrows ranks 1 and 2 only: a part-number match
- * shows whatever its category. Every value is a bound parameter (no SQL
- * built from text).
+ * strongest match first. Rank: 4 = main part number equal, 3 = another part
+ * number equal or a part number starting with it, 2 = a machine it fits
+ * contains it, 1 = enough of the words appear in its name, brand or
+ * machines (`minWords`; developer report 19 Nov 2026: "Air filter element"
+ * must find "Air Filter"). Within a rank: more words matched first, then the
+ * searched category, then newest. The category only RAISES matches, it does
+ * not hide others (an AI guess can differ from the seller's category). Every
+ * value is a bound parameter (no SQL built from text).
  *
  * The word and machine matches are substring searches, so they read all
  * live products of these sellers (fine for the market test; a trigram
@@ -324,17 +326,20 @@ export type SearchMatchRank = 1 | 2 | 3 | 4;
  */
 export async function searchPublishedProducts(input: {
   sellerIds: string[];
+  /** Same-category matches rank first; null = no preference. */
   categoryId: string | null;
   /** Normalised part number ("6020F4"); empty = no part number search. */
   partNumber: string;
   /** Normalised machine ("kobelcosk380"); empty = no machine search. */
   fitment: string;
-  /** A machine match also needs every word to match (photo search with a part name). */
+  /** A machine match also needs the words to match (photo search with a part name). */
   fitsNeedsWords: boolean;
   /** ILIKE patterns, one per word, wildcards already escaped. */
   wordPatterns: string[];
   /** Normalised words, for matching machines word by word. */
   wordFitments: string[];
+  /** How many of the words must match for a "related" part. */
+  minWords: number;
   offset: number;
   limit: number;
 }): Promise<{ rows: { id: string; rank: SearchMatchRank }[]; total: number }> {
@@ -350,33 +355,37 @@ export async function searchPublishedProducts(input: {
     input.fitment.length >= 3
       ? sql`exists (select 1 from ${productFitments} f where f.product_id = p.id and f.normalized like ${`%${input.fitment}%`})`
       : sql`false`;
-  const words =
+  // How many of the words this product has (name, brand or a machine it fits).
+  const hits =
     input.wordPatterns.length > 0
       ? sql.join(
           input.wordPatterns.map((pattern, index) => {
             const fit = input.wordFitments[index] ?? "";
-            return sql`(p.name ilike ${pattern} or coalesce(p.brand, '') ilike ${pattern}${
+            return sql`(case when (p.name ilike ${pattern} or coalesce(p.brand, '') ilike ${pattern}${
               fit ? sql` or exists (select 1 from ${productFitments} f where f.product_id = p.id and f.normalized like ${`%${fit}%`})` : sql``
-            })`;
+            }) then 1 else 0 end)`;
           }),
-          sql` and `,
+          sql` + `,
         )
-      : sql`false`;
-  const inCategory = input.categoryId ? sql`p.category_id = ${input.categoryId}` : sql`true`;
+      : sql`0`;
+  const words = input.wordPatterns.length > 0 ? sql`((${hits}) >= ${Math.max(1, input.minWords)})` : sql`false`;
   const fits = input.fitsNeedsWords ? sql`(${fitsMachine} and ${words})` : fitsMachine;
+  const sameCategory = input.categoryId ? sql`(p.category_id = ${input.categoryId})` : sql`false`;
+  const seller = inArray(sql`p.seller_user_id`, input.sellerIds);
 
   const result = await db.execute<{ id: string; rank: number; total: number }>(sql`
     with ranked as (
       select p.id, p.published_at,
-        case when ${exact} then 4 when ${alternative} then 3
-          when ${inCategory} and ${fits} then 2 when ${inCategory} and ${words} then 1 else 0 end as rank
+        case when ${exact} then 4 when ${alternative} then 3 when ${fits} then 2 when ${words} then 1 else 0 end as rank,
+        (${hits}) as hits,
+        case when ${sameCategory} then 1 else 0 end as same_category
       from ${products} p
-      where p.status = 'published' and ${inArray(sql`p.seller_user_id`, input.sellerIds)}
+      where p.status = 'published' and ${seller}
     )
     select id, rank, (count(*) over ())::int as total
     from ranked
     where rank > 0
-    order by rank desc, published_at desc, id desc
+    order by rank desc, hits desc, same_category desc, published_at desc, id desc
     offset ${input.offset} limit ${input.limit}
   `);
   const rows = result.rows.map((row) => ({ id: String(row.id), rank: Number(row.rank) as SearchMatchRank }));
@@ -385,8 +394,8 @@ export async function searchPublishedProducts(input: {
   if (rows.length === 0 && input.offset > 0) {
     const counted = await db.execute<{ total: number }>(sql`
       select count(*)::int as total from ${products} p
-      where p.status = 'published' and ${inArray(sql`p.seller_user_id`, input.sellerIds)}
-        and (${exact} or ${alternative} or (${inCategory} and (${fits} or ${words})))
+      where p.status = 'published' and ${seller}
+        and (${exact} or ${alternative} or ${fits} or ${words})
     `);
     total = Number(counted.rows[0]?.total ?? 0);
   }
