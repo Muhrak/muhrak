@@ -55,6 +55,7 @@
   --font-portal: var(--font-albert-sans);
   /* Muhrak AI page (refs/muhrak ai): clean sans text, serif question. */
   --font-ai: var(--font-manrope);
+  --font-buyer: var(--font-urbanist);
   --font-ai-serif: var(--font-gloock);
 
   /* Auth screens: "Buyer – Log in / Sign up (Light)" */

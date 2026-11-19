@@ -311,6 +311,17 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
 - Checked with temporary local accounts (removed): desktop 1440 and phone
   390 (no sideways scroll), requests, messenger and a coming-soon page in
   the new frame, the menu and the search.
+- Second pass (same day, developer: "make it exact, even small details"):
+  sizes measured on the reference (its panel is 967 px) and scaled to ours
+  (x1.6 in page units under the 85% zoom). Font: the reference uses Gilroy
+  (not free); the Buyer Centre now uses Urbanist (`--font-buyer`, Google
+  font via next/font, no new package). Filled rail icons drawn to match
+  (`buyer-rail-icons.tsx`) with the white wedge pointer; name in capitals
+  in the greeting; plain "Search" box; filled person glyph on "My account";
+  three-dot buttons on the cards; two overlapping circles on the white card;
+  status dots on the table avatars; dates as "Nov 19, 2026"; thick ring with
+  the reference's legend (no counts); the Statistic card runs to the bottom
+  of the table; no heading over the sellers list.
 
 ### Part matching fixed + recommended sellers on a Muhrak AI result (Thu 19 Nov, developer report)
 

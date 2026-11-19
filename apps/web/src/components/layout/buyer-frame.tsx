@@ -8,7 +8,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useSignOut } from "@/features/auth/hooks";
 import { LANDING_PATH } from "@/features/auth/paths";
 import { cn } from "@/lib/utils";
-import { Icon, type IconName } from "./icon";
+import { RailIcon, type RailIconName } from "./buyer-rail-icons";
 import { PortalSidebar } from "./portal-sidebar";
 
 /**
@@ -19,14 +19,14 @@ import { PortalSidebar } from "./portal-sidebar";
  * with the labelled menu in a drawer.
  */
 
-const RAIL: { label: string; slug: string; icon: IconName }[] = [
-  { label: "Dashboard", slug: "dashboard", icon: "grid" },
-  { label: "Messenger", slug: "messages", icon: "message" },
-  { label: "Inquiries & RFQs", slug: "requests", icon: "list" },
-  { label: "Orders", slug: "orders", icon: "box" },
-  { label: "Payments", slug: "payments", icon: "credit-card" },
-  { label: "Saved & history", slug: "saved", icon: "clock" },
-  { label: "Settings", slug: "settings", icon: "cog" },
+const RAIL: { label: string; slug: string; icon: RailIconName }[] = [
+  { label: "Dashboard", slug: "dashboard", icon: "dashboard" },
+  { label: "Messenger", slug: "messages", icon: "messages" },
+  { label: "Inquiries & RFQs", slug: "requests", icon: "requests" },
+  { label: "Orders", slug: "orders", icon: "orders" },
+  { label: "Payments", slug: "payments", icon: "payments" },
+  { label: "Saved & history", slug: "saved", icon: "saved" },
+  { label: "Settings", slug: "settings", icon: "settings" },
 ];
 
 export function BuyerFrame({ children }: { children: ReactNode }) {
@@ -43,32 +43,37 @@ export function BuyerFrame({ children }: { children: ReactNode }) {
   }, [drawerOpen]);
 
   return (
-    <div data-side="buyer" className="flex min-h-dvh flex-1 flex-col bg-ink font-portal text-text-strong lg:flex-row">
+    <div data-side="buyer" className="flex min-h-dvh flex-1 flex-col bg-ink font-buyer text-text-strong lg:flex-row">
       {/* Icon rail (laptop and desktop). */}
-      <nav aria-label="Buyer Centre" className="sticky top-0 hidden h-dvh w-[92px] shrink-0 flex-col items-center py-8 lg:flex">
+      <nav aria-label="Buyer Centre" className="sticky top-0 hidden h-dvh w-[100px] shrink-0 flex-col items-center pt-[46px] pb-10 lg:flex">
         <Link
           href={LANDING_PATH.buyer}
           aria-label="Muhrak home"
           className="flex size-11 items-center justify-center rounded-[14px] outline-none focus-visible:ring-3 focus-visible:ring-white/40"
         >
-          <Image src="/ai/muhrak-mark.svg" alt="" width={35} height={29.86} className="invert" priority />
+          <Image src="/ai/muhrak-mark.svg" alt="" width={32} height={27.3} className="invert" priority />
         </Link>
-        <ul className="mt-16 flex flex-col gap-3">
+        <ul className="mt-[78px] flex flex-col gap-[14px]">
           {RAIL.map((item) => {
             const active = isActive(item.slug);
             return (
               <li key={item.slug} className="relative">
-                {active ? <span aria-hidden className="absolute top-1/2 -left-[24px] h-5 w-[7px] -translate-y-1/2 rounded-r-full bg-white" /> : null}
+                {/* The reference's pointer: a small white rounded wedge on the frame's edge. */}
+                {active ? (
+                  <svg aria-hidden viewBox="0 0 8 18" className="absolute top-1/2 -left-7 h-[18px] w-2 -translate-y-1/2 text-white" fill="currentColor">
+                    <path d="M0 0c0 3 1.6 4.6 4.6 7.1 1.9 1.6 1.9 2.2 0 3.8C1.6 13.4 0 15 0 18V0Z" />
+                  </svg>
+                ) : null}
                 <Link
                   href={`/buyer/${item.slug}`}
                   aria-label={item.label}
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "group relative flex size-11 items-center justify-center rounded-[14px] outline-none transition-colors focus-visible:ring-3 focus-visible:ring-white/40",
-                    active ? "text-white" : "text-white/40 hover:bg-white/6 hover:text-white/80",
+                    active ? "text-white" : "text-white/35 hover:text-white/70",
                   )}
                 >
-                  <Icon name={item.icon} className="size-[22px]" />
+                  <RailIcon name={item.icon} className="size-[22px]" />
                   <RailTip>{item.label}</RailTip>
                 </Link>
               </li>
@@ -79,9 +84,9 @@ export function BuyerFrame({ children }: { children: ReactNode }) {
           type="button"
           onClick={() => void signOut()}
           aria-label="Log out"
-          className="group relative mt-auto flex size-11 items-center justify-center rounded-[14px] text-white/85 outline-none transition-colors hover:bg-white/6 hover:text-white focus-visible:ring-3 focus-visible:ring-white/40"
+          className="group relative mt-auto flex size-11 items-center justify-center rounded-[14px] text-white outline-none transition-colors hover:text-white/80 focus-visible:ring-3 focus-visible:ring-white/40"
         >
-          <Icon name="log-out" className="size-[22px]" />
+          <RailIcon name="logout" className="size-[22px]" />
           <RailTip>Log out</RailTip>
         </button>
       </nav>
@@ -119,11 +124,11 @@ export function BuyerFrame({ children }: { children: ReactNode }) {
       ) : null}
 
       {/* The light panel. */}
-      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-t-[28px] bg-surface lg:my-4 lg:mr-4 lg:rounded-[36px]">
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-t-[28px] bg-[#f4f4f4] lg:my-4 lg:mr-4 lg:rounded-[32px]">
         <PanelLines />
         <main
           className={cn(
-            "relative flex flex-1 flex-col gap-5 px-4 pt-6 pb-7 sm:px-6 lg:px-10 lg:pt-[30px]",
+            "relative flex flex-1 flex-col gap-5 px-4 pt-6 pb-7 sm:px-6 lg:px-12 lg:pt-[31px] lg:pb-12",
             // Everything at 85% on laptops and desktops (developer request, 16 Nov 2026).
             // No pop-up dialogs in Centre pages: a zoomed parent misplaces them.
             "lg:[zoom:0.85]",
