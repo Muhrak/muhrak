@@ -18,7 +18,7 @@ import type { RfqRow } from "../../db/schema";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/errors";
 import { enqueueJob, wakeWorker } from "../../shared/jobs";
 import { logger } from "../../shared/logger";
-import { getIdentificationPhotoUpload } from "../ai";
+import { getIdentificationPhotoUploads } from "../ai";
 import { getUsersByIds } from "../auth";
 import { getLiveProductForRfq, getProductSnapshots } from "../catalog";
 import { sendNewRfqEmail } from "../notification";
@@ -92,6 +92,7 @@ async function baseFields(rows: RfqRow[], now: Date) {
       declineReason: row.declineReason,
       hasBuyerPhoto: row.buyerPhotoUploadId !== null,
       buyerPhotoUrl: null as string | null,
+      buyerPhotoUrls: [] as string[],
       product: { id: row.productId, name: product?.name ?? row.partName, photoUrl: product?.photoUrl ?? null },
       createdAt: row.createdAt.toISOString(),
       expiresAt: row.expiresAt.toISOString(),
@@ -148,8 +149,9 @@ export async function createRfq(buyerUserId: string, input: RfqCreateInput, now 
     throw forbidden(`You have ${RFQ_LIMITS.maxOpenPerBuyer} open quote requests. Wait for replies or cancel some before sending more.`);
   }
 
-  // The buyer's photo: only from their OWN finished photo search (checked by the AI module).
-  const buyerPhotoUploadId = input.identificationId ? await getIdentificationPhotoUpload(buyerUserId, input.identificationId) : null;
+  // The buyer's photos (up to 4): only from their OWN finished photo search (checked by the AI module).
+  const buyerPhotos = input.identificationId ? await getIdentificationPhotoUploads(buyerUserId, input.identificationId) : [];
+  const buyerPhotoUploadId = buyerPhotos[0] ?? null;
 
   const users = await getUsersByIds([product.sellerUserId, buyerUserId]);
   const seller = users.find((user) => user.id === product.sellerUserId && user.role === "seller");
@@ -177,6 +179,7 @@ export async function createRfq(buyerUserId: string, input: RfqCreateInput, now 
       at: now,
     });
     if (!created) return undefined;
+    await repo.insertMoreBuyerPhotos(tx, created.id, buyerPhotos.slice(1));
     const unit = UNIT_LABELS[created.unit];
     await sendNewRfqEmail(
       {
@@ -230,15 +233,16 @@ async function ownAsSeller(sellerUserId: string, id: string): Promise<RfqRow> {
 /** How long a link to the buyer's photo works. */
 export const BUYER_PHOTO_LINK_SECONDS = 10 * 60;
 
-/** A single request, AFTER its owner was checked: add the short-lived link to the buyer's photo. */
-async function withPhotoLink<T extends { buyerPhotoUrl: string | null }>(row: RfqRow, rfq: T, now: Date): Promise<T> {
+/** A single request, AFTER its owner was checked: add short-lived links to the buyer's photos (up to 4). */
+async function withPhotoLink<T extends { buyerPhotoUrl: string | null; buyerPhotoUrls: string[] }>(row: RfqRow, rfq: T, now: Date): Promise<T> {
   if (!row.buyerPhotoUploadId) return rfq;
   try {
-    const link = await getDownloadLink(row.buyerPhotoUploadId, BUYER_PHOTO_LINK_SECONDS, now);
-    return { ...rfq, buyerPhotoUrl: link.url };
+    const uploads = [row.buyerPhotoUploadId, ...(await repo.listMoreBuyerPhotos(row.id))];
+    const links = await Promise.all(uploads.map((uploadId) => getDownloadLink(uploadId, BUYER_PHOTO_LINK_SECONDS, now)));
+    return { ...rfq, buyerPhotoUrl: links[0]?.url ?? null, buyerPhotoUrls: links.map((link) => link.url) };
   } catch (error) {
-    // The request still shows without its photo.
-    logger.warn({ rfqId: row.id, err: { message: (error as Error).message } }, "Could not link the buyer's photo");
+    // The request still shows without its photos.
+    logger.warn({ rfqId: row.id, err: { message: (error as Error).message } }, "Could not link the buyer's photos");
     return rfq;
   }
 }

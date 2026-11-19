@@ -3,7 +3,7 @@ import { AiProviderError } from "../ai-provider";
 import { createGeminiProvider } from "./gemini";
 
 const KEY = "test-gemini-key-0123456789abcdef";
-const input = { image: new Uint8Array([1, 2, 3]), mimeType: "image/webp", categories: [{ slug: "filters", name: "Filters" }] };
+const input = { images: [{ bytes: new Uint8Array([1, 2, 3]), mimeType: "image/webp" }], categories: [{ slug: "filters", name: "Filters" }] };
 
 function reply(status: number, body: unknown) {
   return vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }));

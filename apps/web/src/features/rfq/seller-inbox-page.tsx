@@ -9,7 +9,7 @@ import { focusRing } from "@/features/seller/parts";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useDeclineRfq, useSellerRfq, useSellerRfqs } from "./api";
-import { BuyerPhoto, closesIn, DetailTiles, neededByLabel, quantityLabel, RfqChip, sellerStatus, sentAgo, shortAge, Thumb } from "./parts";
+import { BuyerPhotos, closesIn, DetailTiles, neededByLabel, quantityLabel, RfqChip, sellerStatus, sentAgo, shortAge, Thumb } from "./parts";
 import { LogoLoader } from "@/components/ui/logo-loader";
 import { useToast } from "@/components/ui/toast";
 
@@ -220,7 +220,7 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
         </div>
       ) : null}
 
-      <BuyerPhoto url={rfq.buyerPhotoUrl} label="Buyer's photo of the part" />
+      <BuyerPhotos urls={rfq.buyerPhotoUrls} label={rfq.buyerPhotoUrls.length > 1 ? "Buyer's photos of the part" : "Buyer's photo of the part"} />
 
       <div className="flex flex-col gap-2.5">
         <p className="text-sm font-medium text-text-strong">Asked about</p>

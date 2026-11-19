@@ -1,6 +1,6 @@
 import { and, count, eq, gte, inArray, sql, sum } from "drizzle-orm";
 import { db } from "../../db/client";
-import { aiIdentifications, type AiIdentificationRow } from "../../db/schema";
+import { aiIdentificationPhotos, aiIdentifications, type AiIdentificationRow } from "../../db/schema";
 
 /** Repository layer: database queries only. Identifications are never deleted. */
 
@@ -26,6 +26,32 @@ export async function findById(id: string): Promise<AiIdentificationRow | undefi
 export async function findByUpload(uploadId: string, ex: typeof db | Tx = db): Promise<AiIdentificationRow | undefined> {
   const rows = await ex.select().from(aiIdentifications).where(eq(aiIdentifications.uploadId, uploadId)).limit(1);
   return rows[0];
+}
+
+/** The search's photos 2-4 (upload ids, in order). */
+export async function listMorePhotos(identificationId: string): Promise<string[]> {
+  const rows = await db
+    .select({ uploadId: aiIdentificationPhotos.uploadId })
+    .from(aiIdentificationPhotos)
+    .where(eq(aiIdentificationPhotos.identificationId, identificationId))
+    .orderBy(aiIdentificationPhotos.position);
+  return rows.map((row) => row.uploadId);
+}
+
+/** Uploads among `uploadIds` already used by any photo search, as its first photo or a later one. */
+export async function findUsedUploads(uploadIds: string[], ex: typeof db | Tx = db): Promise<string[]> {
+  if (uploadIds.length === 0) return [];
+  const [first, more] = await Promise.all([
+    ex.select({ id: aiIdentifications.uploadId }).from(aiIdentifications).where(inArray(aiIdentifications.uploadId, uploadIds)),
+    ex.select({ id: aiIdentificationPhotos.uploadId }).from(aiIdentificationPhotos).where(inArray(aiIdentificationPhotos.uploadId, uploadIds)),
+  ]);
+  return [...first, ...more].map((row) => row.id);
+}
+
+/** Photos 2-4 of a new search, in the same transaction as the search itself. */
+export async function insertMorePhotos(tx: Tx, identificationId: string, uploadIds: string[]): Promise<void> {
+  if (uploadIds.length === 0) return;
+  await tx.insert(aiIdentificationPhotos).values(uploadIds.map((uploadId, index) => ({ identificationId, uploadId, position: index + 1 })));
 }
 
 /** Identifications a user started since `since` (any outcome). */

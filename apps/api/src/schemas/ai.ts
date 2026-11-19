@@ -78,9 +78,18 @@ export type AiModelOutput = z.infer<typeof aiModelOutputSchema>;
 
 // ---------------------------------------------------------------- API
 
+/** Most photos of one part in a buyer photo search, all read in one model call (developer request, 19 Nov 2026). */
+export const AI_MAX_PHOTOS = 4;
+
 export const createAiIdentificationSchema = z.object({
-  /** A ready photo the caller uploaded (purpose product_photo). */
+  /** A ready photo the caller uploaded (seller: product_photo; buyer: part_photo). */
   uploadId: z.string().uuid(),
+  /** Buyer photo search only: up to 3 more photos of the same part (other angles, the label). */
+  moreUploadIds: z
+    .array(z.string().uuid())
+    .max(AI_MAX_PHOTOS - 1)
+    .optional()
+    .refine((ids) => !ids || new Set(ids).size === ids.length, "The same photo was sent twice."),
 });
 export type CreateAiIdentificationInput = z.infer<typeof createAiIdentificationSchema>;
 
@@ -102,6 +111,8 @@ export type AiSuggestion = z.infer<typeof aiSuggestionSchema>;
 export const aiIdentificationSchema = z.object({
   id: z.string().uuid(),
   uploadId: z.string().uuid(),
+  /** How many photos the search has (1 to AI_MAX_PHOTOS). */
+  photoCount: z.number().int().min(1).max(AI_MAX_PHOTOS),
   /** pending/running: ask again shortly. failed: show the manual form. */
   status: aiIdentificationStatusSchema,
   suggestion: aiSuggestionSchema.nullable(),
@@ -110,6 +121,12 @@ export const aiIdentificationSchema = z.object({
 export type AiIdentification = z.infer<typeof aiIdentificationSchema>;
 
 export const aiIdentificationResponseSchema = z.object({ identification: aiIdentificationSchema });
+
+/** The buyer's own photos of a search, in order, as short-lived links. */
+export const aiIdentificationPhotosResponseSchema = z.object({
+  photos: z.array(z.object({ url: z.string().url(), expiresAt: z.string() })),
+});
+export type AiIdentificationPhotosResponse = z.infer<typeof aiIdentificationPhotosResponseSchema>;
 export type AiIdentificationResponse = z.infer<typeof aiIdentificationResponseSchema>;
 
 /** Whether to offer "fill from photo" to the signed-in user right now. */

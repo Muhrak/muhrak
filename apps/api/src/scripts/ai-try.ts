@@ -49,7 +49,7 @@ async function main(): Promise<void> {
     try {
       const photo = await processProductPhoto(await readFile(file));
       const started = Date.now();
-      const result = await provider.identifyPart({ image: photo.large, mimeType: "image/webp", categories });
+      const result = await provider.identifyPart({ images: [{ bytes: photo.large, mimeType: "image/webp" }], categories });
       const cost =
         Math.ceil((result.usage.inputTokens * env.GEMINI_INPUT_USD_PER_MTOK) / 1_000_000) +
         Math.ceil((result.usage.outputTokens * env.GEMINI_OUTPUT_USD_PER_MTOK) / 1_000_000);

@@ -1,9 +1,9 @@
 import { and, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import { db } from "../../db/client";
-import { rfqs, type RfqRow } from "../../db/schema";
+import { rfqBuyerPhotos, rfqs, type RfqRow } from "../../db/schema";
 import type { RfqListFilter, RfqStatus } from "../../schemas";
 
-/** Repository layer: database queries only (the rfqs table). No business rules. */
+/** Repository layer: database queries only (the rfqs and rfq_buyer_photos tables). No business rules. */
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -21,6 +21,22 @@ export type NewRfq = Omit<
  * (the same request key, or an open request for the same product), so the
  * service can tell which and answer accordingly.
  */
+/** The buyer's photos 2-4 of a new request, in the same transaction as the request. */
+export async function insertMoreBuyerPhotos(tx: Tx, rfqId: string, uploadIds: string[]): Promise<void> {
+  if (uploadIds.length === 0) return;
+  await tx.insert(rfqBuyerPhotos).values(uploadIds.map((uploadId, index) => ({ rfqId, uploadId, position: index + 1 })));
+}
+
+/** The buyer's photos 2-4 of a request (upload ids, in order). */
+export async function listMoreBuyerPhotos(rfqId: string): Promise<string[]> {
+  const rows = await db
+    .select({ uploadId: rfqBuyerPhotos.uploadId })
+    .from(rfqBuyerPhotos)
+    .where(eq(rfqBuyerPhotos.rfqId, rfqId))
+    .orderBy(rfqBuyerPhotos.position);
+  return rows.map((row) => row.uploadId);
+}
+
 export async function insertRfq(tx: Tx, values: NewRfq): Promise<RfqRow | undefined> {
   const { at, ...fields } = values;
   const rows = await tx

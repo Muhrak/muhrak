@@ -6,6 +6,8 @@ const OTHER = "22222222-2222-4222-8222-222222222222";
 const UPLOAD = "33333333-3333-4333-8333-333333333333";
 const IDENT = "44444444-4444-4444-8444-444444444444";
 const CAT = "55555555-5555-4555-8555-555555555555";
+const PHOTO2 = "66666666-6666-4666-8666-666666666666";
+const PHOTO3 = "77777777-7777-4777-8777-777777777777";
 
 vi.hoisted(() => {
   Object.assign(process.env, {
@@ -27,6 +29,9 @@ vi.mock("./ai.repository", () => ({
   countByUserSince: vi.fn(),
   spendSince: vi.fn(),
   insert: vi.fn(),
+  listMorePhotos: vi.fn(),
+  findUsedUploads: vi.fn(),
+  insertMorePhotos: vi.fn(),
   markRunning: vi.fn(),
   addUsage: vi.fn(),
   finish: vi.fn(),
@@ -89,6 +94,8 @@ beforeEach(() => {
   vi.mocked(repo.countByUserSince).mockResolvedValue(0);
   vi.mocked(repo.spendSince).mockResolvedValue({ spentMicroUsd: 0, unfinished: 0 });
   vi.mocked(repo.insert).mockResolvedValue(row());
+  vi.mocked(repo.listMorePhotos).mockResolvedValue([]);
+  vi.mocked(repo.findUsedUploads).mockResolvedValue([]);
   vi.mocked(repo.markRunning).mockResolvedValue(row({ status: "running" }));
   vi.mocked(upload.readPhotoForAi).mockResolvedValue({ bytes: new Uint8Array([1, 2, 3]), contentType: "image/webp" });
   vi.mocked(catalog.listCategories).mockResolvedValue([{ id: CAT, slug: "filters", name: "Filters" }] as never);
@@ -199,20 +206,21 @@ describe("getIdentification", () => {
 });
 
 describe("photo for a quote request", () => {
-  it("gives the upload of the caller's own finished identification", async () => {
+  it("gives the uploads of the caller's own finished identification, first photo first", async () => {
     vi.mocked(repo.findById).mockResolvedValue(row({ userId: OTHER, status: "done" }));
-    await expect(service.getIdentificationPhotoUpload(OTHER, IDENT)).resolves.toBe(UPLOAD);
+    vi.mocked(repo.listMorePhotos).mockResolvedValue([PHOTO2, PHOTO3]);
+    await expect(service.getIdentificationPhotoUploads(OTHER, IDENT)).resolves.toEqual([UPLOAD, PHOTO2, PHOTO3]);
   });
 
   it("hides another user's, an unfinished or a failed identification as not found", async () => {
     vi.mocked(repo.findById).mockResolvedValue(row({ userId: SELLER, status: "done" }));
-    await expect(service.getIdentificationPhotoUpload(OTHER, IDENT)).rejects.toMatchObject({ status: 404 });
+    await expect(service.getIdentificationPhotoUploads(OTHER, IDENT)).rejects.toMatchObject({ status: 404 });
     for (const status of ["pending", "running", "failed"] as const) {
       vi.mocked(repo.findById).mockResolvedValue(row({ userId: OTHER, status }));
-      await expect(service.getIdentificationPhotoUpload(OTHER, IDENT)).rejects.toMatchObject({ status: 404 });
+      await expect(service.getIdentificationPhotoUploads(OTHER, IDENT)).rejects.toMatchObject({ status: 404 });
     }
     vi.mocked(repo.findById).mockResolvedValue(undefined);
-    await expect(service.getIdentificationPhotoUpload(OTHER, IDENT)).rejects.toMatchObject({ status: 404 });
+    await expect(service.getIdentificationPhotoUploads(OTHER, IDENT)).rejects.toMatchObject({ status: 404 });
   });
 });
 
@@ -238,6 +246,68 @@ describe("buyer photo search", () => {
   });
 });
 
+describe("buyer photo search with up to 4 photos", () => {
+  it("saves photos 2-4 with the search, in the same transaction, and reports the count", async () => {
+    vi.mocked(repo.listMorePhotos).mockResolvedValue([PHOTO2, PHOTO3]);
+    const result = await service.requestIdentification(OTHER, UPLOAD, "part_photo", now, [PHOTO2, PHOTO3]);
+    for (const id of [UPLOAD, PHOTO2, PHOTO3]) expect(upload.getOwnedPhotoForAi).toHaveBeenCalledWith(OTHER, id, "part_photo");
+    expect(repo.insertMorePhotos).toHaveBeenCalledWith({ tx: true }, IDENT, [PHOTO2, PHOTO3]);
+    expect(result.photoCount).toBe(3);
+  });
+
+  it("refuses more than 4 photos, the same photo twice, and extra photos on a seller's product photo", async () => {
+    const four = [PHOTO2, PHOTO3, "88888888-8888-4888-8888-888888888888", "99999999-9999-4999-8999-999999999999"];
+    await expect(service.requestIdentification(OTHER, UPLOAD, "part_photo", now, four)).rejects.toMatchObject({ status: 400 });
+    await expect(service.requestIdentification(OTHER, UPLOAD, "part_photo", now, [UPLOAD])).rejects.toMatchObject({ status: 400 });
+    await expect(service.requestIdentification(OTHER, UPLOAD, "part_photo", now, [PHOTO2, PHOTO2])).rejects.toMatchObject({ status: 400 });
+    await expect(service.requestIdentification(SELLER, UPLOAD, "product_photo", now, [PHOTO2])).rejects.toMatchObject({ status: 400 });
+    expect(repo.insert).not.toHaveBeenCalled();
+  });
+
+  it("someone else's photo among them: 404 and nothing is started", async () => {
+    vi.mocked(upload.getOwnedPhotoForAi).mockImplementation(async (_user, id) => {
+      if (id === PHOTO3) throw notFound("Photo not found");
+      return {} as never;
+    });
+    await expect(service.requestIdentification(OTHER, UPLOAD, "part_photo", now, [PHOTO2, PHOTO3])).rejects.toMatchObject({ status: 404 });
+    expect(repo.insert).not.toHaveBeenCalled();
+    expect(jobs.enqueueJob).not.toHaveBeenCalled();
+  });
+
+  it("a photo already in another search is refused, nothing is started", async () => {
+    vi.mocked(repo.findUsedUploads).mockResolvedValue([PHOTO2]);
+    await expect(service.requestIdentification(OTHER, UPLOAD, "part_photo", now, [PHOTO2])).rejects.toMatchObject({ status: 400 });
+    expect(repo.insert).not.toHaveBeenCalled();
+    expect(jobs.enqueueJob).not.toHaveBeenCalled();
+  });
+
+  it("links to all the owner's photos, in order; another user's: 404 and no link", async () => {
+    vi.mocked(repo.findById).mockResolvedValue(row({ userId: OTHER }));
+    vi.mocked(repo.listMorePhotos).mockResolvedValue([PHOTO2]);
+    vi.mocked(upload.getOwnedPartPhotoLink).mockImplementation(async (_user, id) => ({ url: `https://bucket.example/${id}`, expiresAt: now.toISOString() }));
+    const links = await service.getIdentificationPhotos(OTHER, IDENT, now);
+    expect(links.map((link) => link.url)).toEqual([`https://bucket.example/${UPLOAD}`, `https://bucket.example/${PHOTO2}`]);
+    vi.clearAllMocks();
+    vi.mocked(repo.findById).mockResolvedValue(row({ userId: SELLER }));
+    await expect(service.getIdentificationPhotos(OTHER, IDENT, now)).rejects.toMatchObject({ status: 404 });
+    expect(upload.getOwnedPartPhotoLink).not.toHaveBeenCalled();
+  });
+
+  it("the job sends every photo to the model in one call", async () => {
+    vi.mocked(repo.listMorePhotos).mockResolvedValue([PHOTO2, PHOTO3]);
+    provider.identifyPart.mockResolvedValue({ output: goodOutput, usage: { inputTokens: 3000, outputTokens: 500 } });
+    await service.runAiJob({ id: "job-1", payload: { identificationId: IDENT } });
+    expect(provider.identifyPart).toHaveBeenCalledTimes(1);
+    expect(provider.identifyPart.mock.calls[0]![0].images).toHaveLength(3);
+    expect(upload.readPhotoForAi).toHaveBeenCalledWith(PHOTO3);
+  });
+
+  it("counts an unfinished call at the cost of the largest (4-photo) call", () => {
+    // (1000 + 4 * 3000) input tokens * 0.30 + 4096 output tokens * 2.50, in micro dollars.
+    expect(service.maxCallCostMicroUsd()).toBe(Math.ceil(13000 * 0.3) + Math.ceil(4096 * 2.5));
+  });
+});
+
 describe("runAiJob", () => {
   const job = { id: "job-1", payload: { identificationId: IDENT } };
 
@@ -245,7 +315,7 @@ describe("runAiJob", () => {
     provider.identifyPart.mockResolvedValue({ output: goodOutput, usage: { inputTokens: 1000, outputTokens: 500 } });
     await service.runAiJob(job);
     expect(provider.identifyPart).toHaveBeenCalledWith(
-      expect.objectContaining({ mimeType: "image/webp", categories: [{ slug: "filters", name: "Filters" }] }),
+      expect.objectContaining({ images: [{ bytes: new Uint8Array([1, 2, 3]), mimeType: "image/webp" }], categories: [{ slug: "filters", name: "Filters" }] }),
     );
     expect(repo.addUsage).toHaveBeenCalledWith(IDENT, expect.objectContaining({ inputTokens: 1000, outputTokens: 500, costMicroUsd: 1550 }));
     const outcome = vi.mocked(repo.finish).mock.calls[0]![1];

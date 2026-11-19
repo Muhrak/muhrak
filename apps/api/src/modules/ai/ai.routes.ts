@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import {
   createAiIdentificationSchema,
+  type AiIdentificationPhotosResponse,
   type AiIdentificationResponse,
   type AiStatusResponse,
   type CreateAiIdentificationInput,
@@ -42,9 +43,9 @@ function identificationRoutes(router: Router, purpose: AiPhotoPurpose): void {
     limitByUser({ name: "ai-identify:user", max: 20, windowMs: 15 * MINUTE }),
     validateBody(createAiIdentificationSchema),
     async (req, res) => {
-      const { uploadId } = req.body as CreateAiIdentificationInput;
+      const { uploadId, moreUploadIds } = req.body as CreateAiIdentificationInput;
       const body: AiIdentificationResponse = {
-        identification: await aiService.requestIdentification(req.auth!.userId, uploadId, purpose),
+        identification: await aiService.requestIdentification(req.auth!.userId, uploadId, purpose, new Date(), moreUploadIds ?? []),
       };
       res.status(body.identification.status === "pending" ? 202 : 200).json(body);
     },
@@ -76,6 +77,19 @@ buyerAiRouter.get(
   async (req, res) => {
     const { id } = req.params as z.infer<typeof idParams>;
     const body: FileLink = await aiService.getIdentificationPhoto(req.auth!.userId, id);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.json(body);
+  },
+);
+
+/** All the buyer's own photos of a search (up to 4), for the result page; short-lived links. */
+buyerAiRouter.get(
+  "/identifications/:id/photos",
+  limitByUser({ name: "ai-photo:user", max: 60, windowMs: MINUTE }),
+  validateParams(idParams),
+  async (req, res) => {
+    const { id } = req.params as z.infer<typeof idParams>;
+    const body: AiIdentificationPhotosResponse = { photos: await aiService.getIdentificationPhotos(req.auth!.userId, id) };
     res.setHeader("Cache-Control", "private, no-store");
     res.json(body);
   },

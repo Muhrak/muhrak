@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowUp, Camera, ChevronRight, ClipboardList, House, ImageIcon, Loader2, Pencil, RotateCcw, Search, Store, X } from "lucide-react";
+import { ArrowUp, Camera, ChevronLeft, ChevronRight, ClipboardList, House, ImageIcon, Loader2, Pencil, Plus, RotateCcw, Search, Store, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -9,7 +9,7 @@ import { Suspense, use, useEffect, useRef, useState, type DragEvent, type FormEv
 import { browser } from "react-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { PART_MATCH_LABELS, type AiConfidence, type AiSuggestion, type PartSearchResponse, type PartSearchResult } from "@/schemas";
+import { AI_MAX_PHOTOS, PART_MATCH_LABELS, type AiConfidence, type AiSuggestion, type PartSearchResponse, type PartSearchResult } from "@/schemas";
 import { NavActions, SignedOutActions } from "@/components/landing/nav-actions";
 import { LOGIN_PATH } from "@/features/auth/paths";
 import { useSession } from "@/features/auth/session";
@@ -22,7 +22,7 @@ import { LogoTile, VerifiedMark } from "@/features/storefront/soft";
 import { acceptFor, checkFile, uploadFile } from "@/features/upload/upload-file";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { startIdentification, useAiAvailable, useBuyerIdentification, useBuyerIdentificationPhoto } from "./api";
+import { startIdentification, useAiAvailable, useBuyerIdentification, useBuyerIdentificationPhotos } from "./api";
 
 /**
  * /ai: Muhrak AI (Day 8; redesigned 18 Nov 2026 from the developer's
@@ -31,9 +31,11 @@ import { startIdentification, useAiAvailable, useBuyerIdentification, useBuyerId
  * glow uses the buyer blue palette only.
  *
  * Everything happens inside the card, no separate result page:
- * - a photo (round camera button, a chip, or drag and drop) is uploaded
- *   (private, cleaned of metadata), Muhrak AI identifies it and matching
- *   parts are listed, with each step shown as it runs;
+ * - up to 4 photos of one part (round camera button, a chip, or drag and
+ *   drop; developer request 19 Nov 2026) wait in a tray where each can be
+ *   previewed or removed; "Identify part" uploads them (private, cleaned of
+ *   metadata), Muhrak AI reads them together and matching parts are listed,
+ *   with each step shown as it runs;
  * - text typed in the pill searches by part number, name or machine.
  * A matching part opens the quote request in a modal.
  *
@@ -47,7 +49,7 @@ import { startIdentification, useAiAvailable, useBuyerIdentification, useBuyerId
 const PAGE = "/ai";
 
 /** Local previews of photos sent from this tab, by identification id (shown again after Back / Forward). */
-const previews = new Map<string, string>();
+const previews = new Map<string, string[]>();
 
 /** URL keys of details the buyer edited; a key present (even empty) overrides what the AI read. */
 const KEYS = { name: "name", partNumber: "pn", machine: "machine", category: "cat" } as const;
@@ -59,8 +61,11 @@ interface Details {
   category: string;
 }
 
-/** A photo being sent from this page; `id` once Muhrak AI has it (the URL then takes over). */
-type LocalRun = { previewUrl: string; stage: "uploading" | "identifying"; id?: string };
+/** Photos being sent from this page; `id` once Muhrak AI has them (the URL then takes over). */
+type LocalRun = { previewUrls: string[]; stage: "uploading" | "identifying"; id?: string };
+
+/** A photo chosen but not sent yet (the tray above the composer). */
+type Picked = { file: File; url: string };
 
 const chip = cn(
   "inline-flex h-11 items-center gap-2 rounded-full bg-black/[0.055] px-[18px] text-[15px] leading-none text-ink-secondary transition-colors hover:bg-black/[0.09] disabled:opacity-50 sm:h-12 sm:px-5 sm:text-base",
@@ -101,6 +106,8 @@ export function MuhrakAiPage() {
   const quoteFor = params.get("quote");
 
   const [local, setLocal] = useState<LocalRun | null>(null);
+  const [picked, setPicked] = useState<Picked[]>([]);
+  const [viewer, setViewer] = useState<{ urls: string[]; index: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState(q);
   const [editing, setEditing] = useState(false);
@@ -109,14 +116,16 @@ export function MuhrakAiPage() {
   const cameraRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLInputElement>(null);
 
-  // The local preview of the photo being checked; freed when replaced or on leaving,
-  // unless it is kept as the preview of a started photo search (see `previews`).
-  useEffect(
-    () => () => {
-      if (local && !local.id) URL.revokeObjectURL(local.previewUrl);
-    },
-    [local],
-  );
+  // Local previews made on this page: freed on leaving, except those kept as the previews of a
+  // started photo search (see `previews`, shown again after Back / Forward).
+  const created = useRef(new Set<string>());
+  useEffect(() => {
+    const urls = created.current;
+    return () => {
+      const kept = new Set([...previews.values()].flat());
+      for (const url of urls) if (!kept.has(url)) URL.revokeObjectURL(url);
+    };
+  }, []);
 
   // Back / Forward (developer report, 19 Nov 2026): a photo that was being sent belongs to the
   // page it was sent from. Forget it, so going Back never shows "Identifying the part" again;
@@ -139,7 +148,7 @@ export function MuhrakAiPage() {
 
   const identification = useBuyerIdentification(id ?? "", Boolean(id) && signedIn);
   const localPreview = id ? previews.get(id) : undefined;
-  const photo = useBuyerIdentificationPhoto(id ?? "", Boolean(id) && signedIn && !local && !localPreview);
+  const photos = useBuyerIdentificationPhotos(id ?? "", Boolean(id) && signedIn && !local && !localPreview);
   const data = id ? identification.data : undefined;
   const suggestion = data?.status === "done" && data.suggestion?.isPart ? data.suggestion : null;
   const base = suggestion ? fromSuggestion(suggestion) : null;
@@ -191,38 +200,69 @@ export function MuhrakAiPage() {
     (camera ? cameraRef : pickerRef).current?.click();
   }
 
-  async function startPhoto(file: File | undefined) {
-    if (!file || local) return;
+  /** Photos chosen, taken or dropped go to the tray (checked here; up to AI_MAX_PHOTOS). */
+  function addPhotos(files: File[]) {
+    if (files.length === 0 || local) return;
     if (!signedIn) return toLogin();
-    const problem = checkFile("part_photo", file);
-    if (problem) {
-      setError(problem);
-      return;
+    const room = AI_MAX_PHOTOS - picked.length;
+    const added: Picked[] = [];
+    let problem: string | null = null;
+    for (const file of files) {
+      const issue = checkFile("part_photo", file);
+      if (issue) {
+        problem = issue;
+        continue;
+      }
+      if (added.length >= room) {
+        problem = `Up to ${AI_MAX_PHOTOS} photos of one part.`;
+        break;
+      }
+      const url = URL.createObjectURL(file);
+      created.current.add(url);
+      added.push({ file, url });
     }
+    setError(problem);
+    if (added.length > 0) setPicked((current) => [...current, ...added]);
+  }
+
+  function removePicked(url: string) {
+    setPicked((current) => current.filter((item) => item.url !== url));
+    URL.revokeObjectURL(url);
+    created.current.delete(url);
+  }
+
+  /** Upload the tray's photos and ask Muhrak AI to read them together. */
+  async function startPhotos() {
+    if (local || picked.length === 0) return;
+    if (!signedIn) return toLogin();
+    const files = picked;
+    const previewUrls = files.map((item) => item.url);
+    setPicked([]);
     setError(null);
     setEditing(false);
     setDraft("");
     router.replace(PAGE, { scroll: false });
-    const previewUrl = URL.createObjectURL(file);
-    setLocal({ previewUrl, stage: "uploading" });
+    setLocal({ previewUrls, stage: "uploading" });
     try {
-      const uploadId = await uploadFile("buyer", "part_photo", file);
-      setLocal({ previewUrl, stage: "identifying" });
-      const started = await startIdentification("buyer", uploadId);
-      // Keep the local preview for this search (also after Back / Forward); once the URL has the id,
+      const uploadIds = await Promise.all(files.map((item) => uploadFile("buyer", "part_photo", item.file)));
+      setLocal({ previewUrls, stage: "identifying" });
+      const started = await startIdentification("buyer", uploadIds[0]!, uploadIds.slice(1));
+      // Keep the local previews for this search (also after Back / Forward); once the URL has the id,
       // the identification query shows the progress.
-      previews.set(started.id, previewUrl);
-      setLocal({ previewUrl, stage: "identifying", id: started.id });
+      previews.set(started.id, previewUrls);
+      setLocal({ previewUrls, stage: "identifying", id: started.id });
       router.replace(`${PAGE}?id=${started.id}`, { scroll: false });
     } catch (caught) {
-      URL.revokeObjectURL(previewUrl);
+      // The photos go back to the tray, so the buyer can try again without choosing them again.
       setLocal(null);
+      setPicked(files);
       setError(caught instanceof ApiError ? caught.message : "Something went wrong. Please try again.");
     }
   }
 
-  // Once the URL carries the new identification, the local run has done its job (its preview stays shown).
-  const previewUrl = local?.previewUrl ?? localPreview ?? photo.data ?? null;
+  // Once the URL carries the new identification, the local run has done its job (its previews stay shown).
+  const previewUrls = local?.previewUrls ?? localPreview ?? photos.data ?? [];
+  const photoCount = local?.previewUrls.length ?? localPreview?.length ?? data?.photoCount ?? 1;
   // Before the id is known the run is in progress; once the URL carries its id the query takes over.
   const localStage = local && !local.id ? local.stage : local && local.id && !id ? "identifying" : null;
 
@@ -241,6 +281,7 @@ export function MuhrakAiPage() {
 
   function startOver() {
     setLocal(null);
+    for (const item of picked) removePicked(item.url);
     setError(null);
     setEditing(false);
     setDraft("");
@@ -250,7 +291,7 @@ export function MuhrakAiPage() {
   function onDrop(event: DragEvent) {
     event.preventDefault();
     setDragging(false);
-    void startPhoto(event.dataTransfer.files?.[0]);
+    addPhotos([...(event.dataTransfer.files ?? [])]);
   }
 
   // ------------------------------------------------------------ what the page shows
@@ -262,13 +303,17 @@ export function MuhrakAiPage() {
   const loadingId = Boolean(id) && (identification.isPending || !signedIn) && !local;
   const failed =
     data?.status === "failed"
-      ? "Muhrak AI could not read this photo. Try a clear photo of the whole part, or type the part number below."
+      ? photoCount > 1
+        ? "Muhrak AI could not read these photos. Try clear photos of the whole part and its label, or type the part number below."
+        : "Muhrak AI could not read this photo. Try a clear photo of the whole part, or type the part number below."
       : data?.suggestion && !data.suggestion.isPart
-        ? "This photo does not look like a vehicle or machine part. Try another photo, or type what you need below."
+        ? `${photoCount > 1 ? "These photos do" : "This photo does"} not look like a vehicle or machine part. Try another photo, or type what you need below.`
         : null;
   const working: string | null =
     localStage === "uploading"
-      ? "Uploading your photo"
+      ? photoCount > 1
+        ? `Uploading your ${photoCount} photos`
+        : "Uploading your photo"
       : reading
         ? "Identifying the part"
         : loadingId
@@ -351,7 +396,7 @@ export function MuhrakAiPage() {
     }
     body = (
       <div className="flex flex-col">
-        <PhotoBubble previewUrl={previewUrl} />
+        <PhotoGroup urls={previewUrls} count={photoCount} onOpen={(index) => setViewer({ urls: previewUrls, index })} />
         <div className="mt-6">{answer}</div>
       </div>
     );
@@ -390,7 +435,8 @@ export function MuhrakAiPage() {
       <div>
         <h1 className="font-ai-serif text-[38px] leading-[1.08] tracking-[-0.02em] text-[#8b8d96] sm:text-[56px]">Which part do you need?</h1>
         <p className="mt-3 max-w-[520px] text-base leading-normal text-ink-tertiary sm:text-[17px]">
-          Upload a photo of the part, or type its number. Muhrak AI finds verified sellers who can supply it.
+          Upload up to {AI_MAX_PHOTOS} photos of the part (another angle or its label helps), or type its number. Muhrak AI finds verified
+          sellers who can supply it.
         </p>
         <div className="mt-7 flex flex-wrap gap-2.5">
           {photoOff ? (
@@ -401,7 +447,7 @@ export function MuhrakAiPage() {
                 Take a photo
               </button>
               <button type="button" onClick={() => choosePhoto(false)} className={chip}>
-                Upload a photo
+                Upload photos
               </button>
             </>
           )}
@@ -417,6 +463,7 @@ export function MuhrakAiPage() {
   }
 
   const busy = Boolean(localStage);
+  const trayFull = picked.length >= AI_MAX_PHOTOS;
   const idle = !id && q.length < 2 && !local;
 
   return (
@@ -447,6 +494,16 @@ export function MuhrakAiPage() {
 
         {/* The composer stays at the bottom of the screen: type a part number / name, or the round button for a photo. */}
         <div className="sticky bottom-0 z-10 pt-3 pb-5 sm:pb-8">
+          {picked.length > 0 ? (
+            <PhotoTray
+              picked={picked}
+              busy={busy}
+              onPreview={(index) => setViewer({ urls: picked.map((item) => item.url), index })}
+              onRemove={removePicked}
+              onAdd={() => choosePhoto(false)}
+              onSend={() => void startPhotos()}
+            />
+          ) : null}
           <form role="search" onSubmit={onText} className="flex items-center gap-2.5 sm:gap-3.5">
             <label htmlFor="ai-text" className="sr-only">
               Part number, part name or machine
@@ -473,16 +530,16 @@ export function MuhrakAiPage() {
             <button
               type="button"
               onClick={() => choosePhoto(false)}
-              disabled={busy || photoOff}
-              aria-label="Search with a photo"
-              title="Search with a photo"
+              disabled={busy || photoOff || trayFull}
+              aria-label={picked.length > 0 ? "Add another photo" : "Search with photos"}
+              title={picked.length > 0 ? "Add another photo" : `Search with up to ${AI_MAX_PHOTOS} photos`}
               className="flex size-16 shrink-0 items-center justify-center rounded-full bg-white text-sky-periwinkle shadow-[0_10px_30px_-12px_rgba(10,11,18,0.18),inset_0_0_0_1px_rgba(10,11,18,0.06)] transition-colors outline-none hover:text-sky-blue focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 sm:size-[72px]"
             >
               {busy ? <Loader2 aria-hidden className="size-6 animate-spin" /> : <Camera aria-hidden className="size-6 sm:size-7" />}
             </button>
-            <PhotoInput inputRef={pickerRef} onFile={(file) => void startPhoto(file)} />
-            {/* Opens the rear camera on phones. */}
-            <PhotoInput inputRef={cameraRef} camera onFile={(file) => void startPhoto(file)} />
+            <PhotoInput inputRef={pickerRef} multiple onFiles={addPhotos} />
+            {/* Opens the rear camera on phones; each photo taken joins the tray. */}
+            <PhotoInput inputRef={cameraRef} camera onFiles={addPhotos} />
           </form>
           {!signedIn ? (
             <p className="pt-3 text-center text-[13px] leading-normal text-ink-tertiary">
@@ -507,12 +564,13 @@ export function MuhrakAiPage() {
           }}
         />
       ) : null}
+      {viewer ? <PhotoViewer urls={viewer.urls} start={viewer.index} onClose={() => setViewer(null)} /> : null}
       {open ? (
         <QuoteRequestDialog
           key={open.productId}
           result={open}
-          // From a photo result: offer the buyer's own photo to this seller (they can untick it).
-          photo={id && suggestion ? { identificationId: id, previewUrl } : undefined}
+          // From a photo result: offer the buyer's own photos to this seller (they can untick it).
+          photo={id && suggestion ? { identificationId: id, previewUrls } : undefined}
           onClose={() => router.replace(href({ quote: null }), { scroll: false })}
         />
       ) : null}
@@ -561,21 +619,171 @@ function AiHeader() {
 
 // ---------------------------------------------------------------- pieces
 
-function PhotoInput({ inputRef, camera = false, onFile }: { inputRef: React.Ref<HTMLInputElement>; camera?: boolean; onFile: (file: File | undefined) => void }) {
+function PhotoInput({
+  inputRef,
+  camera = false,
+  multiple = false,
+  onFiles,
+}: {
+  inputRef: React.Ref<HTMLInputElement>;
+  camera?: boolean;
+  multiple?: boolean;
+  onFiles: (files: File[]) => void;
+}) {
   return (
     <input
       ref={inputRef}
       type="file"
       accept={acceptFor("part_photo")}
       capture={camera ? "environment" : undefined}
+      multiple={multiple}
       tabIndex={-1}
       aria-hidden
       className="sr-only"
       onChange={(event) => {
-        onFile(event.target.files?.[0]);
+        onFiles([...(event.target.files ?? [])]);
         event.target.value = "";
       }}
     />
+  );
+}
+
+/** Photos chosen but not sent yet: preview (tap), remove (x), add more, then "Identify part". */
+function PhotoTray({
+  picked,
+  busy,
+  onPreview,
+  onRemove,
+  onAdd,
+  onSend,
+}: {
+  picked: Picked[];
+  busy: boolean;
+  onPreview: (index: number) => void;
+  onRemove: (url: string) => void;
+  onAdd: () => void;
+  onSend: () => void;
+}) {
+  const tile = "size-16 rounded-[16px] sm:size-[72px]";
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[28px] bg-white/90 p-3 shadow-[0_10px_30px_-12px_rgba(10,11,18,0.18),inset_0_0_0_1px_rgba(10,11,18,0.06)] backdrop-blur-sm">
+      <ul aria-label="Photos to identify" className="flex flex-wrap gap-2.5">
+        {picked.map((item, index) => (
+          <li key={item.url} className="relative">
+            <button
+              type="button"
+              onClick={() => onPreview(index)}
+              aria-label={`Preview photo ${index + 1}`}
+              className={cn(tile, "block overflow-hidden bg-black/5 outline-none focus-visible:ring-3 focus-visible:ring-ring/50")}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- local preview of a photo not sent yet */}
+              <img src={item.url} alt="" className="size-full object-cover" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onRemove(item.url)}
+              disabled={busy}
+              aria-label={`Remove photo ${index + 1}`}
+              className="absolute -top-1.5 -right-1.5 flex size-6 items-center justify-center rounded-full bg-ink text-white ring-2 ring-white outline-none hover:opacity-90 focus-visible:ring-ring/60 disabled:opacity-50"
+            >
+              <X aria-hidden className="size-3.5" />
+            </button>
+          </li>
+        ))}
+        {picked.length < AI_MAX_PHOTOS ? (
+          <li>
+            <button
+              type="button"
+              onClick={onAdd}
+              disabled={busy}
+              aria-label="Add another photo"
+              className={cn(
+                tile,
+                "flex items-center justify-center border-2 border-dashed border-black/12 text-ink-tertiary transition-colors outline-none hover:border-black/25 hover:text-ink focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50",
+              )}
+            >
+              <Plus aria-hidden className="size-5" />
+            </button>
+          </li>
+        ) : null}
+      </ul>
+      <div className="ml-auto flex items-center gap-3">
+        <p className="hidden text-[13px] leading-snug text-ink-tertiary sm:block">
+          {picked.length} of {AI_MAX_PHOTOS}
+          <br />
+          Another angle or the label helps
+        </p>
+        <button
+          type="button"
+          onClick={onSend}
+          disabled={busy}
+          className="h-12 shrink-0 rounded-full bg-ink px-5 text-[15px] font-medium text-white outline-none hover:opacity-90 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+        >
+          Identify part
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** A photo full size, with previous / next for the others (arrow keys too); Escape or a click outside closes. */
+function PhotoViewer({ urls, start, onClose }: { urls: string[]; start: number; onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [index, setIndex] = useState(start);
+  const count = urls.length;
+  const go = (step: number) => setIndex((current) => (current + step + count) % count);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+
+  const arrow =
+    "absolute top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-ink shadow-md outline-none hover:bg-white focus-visible:ring-3 focus-visible:ring-ring/50";
+  return (
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      onClick={(event) => {
+        if (event.target === ref.current) ref.current?.close();
+      }}
+      onKeyDown={(event) => {
+        if (count > 1 && event.key === "ArrowRight") go(1);
+        if (count > 1 && event.key === "ArrowLeft") go(-1);
+      }}
+      aria-label={`Photo ${index + 1} of ${count}`}
+      className="m-auto max-h-[calc(100dvh-32px)] w-[calc(100vw-32px)] max-w-[960px] overflow-visible bg-transparent p-0 backdrop:bg-[rgba(10,11,18,0.78)] backdrop:backdrop-blur-[2px]"
+    >
+      <div className="relative flex flex-col items-center gap-3">
+        {/* eslint-disable-next-line @next/next/no-img-element -- local preview or short-lived signed link to the buyer's own photo */}
+        <img src={urls[index]} alt={`Your photo ${index + 1} of the part`} referrerPolicy="no-referrer" className="max-h-[calc(100dvh-120px)] w-auto max-w-full rounded-[20px] object-contain" />
+        {count > 1 ? (
+          <>
+            <button type="button" onClick={() => go(-1)} aria-label="Previous photo" className={cn(arrow, "left-2")}>
+              <ChevronLeft aria-hidden className="size-5" />
+            </button>
+            <button type="button" onClick={() => go(1)} aria-label="Next photo" className={cn(arrow, "right-2")}>
+              <ChevronRight aria-hidden className="size-5" />
+            </button>
+          </>
+        ) : null}
+        <div className="flex items-center gap-3">
+          {count > 1 ? (
+            <span className="rounded-full bg-white/15 px-3 py-1 text-sm text-white">
+              {index + 1} / {count}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => ref.current?.close()}
+            className="flex h-10 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-medium text-ink outline-none hover:bg-white/90 focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <X aria-hidden className="size-4" />
+            Close
+          </button>
+        </div>
+      </div>
+    </dialog>
   );
 }
 
@@ -603,27 +811,49 @@ function Status({ text, done = false }: { text: string; done?: boolean }) {
   );
 }
 
-/** The buyer's photo, on the right like a sent chat message. */
-function PhotoBubble({ previewUrl }: { previewUrl: string | null }) {
+/** The buyer's photos, on the right like a sent chat message; each opens full size. */
+function PhotoGroup({ urls, count, onOpen }: { urls: string[]; count: number; onOpen: (index: number) => void }) {
   // A link that failed (expired, or the file is gone) shows the placeholder, not a broken image.
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState<Set<string>>(() => new Set());
+  const slots = Math.max(1, Math.min(AI_MAX_PHOTOS, Math.max(count, urls.length)));
+  const single = slots === 1;
   return (
-    <div className="size-[150px] self-end overflow-hidden rounded-[24px] rounded-br-[8px] bg-black/5 shadow-sm sm:size-[180px]">
-      {previewUrl && previewUrl !== failedUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- local preview or short-lived signed link to the buyer's private photo
-        <img
-          src={previewUrl}
-          alt="Your photo of the part"
-          referrerPolicy="no-referrer"
-          onError={() => setFailedUrl(previewUrl)}
-          className="size-full object-cover"
-        />
-      ) : (
-        <span className="flex size-full items-center justify-center">
-          <ImageIcon aria-hidden className="size-6 text-ink-placeholder" />
-        </span>
-      )}
-    </div>
+    <ul aria-label="Your photos" className={cn("grid gap-1.5 self-end", single ? "grid-cols-1" : "grid-cols-2")}>
+      {Array.from({ length: slots }, (_, index) => {
+        const url = urls[index];
+        const shown = url && !failed.has(url);
+        return (
+          <li key={index}>
+            <button
+              type="button"
+              disabled={!shown}
+              onClick={() => onOpen(index)}
+              aria-label={`Open photo ${index + 1}`}
+              className={cn(
+                "block overflow-hidden bg-black/5 shadow-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                single ? "size-[150px] rounded-[24px] rounded-br-[8px] sm:size-[180px]" : "size-[96px] rounded-[18px] sm:size-[112px]",
+                !single && index === slots - 1 && "rounded-br-[8px]",
+              )}
+            >
+              {shown ? (
+                // eslint-disable-next-line @next/next/no-img-element -- local preview or short-lived signed link to the buyer's private photo
+                <img
+                  src={url}
+                  alt={`Your photo ${index + 1} of the part`}
+                  referrerPolicy="no-referrer"
+                  onError={() => setFailed((current) => new Set(current).add(url))}
+                  className="size-full object-cover"
+                />
+              ) : (
+                <span className="flex size-full items-center justify-center">
+                  <ImageIcon aria-hidden className="size-6 text-ink-placeholder" />
+                </span>
+              )}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

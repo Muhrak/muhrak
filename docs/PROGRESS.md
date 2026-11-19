@@ -284,6 +284,40 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   (`pending/b6531a02…` and `files/part_photo/b6531a02….webp`; the API
   cannot delete). Remove in the AWS console if wanted.
 
+### Muhrak AI: up to 4 photos of one part, with previews (Thu 19 Nov, developer request)
+
+- Developer decisions (19 Nov): the AI reads ALL photos in one call (better
+  identification; about US$0.004 per photo, so up to ~US$0.016 a search);
+  the seller gets ALL photos on the quote request.
+- Web (`/ai`): photos chosen, dropped or taken wait in a tray above the
+  composer (preview by tapping, remove, "+" to add, up to 4), then
+  "Identify part". A full-size viewer with previous/next (arrows, Escape)
+  for the tray and for the photos in the conversation. The quote form
+  shows all photos ("Share my 3 photos"); the buyer's request and the
+  seller's RFQ Inbox show all of them.
+- API: `moreUploadIds` (max 3, distinct) on POST identifications, buyers
+  only (a seller's product photo stays one). Every photo must be the
+  caller's own ready part photo (else 404); a photo belongs to one search
+  only (checked under the budget lock). Photo 1 stays in
+  `ai_identifications.upload_id` / `rfqs.buyer_photo_upload_id`; photos
+  2-4 in the new `ai_identification_photos` / `rfq_buyer_photos`
+  (migration 0016, only adds tables). `photoCount` on an identification;
+  `GET /v1/buyer/ai/identifications/:id/photos` (all links, owner only);
+  `buyerPhotoUrls` on a single request (owner-checked buyer or seller).
+- Budget: an unfinished call now counts at the cost of a 4-photo call
+  (input estimate 1000 + 4 x 3000 tokens). The daily limit still counts
+  searches, not photos. Uploads are limited to 40 an hour per user.
+- Tests: abuse cases (5 photos, the same photo twice, extra photos on a
+  product photo, someone else's photo, a photo from another search, another
+  user's links) and the one-call job; 313 API tests pass.
+- Checked locally with an INVALID Gemini key (no paid call): 3 photos in
+  the tray, preview, upload, one search with 2 extra photos, clean failure
+  message; reload shows all 3 from private links; the search marked done in
+  the DB, a quote request sent with 3 photos, the seller saw all 3, desktop
+  and phone. Test data removed (DB, Stream). NOT removed: 12 test files
+  (6 photos) in the private staging bucket, because the API key may not
+  delete; nothing links to them. Not run with a real Gemini call yet.
+
 ### Part matching fixed + recommended sellers on a Muhrak AI result (Thu 19 Nov, developer report)
 
 - Report: an air filter photo was identified, but the seller's live "Air

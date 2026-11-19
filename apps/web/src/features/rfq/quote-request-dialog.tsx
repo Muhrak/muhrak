@@ -68,10 +68,10 @@ export type QuoteTarget = Pick<
   "productId" | "name" | "partNumber" | "fitment" | "photoUrl" | "price" | "seller" | "availability" | "stockQuantity" | "leadTimeDays"
 >;
 
-/** The buyer's own photo from Muhrak AI, offered for sharing with this seller. */
+/** The buyer's own photos from Muhrak AI (up to 4), offered for sharing with this seller. */
 export interface QuotePhoto {
   identificationId: string;
-  previewUrl: string | null;
+  previewUrls: string[];
 }
 
 export function QuoteRequestDialog({ result, photo, onClose }: { result: QuoteTarget; photo?: QuotePhoto; onClose: () => void }) {
@@ -210,15 +210,21 @@ function FormView({
 
       {photo ? (
         <label className="flex cursor-pointer items-center gap-3.5 rounded-[16px] border border-black/8 px-3.5 py-3">
-          <span className="flex size-[52px] shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-[#ededf0]">
-            {photo.previewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- the buyer's own photo (local preview or short-lived link)
-              <img src={photo.previewUrl} alt="" className="size-full object-cover" referrerPolicy="no-referrer" />
-            ) : null}
+          <span className="flex shrink-0 -space-x-3">
+            {(photo.previewUrls.length > 0 ? photo.previewUrls : [null]).map((url, index) => (
+              <span key={url ?? index} className="flex size-[52px] items-center justify-center overflow-hidden rounded-[12px] bg-[#ededf0] ring-2 ring-white">
+                {url ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- the buyer's own photo (local preview or short-lived link)
+                  <img src={url} alt="" className="size-full object-cover" referrerPolicy="no-referrer" />
+                ) : null}
+              </span>
+            ))}
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-[normal]">
-            <span className="text-[15px] font-medium">Share my photo with {result.seller.companyName}</span>
-            <span className="text-[13px] text-ink-tertiary">Only this seller sees it. Location and camera details are removed.</span>
+            <span className="text-[15px] font-medium">
+              Share my {photo.previewUrls.length > 1 ? `${photo.previewUrls.length} photos` : "photo"} with {result.seller.companyName}
+            </span>
+            <span className="text-[13px] text-ink-tertiary">Only this seller sees them. Location and camera details are removed.</span>
           </span>
           <input
             type="checkbox"

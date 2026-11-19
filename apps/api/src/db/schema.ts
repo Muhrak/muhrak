@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 /**
  * Database tables. Every module's tables are declared in this one file so
@@ -544,6 +544,30 @@ export const rfqs = pgTable(
 
 export type RfqRow = typeof rfqs.$inferSelect;
 
+/**
+ * More photos of the buyer's part on a quote request (developer request,
+ * 19 Nov 2026: up to 4 photos in Muhrak AI). Photo 1 stays in
+ * rfqs.buyer_photo_upload_id; photos 2-4 are here at positions 1-3. Same
+ * privacy: only the request's buyer and seller, through short-lived links.
+ * Never deleted.
+ */
+export const rfqBuyerPhotos = pgTable(
+  "rfq_buyer_photos",
+  {
+    rfqId: uuid("rfq_id")
+      .notNull()
+      .references(() => rfqs.id),
+    uploadId: uuid("upload_id")
+      .notNull()
+      .references(() => uploads.id),
+    position: integer("position").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.rfqId, table.position] }), check("rfq_buyer_photos_position", sql`${table.position} BETWEEN 1 AND 3`)],
+);
+
+export type RfqBuyerPhotoRow = typeof rfqBuyerPhotos.$inferSelect;
+
 // ---------------------------------------------------------------- ai
 
 export const aiIdentificationStatus = pgEnum("ai_identification_status", ["pending", "running", "done", "failed"]);
@@ -593,6 +617,31 @@ export const aiIdentifications = pgTable(
 );
 
 export type AiIdentificationRow = typeof aiIdentifications.$inferSelect;
+
+/**
+ * More photos of the same part in one buyer photo search (developer request,
+ * 19 Nov 2026: up to 4 photos, all read in ONE model call). Photo 1 stays in
+ * ai_identifications.upload_id; photos 2-4 are here at positions 1-3. A photo
+ * belongs to one search only. Never deleted.
+ */
+export const aiIdentificationPhotos = pgTable(
+  "ai_identification_photos",
+  {
+    identificationId: uuid("identification_id")
+      .notNull()
+      .references(() => aiIdentifications.id),
+    uploadId: uuid("upload_id")
+      .notNull()
+      .unique()
+      .references(() => uploads.id),
+    position: integer("position").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.identificationId, table.position] }),
+    check("ai_identification_photos_position", sql`${table.position} BETWEEN 1 AND 3`),
+  ],
+);
 
 export type CategoryRow = typeof categories.$inferSelect;
 export type ProductRow = typeof products.$inferSelect;

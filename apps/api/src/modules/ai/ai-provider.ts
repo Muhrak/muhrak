@@ -11,9 +11,8 @@ export interface ModelUsage {
 }
 
 export interface IdentifyPartInput {
-  /** The cleaned photo (re-encoded, no metadata). */
-  image: Uint8Array;
-  mimeType: string;
+  /** The cleaned photos of ONE part (re-encoded, no metadata), 1 to AI_MAX_PHOTOS, read together in one call. */
+  images: { bytes: Uint8Array; mimeType: string }[];
   /** The categories the model may choose from. */
   categories: { slug: string; name: string }[];
 }

@@ -13,6 +13,8 @@ const TX = { tx: true };
 vi.mock("./rfq.repository", () => ({
   inTransaction: vi.fn(async (work: (tx: unknown) => unknown) => work(TX)),
   insertRfq: vi.fn(),
+  insertMoreBuyerPhotos: vi.fn(),
+  listMoreBuyerPhotos: vi.fn(async () => []),
   expireStaleForProduct: vi.fn(),
   findByRequestKey: vi.fn(),
   findRfq: vi.fn(),
@@ -28,7 +30,7 @@ vi.mock("../catalog", () => ({ getLiveProductForRfq: vi.fn(), getProductSnapshot
 vi.mock("../notification", () => ({ sendNewRfqEmail: vi.fn() }));
 vi.mock("../seller", () => ({ getSellerCompanies: vi.fn(), isSellerVerified: vi.fn() }));
 vi.mock("../../shared/jobs", () => ({ wakeWorker: vi.fn(), enqueueJob: vi.fn(async () => true) }));
-vi.mock("../ai", () => ({ getIdentificationPhotoUpload: vi.fn() }));
+vi.mock("../ai", () => ({ getIdentificationPhotoUploads: vi.fn() }));
 vi.mock("../upload", () => ({ getDownloadLink: vi.fn() }));
 
 const repo = await import("./rfq.repository");
@@ -36,7 +38,7 @@ const { getUsersByIds } = await import("../auth");
 const { getLiveProductForRfq, getProductSnapshots } = await import("../catalog");
 const { sendNewRfqEmail } = await import("../notification");
 const { getSellerCompanies, isSellerVerified } = await import("../seller");
-const { getIdentificationPhotoUpload } = await import("../ai");
+const { getIdentificationPhotoUploads } = await import("../ai");
 const { getDownloadLink } = await import("../upload");
 const { notFound } = await import("../../shared/errors");
 const service = await import("./rfq.service");
@@ -107,6 +109,7 @@ const user = (id: string, role: "buyer" | "seller", name: string) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(repo.listMoreBuyerPhotos).mockResolvedValue([]);
   vi.mocked(repo.findByRequestKey).mockResolvedValue(undefined);
   vi.mocked(repo.countOpenForBuyer).mockResolvedValue(0);
   vi.mocked(repo.insertRfq).mockImplementation(async (_tx, values) => row({ ...values, unit: values.unit, expiresAt: values.expiresAt as Date }));
@@ -193,16 +196,36 @@ describe("the buyer's photo (Muhrak AI)", () => {
   const IDENT = "99999999-9999-4999-8999-999999999999";
   const PHOTO = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
+  const PHOTO2 = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const PHOTO3 = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
   it("attaches the photo of the buyer's OWN finished photo search, checked by the AI module", async () => {
-    vi.mocked(getIdentificationPhotoUpload).mockResolvedValue(PHOTO);
+    vi.mocked(getIdentificationPhotoUploads).mockResolvedValue([PHOTO]);
     const { rfq } = await service.createRfq(BUYER, input({ identificationId: IDENT }), now);
-    expect(getIdentificationPhotoUpload).toHaveBeenCalledWith(BUYER, IDENT);
+    expect(getIdentificationPhotoUploads).toHaveBeenCalledWith(BUYER, IDENT);
     expect(vi.mocked(repo.insertRfq).mock.calls[0]![1]).toMatchObject({ buyerPhotoUploadId: PHOTO });
-    expect(rfq).toMatchObject({ hasBuyerPhoto: true, buyerPhotoUrl: null });
+    expect(repo.insertMoreBuyerPhotos).toHaveBeenCalledWith(TX, RFQ, []);
+    expect(rfq).toMatchObject({ hasBuyerPhoto: true, buyerPhotoUrl: null, buyerPhotoUrls: [] });
+  });
+
+  it("a search with several photos: all go with the request (first in the request, the others in the same transaction)", async () => {
+    vi.mocked(getIdentificationPhotoUploads).mockResolvedValue([PHOTO, PHOTO2, PHOTO3]);
+    await service.createRfq(BUYER, input({ identificationId: IDENT }), now);
+    expect(vi.mocked(repo.insertRfq).mock.calls[0]![1]).toMatchObject({ buyerPhotoUploadId: PHOTO });
+    expect(repo.insertMoreBuyerPhotos).toHaveBeenCalledWith(TX, RFQ, [PHOTO2, PHOTO3]);
+  });
+
+  it("the request's seller and buyer get links to every photo, in order", async () => {
+    vi.mocked(repo.findRfq).mockResolvedValue(row({ buyerPhotoUploadId: PHOTO, sellerSeenAt: now }));
+    vi.mocked(repo.listMoreBuyerPhotos).mockResolvedValue([PHOTO2, PHOTO3]);
+    vi.mocked(getDownloadLink).mockImplementation(async (id) => ({ url: `https://bucket.example/${id}`, expiresAt: now.toISOString() }));
+    const urls = [PHOTO, PHOTO2, PHOTO3].map((id) => `https://bucket.example/${id}`);
+    await expect(service.getSellerRfq(SELLER, RFQ, now)).resolves.toMatchObject({ buyerPhotoUrl: urls[0], buyerPhotoUrls: urls });
+    await expect(service.getBuyerRfq(BUYER, RFQ, now)).resolves.toMatchObject({ buyerPhotoUrls: urls });
   });
 
   it("refuses another buyer's (or an unfinished) photo search: 404, nothing saved, no email", async () => {
-    vi.mocked(getIdentificationPhotoUpload).mockRejectedValue(notFound("Photo search not found"));
+    vi.mocked(getIdentificationPhotoUploads).mockRejectedValue(notFound("Photo search not found"));
     await expect(service.createRfq(BUYER, input({ identificationId: IDENT }), now)).rejects.toMatchObject({ status: 404 });
     expect(repo.insertRfq).not.toHaveBeenCalled();
     expect(sendNewRfqEmail).not.toHaveBeenCalled();
@@ -210,7 +233,7 @@ describe("the buyer's photo (Muhrak AI)", () => {
 
   it("without a photo search nothing is attached", async () => {
     await service.createRfq(BUYER, input(), now);
-    expect(getIdentificationPhotoUpload).not.toHaveBeenCalled();
+    expect(getIdentificationPhotoUploads).not.toHaveBeenCalled();
     expect(vi.mocked(repo.insertRfq).mock.calls[0]![1]).toMatchObject({ buyerPhotoUploadId: null });
   });
 

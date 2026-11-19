@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { env } from "../../config/env";
 import {
+  AI_MAX_PHOTOS,
   AI_QUEUE,
   type FileLink,
   AI_UNAVAILABLE_CODE,
@@ -10,7 +11,7 @@ import {
   type AiSuggestion,
 } from "../../schemas";
 import type { AiIdentificationRow, JobRow } from "../../db/schema";
-import { AppError, notFound } from "../../shared/errors";
+import { AppError, badRequest, notFound } from "../../shared/errors";
 import { enqueueJob, wakeWorker } from "../../shared/jobs";
 import { logger } from "../../shared/logger";
 import { listCategories } from "../catalog";
@@ -31,6 +32,9 @@ import * as repo from "./ai.repository";
  *   (Google may use free-tier data; real users' photos never go there).
  * - Only the owner's own ready photo; anyone else's looks like none (404).
  * - One identification per photo: a double submit returns the first one.
+ * - A buyer search may have up to AI_MAX_PHOTOS photos of one part (developer
+ *   request, 19 Nov 2026), all the caller's own, each used by one search only,
+ *   read together in ONE model call.
  * - Per-user limit per 24 hours, and a hard monthly budget. Calls still
  *   running count against the budget at their highest possible cost, so
  *   parallel requests cannot overshoot it. Checked under one lock.
@@ -105,10 +109,11 @@ export async function isAvailable(userId: string, now = new Date()): Promise<boo
 
 // ---------------------------------------------------------------- mapping
 
-function toDto(row: AiIdentificationRow): AiIdentification {
+function toDto(row: AiIdentificationRow, photoCount: number): AiIdentification {
   return {
     id: row.id,
     uploadId: row.uploadId,
+    photoCount,
     status: row.status,
     suggestion: row.status === "done" ? (row.result as AiSuggestion) : null,
     createdAt: row.createdAt.toISOString(),
@@ -146,31 +151,42 @@ export function toSuggestion(output: AiModelOutput, categories: { id: string; sl
 
 // ---------------------------------------------------------------- requests
 
+const SAME_SEARCH = "This photo is already in another photo search. Please add it again.";
+
 /**
  * Start identifying the caller's photo, or return the identification it
  * already has. `purpose` is fixed by the route: sellers send product
  * photos, buyers their private part photos; nobody can send the other kind.
+ * `morePhotos`: a buyer's photos 2-4 of the same part (product photos: none).
  */
 export async function requestIdentification(
   userId: string,
   uploadId: string,
   purpose: AiPhotoPurpose,
   now = new Date(),
+  morePhotos: string[] = [],
 ): Promise<AiIdentification> {
   const reason = blockedReason(userId);
   if (reason) {
     logger.info({ userId, reason }, "AI identification refused");
     throw unavailable(503, OFF_MESSAGE);
   }
-  await getOwnedPhotoForAi(userId, uploadId, purpose);
+  if (morePhotos.length > 0 && purpose !== "part_photo") throw badRequest("Only one photo can be read here.");
+  if (morePhotos.length > AI_MAX_PHOTOS - 1 || new Set([uploadId, ...morePhotos]).size !== morePhotos.length + 1) {
+    throw badRequest(`Add up to ${AI_MAX_PHOTOS} different photos.`);
+  }
+  // Every photo must be the caller's own ready photo of the right kind (anyone else's: 404).
+  for (const id of [uploadId, ...morePhotos]) await getOwnedPhotoForAi(userId, id, purpose);
 
   const existing = await repo.findByUpload(uploadId);
-  if (existing) return toDto(existing);
+  if (existing) return toDto(existing, 1 + (await repo.listMorePhotos(existing.id)).length);
 
   const row = await repo.withBudgetLock(async (tx) => {
     // A parallel request for the same photo may have won while we waited for the lock.
     const raced = await repo.findByUpload(uploadId, tx);
     if (raced) return raced;
+    // A photo belongs to one search only (no reusing a photo of another search, first or later).
+    if ((await repo.findUsedUploads([uploadId, ...morePhotos], tx)).length > 0) throw badRequest(SAME_SEARCH);
     if ((await repo.countByUserSince(tx, userId, new Date(now.getTime() - DAY_MS))) >= env.AI_DAILY_LIMIT_PER_USER) {
       throw unavailable(429, "You have used today's photo recognition limit. Please fill in the details yourself, or try again tomorrow.");
     }
@@ -180,40 +196,49 @@ export async function requestIdentification(
     }
     const inserted = await repo.insert(tx, { userId, uploadId });
     if (!inserted) throw new Error("AI identification insert conflicted inside the lock");
+    await repo.insertMorePhotos(tx, inserted.id, morePhotos);
     // Retries only for rate limits and outages; each try is costed.
     await enqueueJob(AI_QUEUE, "identify-part", { identificationId: inserted.id }, { dedupeKey: `ai:${inserted.id}`, maxAttempts: 3, tx });
     return inserted;
   });
   wakeWorker();
-  return toDto(row);
+  return toDto(row, 1 + (await repo.listMorePhotos(row.id)).length);
 }
 
 /** The caller's own identification only. */
 export async function getIdentification(userId: string, id: string): Promise<AiIdentification> {
   const row = await repo.findById(id);
   if (!row || row.userId !== userId) throw notFound("Not found");
-  return toDto(row);
+  return toDto(row, 1 + (await repo.listMorePhotos(row.id)).length);
 }
 
 /** How long the buyer's link to their own photo works. */
 export const PHOTO_LINK_SECONDS = 10 * 60;
 
-/** Buyer photo search: a short-lived link to the caller's own photo of their own identification. */
+/** Buyer photo search: a short-lived link to the caller's own (first) photo of their own identification. */
 export async function getIdentificationPhoto(userId: string, id: string, now = new Date()): Promise<FileLink> {
   const row = await repo.findById(id);
   if (!row || row.userId !== userId) throw notFound("Not found");
   return getOwnedPartPhotoLink(userId, row.uploadId, PHOTO_LINK_SECONDS, now);
 }
 
+/** Buyer photo search: short-lived links to ALL the caller's own photos of their own identification, in order. */
+export async function getIdentificationPhotos(userId: string, id: string, now = new Date()): Promise<FileLink[]> {
+  const row = await repo.findById(id);
+  if (!row || row.userId !== userId) throw notFound("Not found");
+  const uploads = [row.uploadId, ...(await repo.listMorePhotos(row.id))];
+  return Promise.all(uploads.map((uploadId) => getOwnedPartPhotoLink(userId, uploadId, PHOTO_LINK_SECONDS, now)));
+}
+
 /**
- * For the quote request module: the photo of the caller's OWN finished
- * identification (a private part_photo). Anyone else's, or one still
- * running, looks like none (404).
+ * For the quote request module: the photos (upload ids, first one first) of
+ * the caller's OWN finished identification (private part_photos). Anyone
+ * else's, or one still running, looks like none (404).
  */
-export async function getIdentificationPhotoUpload(userId: string, id: string): Promise<string> {
+export async function getIdentificationPhotoUploads(userId: string, id: string): Promise<string[]> {
   const row = await repo.findById(id);
   if (!row || row.userId !== userId || row.status !== "done") throw notFound("Photo search not found");
-  return row.uploadId;
+  return [row.uploadId, ...(await repo.listMorePhotos(row.id))];
 }
 
 // ---------------------------------------------------------------- background job
@@ -247,13 +272,14 @@ export async function runAiJob(job: Pick<JobRow, "id" | "payload">): Promise<voi
   const ai = getProvider();
   if (reason || !ai) return fail(`Not run: ${reason ?? "no provider"}`);
 
-  const [photo, categories] = await Promise.all([readPhotoForAi(row.uploadId), listCategories()]);
+  const uploads = [row.uploadId, ...(await repo.listMorePhotos(row.id))];
+  const [photos, categories] = await Promise.all([Promise.all(uploads.map((uploadId) => readPhotoForAi(uploadId))), listCategories()]);
   const started = Date.now();
   let result;
   try {
+    // All photos of the part in ONE call (developer decision, 19 Nov 2026).
     result = await ai.identifyPart({
-      image: photo.bytes,
-      mimeType: photo.contentType,
+      images: photos.map((photo) => ({ bytes: photo.bytes, mimeType: photo.contentType })),
       categories: categories.map((category) => ({ slug: category.slug, name: category.name })),
     });
   } catch (error) {

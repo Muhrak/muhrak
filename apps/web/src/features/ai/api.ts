@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { aiIdentificationResponseSchema, aiIdentificationSchema, aiStatusResponseSchema, fileLinkSchema, type AiIdentification } from "@/schemas";
+import { aiIdentificationPhotosResponseSchema, aiIdentificationResponseSchema, aiIdentificationSchema, aiStatusResponseSchema, type AiIdentification } from "@/schemas";
 import { authedRequest } from "@/features/auth/authed-request";
 import type { PortalSide } from "@/features/auth/paths";
 import { useSession } from "@/features/auth/session";
@@ -28,11 +28,14 @@ export function useAiAvailable(side: PortalSide, enabled: boolean) {
   });
 }
 
-/** Ask the AI to read a ready photo. Throws ApiError `ai_unavailable` when AI cannot be used. */
-export async function startIdentification(side: PortalSide, uploadId: string): Promise<AiIdentification> {
+/**
+ * Ask the AI to read a ready photo (buyers: up to 3 more photos of the same part, read together).
+ * Throws ApiError `ai_unavailable` when AI cannot be used.
+ */
+export async function startIdentification(side: PortalSide, uploadId: string, moreUploadIds: string[] = []): Promise<AiIdentification> {
   const { identification } = await authedRequest(side, `${BASE[side]}/identifications`, aiIdentificationResponseSchema, {
     method: "POST",
-    body: { uploadId },
+    body: moreUploadIds.length > 0 ? { uploadId, moreUploadIds } : { uploadId },
   });
   return identification;
 }
@@ -141,12 +144,15 @@ function recallFinished(userId: string, id: string): AiIdentification | undefine
 /** When this browser started waiting for each identification. */
 const firstAsked = new Map<string, number>();
 
-/** A short-lived link to the buyer's own (private) photo. Refreshed before it expires. */
-export function useBuyerIdentificationPhoto(id: string, enabled = true) {
+/** Short-lived links to the buyer's own (private) photos of a search, in order. Refreshed before they expire. */
+export function useBuyerIdentificationPhotos(id: string, enabled = true) {
   const session = useSession("buyer");
   return useQuery({
-    queryKey: ["buyer", "ai", "photo", session?.user.id, id],
-    queryFn: async () => (await authedRequest("buyer", `${BASE.buyer}/identifications/${encodeURIComponent(id)}/photo`, fileLinkSchema)).url,
+    queryKey: ["buyer", "ai", "photos", session?.user.id, id],
+    queryFn: async () =>
+      (await authedRequest("buyer", `${BASE.buyer}/identifications/${encodeURIComponent(id)}/photos`, aiIdentificationPhotosResponseSchema)).photos.map(
+        (photo) => photo.url,
+      ),
     enabled: enabled && Boolean(session),
     retry: false,
     // The link works 10 minutes; ask for a fresh one after 8.

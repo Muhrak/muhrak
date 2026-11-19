@@ -71,8 +71,8 @@ export function createGeminiProvider(options: { apiKey: string; model: string; f
           {
             role: "user",
             parts: [
-              { inlineData: { mimeType: input.mimeType, data: Buffer.from(input.image).toString("base64") } },
-              { text: userPrompt(input.categories) },
+              ...input.images.map((image) => ({ inlineData: { mimeType: image.mimeType, data: Buffer.from(image.bytes).toString("base64") } })),
+              { text: userPrompt(input.categories, input.images.length) },
             ],
           },
         ],

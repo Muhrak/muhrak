@@ -90,15 +90,33 @@ export function sellerStatus(status: RfqStatus): { label: string; tone: Tone } {
 }
 
 /** The buyer's own photo on a request (Muhrak AI): a short-lived link; opens full size in a new tab. */
-export function BuyerPhoto({ url, label }: { url: string | null; label: string }) {
-  if (!url) return null;
+/** The buyer's photos on a request (up to 4, short-lived links); each opens full size in a new tab. */
+export function BuyerPhotos({ urls, label }: { urls: string[]; label: string }) {
+  if (urls.length === 0) return null;
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-sm font-medium text-text-strong">{label}</p>
-      <a href={url} target="_blank" rel="noreferrer noopener" className="block w-fit overflow-hidden rounded-[16px] border border-line outline-none focus-visible:ring-3 focus-visible:ring-brand-blue/40">
-        {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed link to a private photo */}
-        <img src={url} alt={label} referrerPolicy="no-referrer" className="h-[180px] w-auto max-w-full object-cover" />
-      </a>
+      <ul className="flex flex-wrap gap-2.5">
+        {urls.map((url, index) => (
+          <li key={url}>
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer noopener"
+              aria-label={`Open photo ${index + 1} of ${urls.length}`}
+              className="block overflow-hidden rounded-[16px] border border-line outline-none focus-visible:ring-3 focus-visible:ring-brand-blue/40"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed link to a private photo */}
+              <img
+                src={url}
+                alt={`${label}, ${index + 1} of ${urls.length}`}
+                referrerPolicy="no-referrer"
+                className={urls.length === 1 ? "h-[180px] w-auto max-w-full object-cover" : "size-[132px] object-cover"}
+              />
+            </a>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

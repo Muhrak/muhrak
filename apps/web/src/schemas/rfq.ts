@@ -139,6 +139,8 @@ const rfqBaseSchema = z.object({
   hasBuyerPhoto: z.boolean(),
   /** A 10-minute link to that photo: only on a single request (GET by id), null in lists. */
   buyerPhotoUrl: z.string().url().nullable(),
+  /** Every photo the buyer shared (up to 4), short-lived links, first one first: only on a single request; empty in lists. */
+  buyerPhotoUrls: z.array(z.string().url()),
   product: z.object({
     id: z.string().uuid(),
     name: z.string(),
