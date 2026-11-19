@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { productConditionSchema, productUnitSchema } from "./catalog";
+import { productAvailabilitySchema, productConditionSchema, productUnitSchema } from "./catalog";
 import { moneySchema } from "./money-schema";
 
 /**
@@ -89,6 +89,12 @@ export const publicProductCardSchema = z.object({
   condition: productConditionSchema,
   price: moneySchema.nullable(),
   unit: productUnitSchema,
+  /** First machine it fits, e.g. "Kobelco SK380" (pre-fills the quote request). */
+  fitment: z.string().nullable(),
+  /** Null stock = not tracked. */
+  stockQuantity: z.number().int().nullable(),
+  availability: productAvailabilitySchema,
+  leadTimeDays: z.number().int().nullable(),
   photoUrl: z.string().url().nullable(),
   isNew: z.boolean(),
 });

@@ -24,6 +24,7 @@ vi.mock("./catalog.repository", () => ({
   listSellerProducts: vi.fn(),
   countSellerProducts: vi.fn(),
   searchPublishedProducts: vi.fn(async () => ({ rows: [], total: 0 })),
+  listPublishedForSeller: vi.fn(),
   findProductsByIds: vi.fn(async () => []),
 }));
 vi.mock("../seller", () => ({ isSellerVerified: vi.fn() }));
@@ -32,7 +33,7 @@ vi.mock("../upload", () => ({ attachUpload: vi.fn(), getProductPhotoUrls: vi.fn(
 const repo = await import("./catalog.repository");
 const { isSellerVerified } = await import("../seller");
 const { attachUpload, getProductPhotoUrls } = await import("../upload");
-const { createProduct, updateProduct, changeProductStatus, getProduct, listProducts, searchLiveProducts, STATUS_TRANSITIONS } = await import("./catalog.service");
+const { createProduct, updateProduct, changeProductStatus, getProduct, listProducts, listPublishedProducts, searchLiveProducts, STATUS_TRANSITIONS } = await import("./catalog.service");
 
 const SELLER = "11111111-1111-4111-8111-111111111111";
 const OTHER_SELLER = "22222222-2222-4222-8222-222222222222";
@@ -299,3 +300,23 @@ describe("searchLiveProducts (what is matched as what)", () => {
   });
 });
 
+describe("listPublishedProducts (public seller page)", () => {
+  it("gives each card its own photo and its first machine, for the quote request", async () => {
+    vi.mocked(repo.listPublishedForSeller).mockResolvedValue({ rows: [product({ status: "published", publishedAt: now })], total: 1 });
+    vi.mocked(repo.findChildren).mockResolvedValue({
+      ...children(),
+      fitments: [
+        { id: "f-0", productId: PRODUCT, make: "Kobelco", model: "SK380", normalized: "kobelcosk380", position: 0 },
+        { id: "f-1", productId: PRODUCT, make: "Hitachi", model: "ZW310", normalized: "hitachizw310", position: 1 },
+      ],
+    } as never);
+    const result = await listPublishedProducts({ sellerUserId: SELLER, categoryId: null, page: 1, pageSize: 8, now });
+    expect(result.items[0]).toMatchObject({ id: PRODUCT, fitment: "Kobelco SK380", photoUrl: "https://b/public/products/p.webp", stockQuantity: 4, availability: "in_stock", leadTimeDays: null });
+  });
+
+  it("has no machine when the product lists none", async () => {
+    vi.mocked(repo.listPublishedForSeller).mockResolvedValue({ rows: [product({ status: "published", publishedAt: now })], total: 1 });
+    const result = await listPublishedProducts({ sellerUserId: SELLER, categoryId: null, page: 1, pageSize: 8, now });
+    expect(result.items[0]?.fitment).toBeNull();
+  });
+});

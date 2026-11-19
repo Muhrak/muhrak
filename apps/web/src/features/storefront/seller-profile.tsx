@@ -6,6 +6,9 @@ import type { ReactNode } from "react";
 import { CONDITION_LABELS, formatMoney, UNIT_LABELS, type PublicProductCard, type PublicSeller } from "@/schemas";
 import { Footer, SiteNav } from "@/components/landing/sections";
 import { LogoLoader } from "@/components/ui/logo-loader";
+import { LOGIN_PATH } from "@/features/auth/paths";
+import { useSession } from "@/features/auth/session";
+import { availability, QuoteRequestDialog, type QuoteTarget } from "@/features/rfq/quote-request-dialog";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { usePublicSeller, useSellerProducts } from "./api";
@@ -16,8 +19,9 @@ import { Chip, LogoTile, softCard, softFocus, SoftHero, VerifiedMark } from "./s
  * /sellers/[id]: a verified seller's page in the Muhrak AI style (developer
  * request, 18 Nov 2026): the landing nav, an identity card on the soft glow
  * (logo, serif name, verified mark, place, about, key facts), then Products
- * and About as chips. Product cards show the product's own photo. Only the
- * facts Muhrak really has (no "Established" or "Replies within").
+ * and About as chips. Product cards show the product's own photo and a
+ * "Request quote" button (the same request form as search; buyer sign-in
+ * needed). Only the facts Muhrak really has (no "Established" or "Replies within").
  */
 
 const dateFormat = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" });
@@ -68,14 +72,29 @@ function Profile({ seller }: { seller: PublicSeller }) {
   const tab = params.get("tab") === "overview" ? "overview" : "products";
   const category = params.get("category") ?? "";
   const page = Math.max(1, Math.min(1000, Number(params.get("page")) || 1));
+  const quoteFor = params.get("quote");
+  const buyer = useSession("buyer");
 
-  function go(next: { tab?: string; category?: string; page?: number }) {
-    const merged = { tab, category, page: 1, ...next };
+  function href(next: { tab?: string; category?: string; page?: number; quote?: string | null }) {
+    const merged = { tab, category, page: 1, quote: null as string | null, ...next };
     const search = new URLSearchParams();
     if (merged.tab !== "products") search.set("tab", merged.tab);
     if (merged.category) search.set("category", merged.category);
     if (merged.page > 1) search.set("page", String(merged.page));
-    router.push(search.size ? `/sellers/${seller.id}?${search}` : `/sellers/${seller.id}`, { scroll: false });
+    if (merged.quote) search.set("quote", merged.quote);
+    return search.size ? `/sellers/${seller.id}?${search}` : `/sellers/${seller.id}`;
+  }
+
+  function go(next: { tab?: string; category?: string; page?: number }) {
+    router.push(href(next), { scroll: false });
+  }
+
+  // "Request quote" needs a BUYER sign-in (a seller signed in counts as a visitor here): visitors go to
+  // the buyer login and come back with the form open (?quote= in the URL), like on /search.
+  function requestQuote(productId: string) {
+    const withForm = href({ category, page, quote: productId });
+    if (buyer?.user.role === "buyer") router.replace(withForm, { scroll: false });
+    else router.push(`${LOGIN_PATH.buyer}?next=${encodeURIComponent(withForm)}`);
   }
 
   const place = [seller.city, seller.countryName].filter(Boolean).join(", ");
@@ -135,7 +154,16 @@ function Profile({ seller }: { seller: PublicSeller }) {
           {tab === "overview" ? (
             <Overview seller={seller} onCategory={(id) => go({ tab: "products", category: id })} />
           ) : (
-            <Products seller={seller} category={category} page={page} onCategory={(id) => go({ category: id })} onPage={(next) => go({ page: next })} />
+            <Products
+              seller={seller}
+              category={category}
+              page={page}
+              onCategory={(id) => go({ category: id })}
+              onPage={(next) => go({ category, page: next })}
+              onRequest={requestQuote}
+              quoteFor={buyer?.user.role === "buyer" ? quoteFor : null}
+              onCloseQuote={() => router.replace(href({ category, page }), { scroll: false })}
+            />
           )}
         </div>
       </section>
@@ -151,15 +179,37 @@ function Products({
   page,
   onCategory,
   onPage,
+  onRequest,
+  quoteFor,
+  onCloseQuote,
 }: {
   seller: PublicSeller;
   category: string;
   page: number;
   onCategory: (id: string) => void;
   onPage: (page: number) => void;
+  onRequest: (productId: string) => void;
+  quoteFor: string | null;
+  onCloseQuote: () => void;
 }) {
   const products = useSellerProducts(seller.id, { category: category || undefined, page });
   const data = products.data;
+  // Only a product on this page of this seller can be asked about (a tampered ?quote= opens nothing).
+  const quoted = quoteFor ? data?.items.find((item) => item.id === quoteFor) : undefined;
+  const target: QuoteTarget | null = quoted
+    ? {
+        productId: quoted.id,
+        name: quoted.name,
+        partNumber: quoted.partNumber,
+        fitment: quoted.fitment,
+        photoUrl: quoted.photoUrl,
+        price: quoted.price,
+        availability: quoted.availability,
+        stockQuantity: quoted.stockQuantity,
+        leadTimeDays: quoted.leadTimeDays,
+        seller: { id: seller.id, companyName: seller.companyName, city: seller.city, countryName: seller.countryName },
+      }
+    : null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -186,7 +236,7 @@ function Products({
           <ul className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-3">
             {data.items.map((product) => (
               <li key={product.id}>
-                <ProductCardView product={product} />
+                <ProductCardView product={product} onRequest={() => onRequest(product.id)} />
               </li>
             ))}
           </ul>
@@ -195,12 +245,13 @@ function Products({
       ) : (
         <p className="py-16 text-center text-[15px] text-ink-tertiary">This seller has no live products here yet.</p>
       )}
+      {target ? <QuoteRequestDialog key={target.productId} result={target} onClose={onCloseQuote} /> : null}
     </div>
   );
 }
 
-/** A product: its own photo, name, price, part number, category and condition. */
-function ProductCardView({ product }: { product: PublicProductCard }) {
+/** A product: its own photo, name, price, part number, category and condition, and "Request quote". */
+function ProductCardView({ product, onRequest }: { product: PublicProductCard; onRequest: () => void }) {
   const unit = product.unit === "piece" ? "" : ` / ${UNIT_LABELS[product.unit].one}`;
   return (
     <article className={cn("flex h-full flex-col p-3", softCard)}>
@@ -214,12 +265,22 @@ function ProductCardView({ product }: { product: PublicProductCard }) {
       </div>
       <div className="flex flex-1 flex-col gap-1.5 px-2 pt-4 pb-2">
         <h3 className="line-clamp-2 text-base leading-snug font-medium text-ink">{product.name}</h3>
-        <p className="text-[15px] text-ink">{product.price ? `${formatMoney(product.price)}${unit}` : "Price on request"}</p>
+        <p className="text-[15px] text-ink">
+          {product.price ? `${formatMoney(product.price)}${unit}` : "Price on request"}
+          <span className="text-[13px] text-ink-tertiary"> · {availability(product)}</span>
+        </p>
         <p className="truncate text-[13px] text-ink-tertiary">{product.partNumber ? `Part no. ${product.partNumber}` : product.categoryName}</p>
         <div className="mt-auto flex flex-wrap gap-1.5 pt-3">
           <span className="rounded-full bg-black/[0.055] px-2.5 py-1 text-[12px] text-ink-secondary">{CONDITION_LABELS[product.condition]}</span>
           {product.partNumber ? <span className="rounded-full bg-black/[0.055] px-2.5 py-1 text-[12px] text-ink-secondary">{product.categoryName}</span> : null}
         </div>
+        <button
+          type="button"
+          onClick={onRequest}
+          className={cn("mt-4 h-11 w-full rounded-full bg-ink text-[15px] font-medium text-white hover:opacity-90", softFocus)}
+        >
+          Request quote
+        </button>
       </div>
     </article>
   );

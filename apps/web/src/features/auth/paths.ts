@@ -55,8 +55,8 @@ export function afterLoginPath(side: AuthSide, next: string | null | undefined):
   // still starts on the landing page (developer request, 17 Nov 2026).
   if (side !== "admin" && (next === HOME_PATH[side] || next.startsWith(`${HOME_PATH[side]}?`))) return home;
   if (next.startsWith(`/${side}/`)) return next;
-  // A buyer sent to login from the public part search or Muhrak AI goes back to it
+  // A buyer sent to login from the public part search, Muhrak AI or a seller's page goes back to it
   // (and its photo result or open quote form, kept in the query).
-  if (side === "buyer" && /^\/(search|ai)(\?|$)/.test(next)) return next;
+  if (side === "buyer" && /^\/(search|ai|sellers\/[0-9a-f-]{36})(\?|$)/i.test(next)) return next;
   return home;
 }

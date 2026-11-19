@@ -366,6 +366,23 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
 - Checked on screen with a temporary buyer, seller and two requests
   (deleted afterwards).
 
+### "Request quote" on a seller's page (Thu 19 Nov, Day 9 follow-up)
+- Each product card on `/sellers/[id]` has "Request quote", opening the
+  same request form as search and Muhrak AI (`QuoteRequestDialog`, whose
+  input is now `QuoteTarget`: only the fields it shows and sends). Visitors
+  (and a seller signed in, who is a visitor here) go to the buyer login and
+  come back with the form open (`?quote=`; `afterLoginPath` allows
+  `/sellers/<id>`). Only a product of that seller on the current page can
+  be opened (a tampered `?quote=` opens nothing).
+- Public product cards (`GET /v1/sellers/:id/products`) now carry the first
+  machine (`fitment`, pre-fills "Fits") and stock / availability / lead
+  time (shown on the card and in the form). Additive schema change, copied
+  to the web app; 2 new catalog tests.
+- Checked in a real browser, desktop and phone: visitor → login → back
+  with the form open and pre-filled → sent (RQ-…) → saved with the right
+  seller and product; a second request for the same part is refused
+  ("You already have an open request…"). Test data removed.
+
 ### Day 9: quote requests (Sun 15 Nov)
 - Developer decisions (15 Nov): **one seller per request** (Figma "Request
   sent to Korvex Hydraulics"; to ask three sellers the buyer sends three

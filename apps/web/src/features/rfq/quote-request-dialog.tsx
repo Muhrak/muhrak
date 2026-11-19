@@ -59,7 +59,16 @@ type FormInput = z.input<typeof formSchema>;
 
 const FIELDS = ["partName", "partNumber", "fitment", "quantity", "neededBy", "deliveryCountry", "deliveryCity", "note"] as const;
 
-export function QuoteRequestDialog({ result, onClose }: { result: PartSearchResult; onClose: () => void }) {
+/**
+ * The product a quote is asked for: only what the form shows and sends. A search result fits,
+ * and so does a product card on a seller's page (19 Nov 2026).
+ */
+export type QuoteTarget = Pick<
+  PartSearchResult,
+  "productId" | "name" | "partNumber" | "fitment" | "photoUrl" | "price" | "seller" | "availability" | "stockQuantity" | "leadTimeDays"
+>;
+
+export function QuoteRequestDialog({ result, onClose }: { result: QuoteTarget; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [sent, setSent] = useState<BuyerRfq | null>(null);
 
@@ -99,7 +108,7 @@ function CloseButton({ onClose }: { onClose: () => void }) {
   );
 }
 
-function FormView({ result, onSent, onClose }: { result: PartSearchResult; onSent: (rfq: BuyerRfq) => void; onClose: () => void }) {
+function FormView({ result, onSent, onClose }: { result: QuoteTarget; onSent: (rfq: BuyerRfq) => void; onClose: () => void }) {
   // One key per opened form: a double click or a retry sends the same key.
   const [requestKey] = useState(() => crypto.randomUUID());
   const create = useCreateRfq();
