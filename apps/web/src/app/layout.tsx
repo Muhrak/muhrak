@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Albert_Sans, Geist, Geist_Mono, Gloock, Manrope, Urbanist } from "next/font/google";
+import { Albert_Sans, Geist, Geist_Mono, Gloock, Manrope } from "next/font/google";
 import { Suspense } from "react";
 import { MaintenanceOverlay, SITE_CONTENT_ID } from "@/features/maintenance/gate";
 import { Providers } from "./providers";
@@ -35,16 +35,6 @@ const gloock = Gloock({
   weight: "400",
 });
 
-/**
- * Buyer Centre (developer reference "dashboard buyer muhrak", 19 Nov 2026). The reference is set in
- * Gilroy, which is not free; Urbanist is the closest Google font.
- */
-const urbanist = Urbanist({
-  variable: "--font-urbanist",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
 export const metadata: Metadata = {
   title: "Muhrak",
   description: "Find heavy equipment and vehicle spare parts across the GCC.",
@@ -55,7 +45,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${albertSans.variable} ${manrope.variable} ${gloock.variable} ${urbanist.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${albertSans.variable} ${manrope.variable} ${gloock.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <Providers>

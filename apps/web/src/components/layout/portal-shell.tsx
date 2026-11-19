@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { LANDING_PATH, type PortalSide } from "@/features/auth/paths";
 import { cn } from "@/lib/utils";
-import { BuyerFrame } from "./buyer-frame";
 import { PortalSidebar } from "./portal-sidebar";
 import { LogoLoader } from "@/components/ui/logo-loader";
 
@@ -16,12 +15,6 @@ import { LogoLoader } from "@/components/ui/logo-loader";
  * opened from a top bar.
  */
 export function PortalShell({ side, children }: { side: PortalSide; children: ReactNode }) {
-  if (side === "buyer") return <BuyerFrame>{children}</BuyerFrame>;
-  return <SideBarShell side={side}>{children}</SideBarShell>;
-}
-
-/** The seller (and labelled) frame. */
-function SideBarShell({ side, children }: { side: PortalSide; children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Sidebar links close the drawer themselves (onNavigate); Escape closes it too.

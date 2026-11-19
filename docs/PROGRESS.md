@@ -284,45 +284,6 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   (`pending/b6531a02…` and `files/part_photo/b6531a02….webp`; the API
   cannot delete). Remove in the AWS console if wanted.
 
-### Buyer Centre redesign from the "dashboard buyer muhrak" reference (Thu 19 Nov, developer request)
-
-- Reference: `refs/muhrak ai/dashboard buyer muhrak.jpeg`. Layout as in the
-  image, Muhrak colours instead of its own (ink #0a0b12 for the dark parts,
-  sky blue #4a88c1 for its light blue).
-- Frame (`components/layout/buyer-frame.tsx`, buyer side only; the seller
-  frame is unchanged): dark icon rail (Muhrak mark, Dashboard, Messenger,
-  Inquiries & RFQs, Orders, Payments, Saved & history, Settings, Log out;
-  labels on hover/focus; white notch on the active page) and the page on a
-  rounded light panel. Orders, Payments and Saved open "Coming soon". Phones:
-  dark top bar, the labelled menu in a drawer.
-- Dashboard (`components/dashboard/buyer-dashboard.tsx`), all real data
-  from one call to the buyer's requests (newest 20 plus all-time counts):
-  greeting; search box (opens Muhrak AI with the text); "My account" menu
-  (name, email, Settings, Log out). The two cards: requests waiting and
-  quotes received, each with the newest reference and date, linking to the
-  filtered list. Four buttons: Find by photo, Search parts, Sellers,
-  Messages. "Recent requests" table (part, date, status, seller; opens the
-  request). "Statistic": all requests by status as a ring with total and
-  legend, then "Sellers you asked" (from the newest 20 requests, opens the
-  seller page).
-- Left out from the image on purpose (no data behind them): the card
-  numbers/expiry, the "This week" period picker (counts are all-time; the
-  label says so), a chat unread dot.
-- Checked with temporary local accounts (removed): desktop 1440 and phone
-  390 (no sideways scroll), requests, messenger and a coming-soon page in
-  the new frame, the menu and the search.
-- Second pass (same day, developer: "make it exact, even small details"):
-  sizes measured on the reference (its panel is 967 px) and scaled to ours
-  (x1.6 in page units under the 85% zoom). Font: the reference uses Gilroy
-  (not free); the Buyer Centre now uses Urbanist (`--font-buyer`, Google
-  font via next/font, no new package). Filled rail icons drawn to match
-  (`buyer-rail-icons.tsx`) with the white wedge pointer; name in capitals
-  in the greeting; plain "Search" box; filled person glyph on "My account";
-  three-dot buttons on the cards; two overlapping circles on the white card;
-  status dots on the table avatars; dates as "Nov 19, 2026"; thick ring with
-  the reference's legend (no counts); the Statistic card runs to the bottom
-  of the table; no heading over the sellers list.
-
 ### Part matching fixed + recommended sellers on a Muhrak AI result (Thu 19 Nov, developer report)
 
 - Report: an air filter photo was identified, but the seller's live "Air
