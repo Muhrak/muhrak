@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { aiIdentificationResponseSchema, aiStatusResponseSchema, fileLinkSchema, type AiIdentification } from "@/schemas";
+import { aiIdentificationResponseSchema, aiIdentificationSchema, aiStatusResponseSchema, fileLinkSchema, type AiIdentification } from "@/schemas";
 import { authedRequest } from "@/features/auth/authed-request";
 import type { PortalSide } from "@/features/auth/paths";
 import { useSession } from "@/features/auth/session";
@@ -70,16 +70,25 @@ export async function identifyPhoto(uploadId: string, signal: AbortSignal): Prom
  */
 export function useBuyerIdentification(id: string, enabled = true) {
   const session = useSession("buyer");
+  const userId = session?.user.id;
   return useQuery({
-    queryKey: ["buyer", "ai", "identification", session?.user.id, id],
+    queryKey: ["buyer", "ai", "identification", userId, id],
     queryFn: async () => {
       const identification = await fetchIdentification("buyer", id);
-      if (identification.status !== "pending" && identification.status !== "running") return identification;
+      if (identification.status !== "pending" && identification.status !== "running") {
+        if (userId) rememberFinished(userId, identification);
+        return identification;
+      }
       // Timed from when this browser first asked (not the server's clock, which may differ).
       const since = firstAsked.get(id) ?? Date.now();
       firstAsked.set(id, since);
       return Date.now() - since > WAIT_MS ? { ...identification, status: "failed" as const, suggestion: null } : identification;
     },
+    // A finished result (developer report, 19 Nov 2026: Back showed "Identifying" again) is
+    // final: shown at once from this tab's memory, and never asked for again.
+    initialData: userId && id ? () => recallFinished(userId, id) : undefined,
+    staleTime: (query) => (isFinished(query.state.data) ? Infinity : 0),
+    gcTime: 60 * 60_000,
     enabled: enabled && Boolean(session),
     retry: false,
     refetchInterval: (query) => {
@@ -87,6 +96,46 @@ export function useBuyerIdentification(id: string, enabled = true) {
       return status === "pending" || status === "running" ? POLL_MS : false;
     },
   });
+}
+
+function isFinished(identification: AiIdentification | undefined): boolean {
+  return identification?.status === "done" || identification?.status === "failed";
+}
+
+/**
+ * Finished identifications of this tab (sessionStorage: gone when the tab
+ * closes, never shared with other tabs or users), so going Back or a phone
+ * reloading the page shows the result at once instead of loading again.
+ */
+const FINISHED_KEY = "muhrak.ai.finished";
+const FINISHED_MAX = 20;
+
+function readFinished(): Record<string, AiIdentification> {
+  try {
+    const raw = sessionStorage.getItem(FINISHED_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, AiIdentification>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function rememberFinished(userId: string, identification: AiIdentification): void {
+  try {
+    const all = readFinished();
+    all[`${userId}:${identification.id}`] = identification;
+    const keys = Object.keys(all);
+    for (const key of keys.slice(0, Math.max(0, keys.length - FINISHED_MAX))) delete all[key];
+    sessionStorage.setItem(FINISHED_KEY, JSON.stringify(all));
+  } catch {
+    // Storage blocked or full: the result is simply fetched again next time.
+  }
+}
+
+function recallFinished(userId: string, id: string): AiIdentification | undefined {
+  const saved = readFinished()[`${userId}:${id}`];
+  // Only a well-formed finished result of this user is reused; anything else is fetched.
+  const parsed = aiIdentificationSchema.safeParse(saved);
+  return parsed.success && parsed.data.id === id && isFinished(parsed.data) ? parsed.data : undefined;
 }
 
 /** When this browser started waiting for each identification. */

@@ -341,6 +341,20 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   logo is wider than the account button), except when the nav carries a
   search box.
 
+### Fix: Back on a Muhrak AI result showed "Identifying" again (Thu 19 Nov, developer report)
+- Cause: the page kept the "photo being sent" state in memory; Back to an
+  earlier `/ai` entry (e.g. a typed search) showed it as still identifying.
+  No AI call was made (the API keeps one identification per photo and the
+  page only asks the AI on a new photo), but the screen looked stuck.
+- Fix (`muhrak-ai-page.tsx`, `features/ai/api.ts`): Back/Forward drops the
+  in-memory run; a finished identification is never fetched again
+  (`staleTime: Infinity`) and is kept for the tab in sessionStorage, so
+  Forward and reloads show it at once; the local photo preview is kept per
+  identification. A result opened from a link with nothing cached says
+  "Loading your result" (a plain fetch), not "Identifying the part".
+- Checked in a real browser, desktop and phone: open → Back → Forward →
+  reload: no identification request after the first load, no AI call.
+
 ### Day 9: quote requests (Sun 15 Nov)
 - Developer decisions (15 Nov): **one seller per request** (Figma "Request
   sent to Korvex Hydraulics"; to ask three sellers the buyer sends three

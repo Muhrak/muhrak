@@ -44,6 +44,9 @@ import { startIdentification, useAiAvailable, useBuyerIdentification, useBuyerId
 
 const PAGE = "/ai";
 
+/** Local previews of photos sent from this tab, by identification id (shown again after Back / Forward). */
+const previews = new Map<string, string>();
+
 /** URL keys of details the buyer edited; a key present (even empty) overrides what the AI read. */
 const KEYS = { name: "name", partNumber: "pn", machine: "machine", category: "cat" } as const;
 
@@ -104,8 +107,26 @@ export function MuhrakAiPage() {
   const cameraRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLInputElement>(null);
 
-  // The local preview of the photo being checked; freed when replaced or on leaving.
-  useEffect(() => () => (local ? URL.revokeObjectURL(local.previewUrl) : undefined), [local]);
+  // The local preview of the photo being checked; freed when replaced or on leaving,
+  // unless it is kept as the preview of a started photo search (see `previews`).
+  useEffect(
+    () => () => {
+      if (local && !local.id) URL.revokeObjectURL(local.previewUrl);
+    },
+    [local],
+  );
+
+  // Back / Forward (developer report, 19 Nov 2026): a photo that was being sent belongs to the
+  // page it was sent from. Forget it, so going Back never shows "Identifying the part" again;
+  // the result itself lives in the URL (?id=) and is shown from cache.
+  useEffect(() => {
+    const onHistory = () => {
+      setLocal(null);
+      setEditing(false);
+    };
+    window.addEventListener("popstate", onHistory);
+    return () => window.removeEventListener("popstate", onHistory);
+  }, []);
 
   // A photo search in the URL belongs to a buyer: anyone else signs in first, then comes back.
   useEffect(() => {
@@ -115,7 +136,8 @@ export function MuhrakAiPage() {
   }, [id, signedIn, router]);
 
   const identification = useBuyerIdentification(id ?? "", Boolean(id) && signedIn);
-  const photo = useBuyerIdentificationPhoto(id ?? "", Boolean(id) && signedIn && !local);
+  const localPreview = id ? previews.get(id) : undefined;
+  const photo = useBuyerIdentificationPhoto(id ?? "", Boolean(id) && signedIn && !local && !localPreview);
   const data = id ? identification.data : undefined;
   const suggestion = data?.status === "done" && data.suggestion?.isPart ? data.suggestion : null;
   const base = suggestion ? fromSuggestion(suggestion) : null;
@@ -185,7 +207,9 @@ export function MuhrakAiPage() {
       const uploadId = await uploadFile("buyer", "part_photo", file);
       setLocal({ previewUrl, stage: "identifying" });
       const started = await startIdentification("buyer", uploadId);
-      // Keep the local preview; once the URL has the id, the identification query shows the progress.
+      // Keep the local preview for this search (also after Back / Forward); once the URL has the id,
+      // the identification query shows the progress.
+      previews.set(started.id, previewUrl);
       setLocal({ previewUrl, stage: "identifying", id: started.id });
       router.replace(`${PAGE}?id=${started.id}`, { scroll: false });
     } catch (caught) {
@@ -196,8 +220,9 @@ export function MuhrakAiPage() {
   }
 
   // Once the URL carries the new identification, the local run has done its job (its preview stays shown).
-  const previewUrl = local?.previewUrl ?? photo.data ?? null;
-  const localStage = local && (!local.id || local.id !== id) ? local.stage : null;
+  const previewUrl = local?.previewUrl ?? localPreview ?? photo.data ?? null;
+  // Before the id is known the run is in progress; once the URL carries its id the query takes over.
+  const localStage = local && !local.id ? local.stage : local && local.id && !id ? "identifying" : null;
 
   function onText(event: FormEvent) {
     event.preventDefault();
@@ -231,6 +256,7 @@ export function MuhrakAiPage() {
   // left under it. While something runs, ONE status line with the turning Muhrak
   // mark says what is happening now, and its text changes as the work moves on.
   const reading = Boolean(localStage) || data?.status === "pending" || data?.status === "running";
+  // Only for a result not in this tab's memory (opened from a link): a short fetch, no AI call.
   const loadingId = Boolean(id) && (identification.isPending || !signedIn) && !local;
   const failed =
     data?.status === "failed"
@@ -241,9 +267,11 @@ export function MuhrakAiPage() {
   const working: string | null =
     localStage === "uploading"
       ? "Uploading your photo"
-      : reading || loadingId
+      : reading
         ? "Identifying the part"
-        : details && search.isPending
+        : loadingId
+          ? "Loading your result"
+          : details && search.isPending
           ? "Finding matching sellers"
           : null;
   const openQuote = (item: PartSearchResult) => router.replace(href({ quote: item.productId }), { scroll: false });
