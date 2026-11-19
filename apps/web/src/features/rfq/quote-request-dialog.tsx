@@ -68,7 +68,13 @@ export type QuoteTarget = Pick<
   "productId" | "name" | "partNumber" | "fitment" | "photoUrl" | "price" | "seller" | "availability" | "stockQuantity" | "leadTimeDays"
 >;
 
-export function QuoteRequestDialog({ result, onClose }: { result: QuoteTarget; onClose: () => void }) {
+/** The buyer's own photo from Muhrak AI, offered for sharing with this seller. */
+export interface QuotePhoto {
+  identificationId: string;
+  previewUrl: string | null;
+}
+
+export function QuoteRequestDialog({ result, photo, onClose }: { result: QuoteTarget; photo?: QuotePhoto; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [sent, setSent] = useState<BuyerRfq | null>(null);
 
@@ -94,7 +100,7 @@ export function QuoteRequestDialog({ result, onClose }: { result: QuoteTarget; o
       {sent ? (
         <SentView rfq={sent} onClose={() => ref.current?.close()} />
       ) : (
-        <FormView result={result} onSent={setSent} onClose={() => ref.current?.close()} />
+        <FormView result={result} photo={photo} onSent={setSent} onClose={() => ref.current?.close()} />
       )}
     </dialog>
   );
@@ -108,9 +114,21 @@ function CloseButton({ onClose }: { onClose: () => void }) {
   );
 }
 
-function FormView({ result, onSent, onClose }: { result: QuoteTarget; onSent: (rfq: BuyerRfq) => void; onClose: () => void }) {
+function FormView({
+  result,
+  photo,
+  onSent,
+  onClose,
+}: {
+  result: QuoteTarget;
+  photo?: QuotePhoto;
+  onSent: (rfq: BuyerRfq) => void;
+  onClose: () => void;
+}) {
   // One key per opened form: a double click or a retry sends the same key.
   const [requestKey] = useState(() => crypto.randomUUID());
+  // The buyer's photo goes to this seller only if they keep this ticked (on by default).
+  const [sharePhoto, setSharePhoto] = useState(true);
   const create = useCreateRfq();
   const {
     register,
@@ -150,6 +168,7 @@ function FormView({ result, onSent, onClose }: { result: QuoteTarget; onSent: (r
         deliveryCountry: values.deliveryCountry,
         deliveryCity: values.deliveryCity,
         note: values.note || null,
+        ...(photo && sharePhoto ? { identificationId: photo.identificationId } : {}),
       });
       onSent(rfq);
     } catch (error) {
@@ -188,6 +207,27 @@ function FormView({ result, onSent, onClose }: { result: QuoteTarget; onSent: (r
           <p className="text-xs text-ink-tertiary">{availability(result)}</p>
         </div>
       </div>
+
+      {photo ? (
+        <label className="flex cursor-pointer items-center gap-3.5 rounded-[16px] border border-black/8 px-3.5 py-3">
+          <span className="flex size-[52px] shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-[#ededf0]">
+            {photo.previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- the buyer's own photo (local preview or short-lived link)
+              <img src={photo.previewUrl} alt="" className="size-full object-cover" referrerPolicy="no-referrer" />
+            ) : null}
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-[normal]">
+            <span className="text-[15px] font-medium">Share my photo with {result.seller.companyName}</span>
+            <span className="text-[13px] text-ink-tertiary">Only this seller sees it. Location and camera details are removed.</span>
+          </span>
+          <input
+            type="checkbox"
+            checked={sharePhoto}
+            onChange={(event) => setSharePhoto(event.target.checked)}
+            className="size-5 shrink-0 accent-ink"
+          />
+        </label>
+      ) : null}
 
       <p className="text-sm leading-[normal] text-ink-secondary">Check the details. The seller quotes on exactly what you send.</p>
 

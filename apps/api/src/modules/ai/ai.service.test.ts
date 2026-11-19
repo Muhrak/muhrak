@@ -198,6 +198,24 @@ describe("getIdentification", () => {
   });
 });
 
+describe("photo for a quote request", () => {
+  it("gives the upload of the caller's own finished identification", async () => {
+    vi.mocked(repo.findById).mockResolvedValue(row({ userId: OTHER, status: "done" }));
+    await expect(service.getIdentificationPhotoUpload(OTHER, IDENT)).resolves.toBe(UPLOAD);
+  });
+
+  it("hides another user's, an unfinished or a failed identification as not found", async () => {
+    vi.mocked(repo.findById).mockResolvedValue(row({ userId: SELLER, status: "done" }));
+    await expect(service.getIdentificationPhotoUpload(OTHER, IDENT)).rejects.toMatchObject({ status: 404 });
+    for (const status of ["pending", "running", "failed"] as const) {
+      vi.mocked(repo.findById).mockResolvedValue(row({ userId: OTHER, status }));
+      await expect(service.getIdentificationPhotoUpload(OTHER, IDENT)).rejects.toMatchObject({ status: 404 });
+    }
+    vi.mocked(repo.findById).mockResolvedValue(undefined);
+    await expect(service.getIdentificationPhotoUpload(OTHER, IDENT)).rejects.toMatchObject({ status: 404 });
+  });
+});
+
 describe("buyer photo search", () => {
   it("passes the buyer's photo kind to the upload check, so a buyer cannot send a product photo", async () => {
     await service.requestIdentification(OTHER, UPLOAD, "part_photo", now);

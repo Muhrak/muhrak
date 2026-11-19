@@ -3,4 +3,4 @@
  * only from here. All model calls go through this module and a queue job.
  */
 export { buyerAiRouter, sellerAiRouter } from "./ai.routes";
-export { failAiJob, PermanentAiJobError, runAiJob } from "./ai.service";
+export { failAiJob, getIdentificationPhotoUpload, PermanentAiJobError, runAiJob } from "./ai.service";

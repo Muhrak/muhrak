@@ -3,7 +3,7 @@
 Read this first in every new session, then `CLAUDE.md`, `docs/PLAN.md` and
 `docs/ARCHITECTURE.md`. Update it whenever a piece of work is committed.
 
-Last updated: Wed 18 Nov 2026 (buyer landing in the Muhrak AI theme). Branch `develop`.
+Last updated: Thu 19 Nov 2026 (Day 9 finished: buyer photo on requests, end-to-end check). Branch `develop`.
 
 ## Status
 
@@ -382,6 +382,29 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   with the form open and pre-filled → sent (RQ-…) → saved with the right
   seller and product; a second request for the same part is refused
   ("You already have an open request…"). Test data removed.
+
+### Day 9 finished: the buyer's photo on a request + end-to-end check (Thu 19 Nov)
+- A request started from a Muhrak AI result can carry the buyer's OWN
+  photo (developer decision, 19 Nov 2026: shared only with that request's
+  seller, cleaned copy, short-lived link, buyer can untick it). Form: "Share
+  my photo with <seller>" (on by default). API: `identificationId` on
+  `POST /v1/buyer/rfqs`; the AI module checks it is the buyer's own finished
+  photo search (`getIdentificationPhotoUpload`, else 404 and nothing
+  saved). Column `rfqs.buyer_photo_upload_id` (migration `0014`, additive).
+  `hasBuyerPhoto` on every request; `buyerPhotoUrl` (10-minute link) only
+  on a single request (GET by id) for its own buyer or seller, never in
+  lists. Seller inbox: "Buyer's photo of the part"; buyer: "Your photo,
+  shared with the seller". 7 new tests (284 API tests).
+- End-to-end in a real browser (temporary accounts, a real photo through
+  the normal upload, a copy of a real AI answer; no AI call): Muhrak AI
+  result → matching part listed (first time on screen with a real match) →
+  request sent with the photo (RQ-…) → seller dashboard and sidebar show
+  1 unread → inbox shows the request and the buyer's photo, marks it seen →
+  seller declines with a reason → buyer sees "Declined", the reason and
+  their photo (phone) → buyer dashboard open requests back to 0. Test
+  data removed (the uploaded test photo stays private in the staging bucket).
+- Day 9 is complete. Remaining outside code: staging emails need a
+  verified Resend domain.
 
 ### Day 9: quote requests (Sun 15 Nov)
 - Developer decisions (15 Nov): **one seller per request** (Figma "Request

@@ -10,7 +10,7 @@ import { focusRing } from "@/features/seller/parts";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useBuyerRfq, useBuyerRfqs, useCancelRfq } from "./api";
-import { buyerStatus, closesIn, DetailTiles, neededByLabel, quantityLabel, RfqChip, sentAgo } from "./parts";
+import { BuyerPhoto, buyerStatus, closesIn, DetailTiles, neededByLabel, quantityLabel, RfqChip, sentAgo } from "./parts";
 import { LogoLoader } from "@/components/ui/logo-loader";
 import { useToast } from "@/components/ui/toast";
 
@@ -211,6 +211,8 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
           { label: "Needed by", value: neededByLabel(rfq.neededBy) },
         ]}
       />
+
+      <BuyerPhoto url={rfq.buyerPhotoUrl} label="Your photo, shared with the seller" />
 
       {/* Who it went to (Figma: the photo + "Muhrak AI" block). */}
       <div className="flex items-center gap-4">

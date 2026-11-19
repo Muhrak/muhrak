@@ -205,6 +205,17 @@ export async function getIdentificationPhoto(userId: string, id: string, now = n
   return getOwnedPartPhotoLink(userId, row.uploadId, PHOTO_LINK_SECONDS, now);
 }
 
+/**
+ * For the quote request module: the photo of the caller's OWN finished
+ * identification (a private part_photo). Anyone else's, or one still
+ * running, looks like none (404).
+ */
+export async function getIdentificationPhotoUpload(userId: string, id: string): Promise<string> {
+  const row = await repo.findById(id);
+  if (!row || row.userId !== userId || row.status !== "done") throw notFound("Photo search not found");
+  return row.uploadId;
+}
+
 // ---------------------------------------------------------------- background job
 
 /** A failure retrying cannot fix: the worker stops the job instead of retrying. */

@@ -28,12 +28,17 @@ vi.mock("../catalog", () => ({ getLiveProductForRfq: vi.fn(), getProductSnapshot
 vi.mock("../notification", () => ({ sendNewRfqEmail: vi.fn() }));
 vi.mock("../seller", () => ({ getSellerCompanies: vi.fn(), isSellerVerified: vi.fn() }));
 vi.mock("../../shared/jobs", () => ({ wakeWorker: vi.fn() }));
+vi.mock("../ai", () => ({ getIdentificationPhotoUpload: vi.fn() }));
+vi.mock("../upload", () => ({ getDownloadLink: vi.fn() }));
 
 const repo = await import("./rfq.repository");
 const { getUsersByIds } = await import("../auth");
 const { getLiveProductForRfq, getProductSnapshots } = await import("../catalog");
 const { sendNewRfqEmail } = await import("../notification");
 const { getSellerCompanies, isSellerVerified } = await import("../seller");
+const { getIdentificationPhotoUpload } = await import("../ai");
+const { getDownloadLink } = await import("../upload");
+const { notFound } = await import("../../shared/errors");
 const service = await import("./rfq.service");
 
 const BUYER = "11111111-1111-4111-8111-111111111111";
@@ -79,6 +84,7 @@ function row(overrides: Partial<RfqRow> = {}): RfqRow {
     deliveryCountry: "OM",
     deliveryCity: "Muscat",
     note: null,
+    buyerPhotoUploadId: null,
     status: "open",
     sellerSeenAt: null,
     declineReason: null,
@@ -176,6 +182,53 @@ describe("createRfq", () => {
   it("closes this buyer's stale open request for the product before inserting", async () => {
     await service.createRfq(BUYER, input(), now);
     expect(repo.expireStaleForProduct).toHaveBeenCalledWith(TX, { buyerUserId: BUYER, productId: PRODUCT, at: now });
+  });
+});
+
+describe("the buyer's photo (Muhrak AI)", () => {
+  const IDENT = "99999999-9999-4999-8999-999999999999";
+  const PHOTO = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+  it("attaches the photo of the buyer's OWN finished photo search, checked by the AI module", async () => {
+    vi.mocked(getIdentificationPhotoUpload).mockResolvedValue(PHOTO);
+    const { rfq } = await service.createRfq(BUYER, input({ identificationId: IDENT }), now);
+    expect(getIdentificationPhotoUpload).toHaveBeenCalledWith(BUYER, IDENT);
+    expect(vi.mocked(repo.insertRfq).mock.calls[0]![1]).toMatchObject({ buyerPhotoUploadId: PHOTO });
+    expect(rfq).toMatchObject({ hasBuyerPhoto: true, buyerPhotoUrl: null });
+  });
+
+  it("refuses another buyer's (or an unfinished) photo search: 404, nothing saved, no email", async () => {
+    vi.mocked(getIdentificationPhotoUpload).mockRejectedValue(notFound("Photo search not found"));
+    await expect(service.createRfq(BUYER, input({ identificationId: IDENT }), now)).rejects.toMatchObject({ status: 404 });
+    expect(repo.insertRfq).not.toHaveBeenCalled();
+    expect(sendNewRfqEmail).not.toHaveBeenCalled();
+  });
+
+  it("without a photo search nothing is attached", async () => {
+    await service.createRfq(BUYER, input(), now);
+    expect(getIdentificationPhotoUpload).not.toHaveBeenCalled();
+    expect(vi.mocked(repo.insertRfq).mock.calls[0]![1]).toMatchObject({ buyerPhotoUploadId: null });
+  });
+
+  it("the request's seller and buyer get a 10-minute link; lists never carry one", async () => {
+    vi.mocked(repo.findRfq).mockResolvedValue(row({ buyerPhotoUploadId: PHOTO, sellerSeenAt: now }));
+    vi.mocked(getDownloadLink).mockResolvedValue({ url: "https://bucket.example/signed", expiresAt: now.toISOString() });
+    await expect(service.getSellerRfq(SELLER, RFQ, now)).resolves.toMatchObject({ hasBuyerPhoto: true, buyerPhotoUrl: "https://bucket.example/signed" });
+    await expect(service.getBuyerRfq(BUYER, RFQ, now)).resolves.toMatchObject({ buyerPhotoUrl: "https://bucket.example/signed" });
+    expect(getDownloadLink).toHaveBeenCalledWith(PHOTO, service.BUYER_PHOTO_LINK_SECONDS, now);
+
+    vi.mocked(repo.listRfqs).mockResolvedValue([row({ buyerPhotoUploadId: PHOTO })]);
+    vi.mocked(repo.countRfqs).mockResolvedValue({ all: 1, open: 1, quoted: 0, closed: 0, unseen: 1 });
+    const list = await service.listSellerRfqs(SELLER, { filter: "all", limit: 20 }, now);
+    expect(list.items[0]).toMatchObject({ hasBuyerPhoto: true, buyerPhotoUrl: null });
+    expect(getDownloadLink).toHaveBeenCalledTimes(2);
+  });
+
+  it("another seller or buyer never gets a link (404 before any link is made)", async () => {
+    vi.mocked(repo.findRfq).mockResolvedValue(row({ buyerPhotoUploadId: PHOTO }));
+    await expect(service.getSellerRfq(OTHER_SELLER, RFQ, now)).rejects.toMatchObject({ status: 404 });
+    await expect(service.getBuyerRfq(OTHER_BUYER, RFQ, now)).rejects.toMatchObject({ status: 404 });
+    expect(getDownloadLink).not.toHaveBeenCalled();
   });
 });
 

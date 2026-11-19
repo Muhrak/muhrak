@@ -1,0 +1,2 @@
+ALTER TABLE "rfqs" ADD COLUMN "buyer_photo_upload_id" uuid;--> statement-breakpoint
+ALTER TABLE "rfqs" ADD CONSTRAINT "rfqs_buyer_photo_upload_id_uploads_id_fk" FOREIGN KEY ("buyer_photo_upload_id") REFERENCES "public"."uploads"("id") ON DELETE no action ON UPDATE no action;

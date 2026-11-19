@@ -504,7 +504,15 @@ export function MuhrakAiPage() {
           }}
         />
       ) : null}
-      {open ? <QuoteRequestDialog key={open.productId} result={open} onClose={() => router.replace(href({ quote: null }), { scroll: false })} /> : null}
+      {open ? (
+        <QuoteRequestDialog
+          key={open.productId}
+          result={open}
+          // From a photo result: offer the buyer's own photo to this seller (they can untick it).
+          photo={id && suggestion ? { identificationId: id, previewUrl } : undefined}
+          onClose={() => router.replace(href({ quote: null }), { scroll: false })}
+        />
+      ) : null}
     </div>
   );
 }

@@ -17,10 +17,12 @@ import type { RfqRow } from "../../db/schema";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/errors";
 import { wakeWorker } from "../../shared/jobs";
 import { logger } from "../../shared/logger";
+import { getIdentificationPhotoUpload } from "../ai";
 import { getUsersByIds } from "../auth";
 import { getLiveProductForRfq, getProductSnapshots } from "../catalog";
 import { sendNewRfqEmail } from "../notification";
 import { getSellerCompanies, isSellerVerified } from "../seller";
+import { getDownloadLink } from "../upload";
 import * as repo from "./rfq.repository";
 
 /**
@@ -87,6 +89,8 @@ async function baseFields(rows: RfqRow[], now: Date) {
       deliveryCountryName: GCC_COUNTRY_NAMES[row.deliveryCountry as GccCountry] ?? row.deliveryCountry,
       note: row.note,
       declineReason: row.declineReason,
+      hasBuyerPhoto: row.buyerPhotoUploadId !== null,
+      buyerPhotoUrl: null as string | null,
       product: { id: row.productId, name: product?.name ?? row.partName, photoUrl: product?.photoUrl ?? null },
       createdAt: row.createdAt.toISOString(),
       expiresAt: row.expiresAt.toISOString(),
@@ -143,6 +147,9 @@ export async function createRfq(buyerUserId: string, input: RfqCreateInput, now 
     throw forbidden(`You have ${RFQ_LIMITS.maxOpenPerBuyer} open quote requests. Wait for replies or cancel some before sending more.`);
   }
 
+  // The buyer's photo: only from their OWN finished photo search (checked by the AI module).
+  const buyerPhotoUploadId = input.identificationId ? await getIdentificationPhotoUpload(buyerUserId, input.identificationId) : null;
+
   const users = await getUsersByIds([product.sellerUserId, buyerUserId]);
   const seller = users.find((user) => user.id === product.sellerUserId && user.role === "seller");
   const buyer = users.find((user) => user.id === buyerUserId && user.role === "buyer");
@@ -164,6 +171,7 @@ export async function createRfq(buyerUserId: string, input: RfqCreateInput, now 
       deliveryCountry: input.deliveryCountry,
       deliveryCity: input.deliveryCity,
       note: input.note,
+      buyerPhotoUploadId,
       expiresAt: new Date(now.getTime() + EXPIRY_MS),
       at: now,
     });
@@ -216,8 +224,25 @@ async function ownAsSeller(sellerUserId: string, id: string): Promise<RfqRow> {
   return row;
 }
 
+/** How long a link to the buyer's photo works. */
+export const BUYER_PHOTO_LINK_SECONDS = 10 * 60;
+
+/** A single request, AFTER its owner was checked: add the short-lived link to the buyer's photo. */
+async function withPhotoLink<T extends { buyerPhotoUrl: string | null }>(row: RfqRow, rfq: T, now: Date): Promise<T> {
+  if (!row.buyerPhotoUploadId) return rfq;
+  try {
+    const link = await getDownloadLink(row.buyerPhotoUploadId, BUYER_PHOTO_LINK_SECONDS, now);
+    return { ...rfq, buyerPhotoUrl: link.url };
+  } catch (error) {
+    // The request still shows without its photo.
+    logger.warn({ rfqId: row.id, err: { message: (error as Error).message } }, "Could not link the buyer's photo");
+    return rfq;
+  }
+}
+
 export async function getBuyerRfq(buyerUserId: string, id: string, now = new Date()): Promise<BuyerRfq> {
-  return one(toBuyerRfqs([await ownAsBuyer(buyerUserId, id)], now));
+  const row = await ownAsBuyer(buyerUserId, id);
+  return withPhotoLink(row, await one(toBuyerRfqs([row], now)), now);
 }
 
 export async function cancelRfq(buyerUserId: string, id: string, now = new Date()): Promise<BuyerRfq> {
@@ -243,7 +268,7 @@ export async function listBuyerRfqs(buyerUserId: string, query: RfqListQuery, no
 export async function getSellerRfq(sellerUserId: string, id: string, now = new Date()): Promise<SellerRfq> {
   const row = await ownAsSeller(sellerUserId, id);
   const seen = row.sellerSeenAt ? row : ((await repo.markSeen(id, sellerUserId, now)) ?? row);
-  return one(toSellerRfqs([seen], now));
+  return withPhotoLink(seen, await one(toSellerRfqs([seen], now)), now);
 }
 
 export async function declineRfq(sellerUserId: string, id: string, reason: string | null, now = new Date()): Promise<SellerRfq> {

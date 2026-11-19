@@ -502,6 +502,13 @@ export const rfqs = pgTable(
     deliveryCountry: text("delivery_country").notNull(),
     deliveryCity: text("delivery_city").notNull(),
     note: text("note"),
+    /**
+     * The buyer's own photo from Muhrak AI (Day 9 follow-up, 19 Nov 2026): a
+     * cleaned, PRIVATE part_photo, attached only when the buyer asked from a
+     * photo search and kept sharing on. Only this request's buyer and seller
+     * can view it, through a short-lived link.
+     */
+    buyerPhotoUploadId: uuid("buyer_photo_upload_id").references(() => uploads.id),
     status: rfqStatus("status").notNull().default("open"),
     sellerSeenAt: timestamp("seller_seen_at", { withTimezone: true }),
     declineReason: text("decline_reason"),

@@ -94,6 +94,11 @@ export const rfqCreateSchema = z.object({
   deliveryCountry: gccCountrySchema,
   deliveryCity: line(2, 60),
   note: optionalParagraph(1000),
+  /**
+   * The buyer's own finished Muhrak AI photo search, when the request starts
+   * from it and the buyer shares the photo. The server checks it is theirs.
+   */
+  identificationId: z.string().uuid().optional(),
 });
 export type RfqCreateInput = z.infer<typeof rfqCreateSchema>;
 
@@ -130,6 +135,10 @@ const rfqBaseSchema = z.object({
   deliveryCountryName: z.string(),
   note: z.string().nullable(),
   declineReason: z.string().nullable(),
+  /** The buyer shared their own photo of the part (Muhrak AI). */
+  hasBuyerPhoto: z.boolean(),
+  /** A 10-minute link to that photo: only on a single request (GET by id), null in lists. */
+  buyerPhotoUrl: z.string().url().nullable(),
   product: z.object({
     id: z.string().uuid(),
     name: z.string(),
