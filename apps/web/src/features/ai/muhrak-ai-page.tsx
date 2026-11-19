@@ -17,6 +17,8 @@ import { useCategories } from "@/features/catalog/api";
 import { priceLabel } from "@/features/catalog/parts";
 import { availability, ProductPhoto, QuoteRequestDialog } from "@/features/rfq/quote-request-dialog";
 import { usePartSearch } from "@/features/search/api";
+import { useSellerDirectory } from "@/features/storefront/api";
+import { LogoTile, VerifiedMark } from "@/features/storefront/soft";
 import { acceptFor, checkFile, uploadFile } from "@/features/upload/upload-file";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -339,6 +341,7 @@ export function MuhrakAiPage() {
                 />
               )}
             </div>
+            <RecommendedSellers categoryId={category?.id} categoryName={category?.name} matches={results?.items ?? []} />
             <div className="mt-5">
               <StartOver onClick={startOver} label="Try another photo" />
             </div>
@@ -709,6 +712,74 @@ function Results({
         </div>
       ) : null}
     </div>
+  );
+}
+
+const RECOMMENDED = 6;
+
+/**
+ * Sellers to ask about this part: those with a matching part first, then other verified sellers who sell in the
+ * identified category (developer request, 19 Nov 2026). Public data only; each opens the seller's page.
+ */
+function RecommendedSellers({ categoryId, categoryName, matches }: { categoryId: string | undefined; categoryName: string | undefined; matches: PartSearchResult[] }) {
+  const directory = useSellerDirectory({ category: categoryId, sort: "name", page: 1 }, categoryId !== undefined);
+  const listed = categoryId ? (directory.data?.items ?? []) : [];
+  const byId = new Map(listed.map((seller) => [seller.id, seller]));
+  const sellers: { id: string; companyName: string; place: string; logoUrl: string | null; note: string }[] = [];
+  const seen = new Set<string>();
+  for (const item of matches) {
+    if (seen.has(item.seller.id)) continue;
+    seen.add(item.seller.id);
+    sellers.push({
+      id: item.seller.id,
+      companyName: item.seller.companyName,
+      place: `${item.seller.city}, ${item.seller.countryName}`,
+      logoUrl: byId.get(item.seller.id)?.logoUrl ?? null,
+      note: "Has a matching part",
+    });
+  }
+  for (const seller of listed) {
+    if (seen.has(seller.id)) continue;
+    seen.add(seller.id);
+    sellers.push({
+      id: seller.id,
+      companyName: seller.companyName,
+      place: `${seller.city}, ${seller.countryName}`,
+      logoUrl: seller.logoUrl,
+      note: `Sells ${categoryName ?? seller.mainCategory ?? "parts"} · ${seller.productCount.toLocaleString("en-US")} ${seller.productCount === 1 ? "part" : "parts"}`,
+    });
+  }
+  if (sellers.length === 0) return null;
+  return (
+    <section aria-labelledby="recommended-sellers" className="mt-7">
+      <h2 id="recommended-sellers" className="text-[15px] text-ink">
+        Recommended sellers
+      </h2>
+      <p className="mt-1 text-[13px] text-ink-tertiary">
+        Verified sellers {categoryName ? `of ${categoryName.toLowerCase()}` : "for this part"}. Open one to see their parts and ask for a quote.
+      </p>
+      <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+        {sellers.slice(0, RECOMMENDED).map((seller) => (
+          <li key={seller.id}>
+            <Link
+              href={`/sellers/${seller.id}`}
+              className="flex items-center gap-3 rounded-[22px] bg-white/85 p-2.5 pr-4 shadow-[inset_0_0_0_1px_rgba(10,11,18,0.05)] transition-colors outline-none hover:bg-white focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <LogoTile name={seller.companyName} logoUrl={seller.logoUrl} className="size-12 rounded-[14px]" initialsClass="text-base" />
+              <span className="flex min-w-0 flex-1 flex-col gap-1 leading-tight">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate text-[15px] text-ink">{seller.companyName}</span>
+                  <VerifiedMark className="size-4" />
+                </span>
+                <span className="truncate text-[13px] text-ink-tertiary">{seller.place}</span>
+                <span className="truncate text-[12px] text-ink-tertiary">{seller.note}</span>
+              </span>
+              <ChevronRight aria-hidden className="size-4 shrink-0 text-ink-placeholder" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

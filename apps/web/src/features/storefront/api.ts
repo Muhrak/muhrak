@@ -11,8 +11,9 @@ import { apiRequest } from "@/lib/api";
 
 /** Public storefront data (no sign-in; nothing personal). */
 
-export function useSellerDirectory(query: { q?: string; category?: string; sort: SellerDirectoryQuery["sort"]; page: number }) {
+export function useSellerDirectory(query: { q?: string; category?: string; sort: SellerDirectoryQuery["sort"]; page: number }, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ["storefront", "directory", query],
     queryFn: () => {
       const params = new URLSearchParams({ sort: query.sort, page: String(query.page) });

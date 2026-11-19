@@ -284,6 +284,27 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   (`pending/b6531a02…` and `files/part_photo/b6531a02….webp`; the API
   cannot delete). Remove in the AWS console if wanted.
 
+### Part matching fixed + recommended sellers on a Muhrak AI result (Thu 19 Nov, developer report)
+
+- Report: an air filter photo was identified, but the seller's live "Air
+  Filter" (Filters, Volvo 2021) was not offered. Cause, found on staging:
+  every word of the AI's name had to appear ("Air filter element" and
+  "Engine air filter" found nothing), and the AI's category was a hard
+  filter for name and machine matches.
+- Fix (`searchPublishedProducts` and `searchLiveProducts` in the catalog
+  module): one or two words must all match; three or more need at least
+  half (`minWordsFor`). Plural "s" and small words ("for", "the") are
+  dropped (`searchWords`). Within a rank, parts with more matching words
+  come first, then the searched category, then newest; the category no
+  longer hides parts. "Hydraulic oil filter" still does not bring up an air
+  filter. Checked on the local Postgres with temporary products (removed)
+  and in service tests.
+- Muhrak AI result: a "Recommended sellers" section under the matching
+  parts: sellers with a matching part first, then other verified sellers
+  in the identified category (public directory, up to 6), each opening the
+  seller's page. Not checked on screen with a real photo (that needs a paid
+  Gemini call); typecheck and lint pass.
+
 ### Buyer landing in the Muhrak AI theme (Wed 18 Nov, developer request)
 - `/` (buyer landing only) now looks like the Muhrak AI page: white page
   (not grey) and the soft blue glow (`components/landing/soft-glow.tsx`)
