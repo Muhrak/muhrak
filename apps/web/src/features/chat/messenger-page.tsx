@@ -65,137 +65,13 @@ function initials(name: string): string {
 
 const timeFormat = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" });
 
-/**
- * Two looks. Buyer: the Buyer Centre design from the developer's reference
- * "dashboard buyer muhrak" (19 Nov 2026; sizes x1.6 in page units under the
- * 85% zoom, like the dashboard). Seller: unchanged.
- */
-const LOOK = {
-  buyer: {
-    page: "flex flex-col gap-5 text-[#262626] lg:gap-[34px]",
-    title: "text-[26px] leading-tight font-semibold tracking-[-0.01em] lg:text-[40px]",
-    subtitle: "text-[14px] font-medium text-[#9b9b9b] lg:text-[19px]",
-    filter: "flex h-10 items-center gap-2 rounded-full px-4 text-[15px] leading-none font-semibold lg:h-[52px] lg:gap-3 lg:px-[24px] lg:text-[19px]",
-    filterOn: "bg-ink text-white",
-    filterOff: "bg-white text-[#262626] hover:bg-white/70",
-    filterCount: "text-xs lg:text-[15px]",
-    grid: "grid gap-5 lg:h-[calc(100dvh/0.85-300px)] lg:min-h-[560px] lg:grid-cols-[minmax(360px,520px)_1fr] lg:gap-[38px]",
-    aside: "flex min-h-0 flex-col gap-3 rounded-[30px] bg-white p-4 lg:gap-[18px] lg:rounded-[48px] lg:p-[30px]",
-    search: "flex h-12 items-center gap-3 rounded-full bg-[#e9e9e9] px-5 focus-within:ring-3 focus-within:ring-sky-blue/35 lg:h-[61px] lg:gap-[14px] lg:px-[22px]",
-    searchIcon: "size-[18px] shrink-0 text-[#9b9b9b] lg:size-[25px]",
-    searchInput: "min-w-0 flex-1 bg-transparent text-[15px] font-medium text-[#262626] outline-none placeholder:text-[#a3a3a3] lg:text-[20px]",
-    note: "px-2 py-10 text-center text-[15px] font-medium text-[#9b9b9b] lg:text-[19px]",
-    list: "-mx-2 flex min-h-0 flex-col overflow-y-auto",
-    item: "flex w-full items-center gap-3.5 rounded-[18px] px-2 py-2 text-left hover:bg-black/[0.03] lg:gap-[22px] lg:rounded-[22px] lg:px-[12px] lg:py-[12px]",
-    itemOn: "bg-[#f4f4f4] hover:bg-[#f4f4f4]",
-    avatar: "flex size-12 shrink-0 items-center justify-center rounded-[14px] bg-ink text-[14px] font-bold text-white lg:size-[71px] lg:rounded-[19px] lg:text-[20px]",
-    avatarUnread: "bg-sky-blue",
-    itemText: "flex min-w-0 flex-1 flex-col gap-0.5 leading-tight lg:gap-[5px]",
-    itemName: "min-w-0 flex-1 truncate text-[15px] font-semibold lg:text-[21px]",
-    itemTime: "shrink-0 text-[12px] font-medium text-[#9b9b9b] lg:text-[16px]",
-    itemPreview: "min-w-0 flex-1 truncate text-[13px] font-medium text-[#9b9b9b] lg:text-[17px]",
-    badge: "flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-sky-blue px-1.5 text-[11px] font-bold text-white lg:h-[28px] lg:min-w-[28px] lg:px-2 lg:text-[15px]",
-    choose: "hidden items-center justify-center rounded-[48px] bg-white p-10 text-center text-[19px] font-medium text-[#9b9b9b] lg:flex",
-    thread: "flex h-[calc(100dvh-246px)] min-h-[420px] min-w-0 flex-col overflow-hidden rounded-[30px] bg-white lg:h-auto lg:min-h-0 lg:rounded-[48px]",
-    header: "flex items-center gap-3 border-b border-[#efefef] px-4 py-4 sm:px-6 lg:gap-[18px] lg:px-[36px] lg:pt-[30px] lg:pb-[24px]",
-    headAvatar: "flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-ink text-[14px] font-bold text-white lg:size-[61px] lg:rounded-[18px] lg:text-[19px]",
-    headText: "flex min-w-0 flex-1 flex-col gap-0.5 leading-tight lg:gap-1",
-    headName: "truncate text-[17px] font-semibold lg:text-[25px]",
-    headSub: "truncate text-[13px] font-medium text-[#9b9b9b] lg:text-[18px]",
-    requestLink: "shrink-0 rounded-full bg-ink px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-ink/90 lg:px-[26px] lg:py-[14px] lg:text-[18px]",
-    messages: "flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-5 sm:px-6 lg:gap-[16px] lg:px-[36px] lg:py-[28px]",
-    bubble: "rounded-[20px] px-4 py-2.5 text-[15px] leading-normal font-medium break-words whitespace-pre-wrap lg:rounded-[24px] lg:px-[22px] lg:py-[14px] lg:text-[19px]",
-    mine: "rounded-br-[8px] bg-ink text-white",
-    theirs: "rounded-bl-[8px] bg-[#f4f4f4] text-[#262626]",
-    time: "px-1 text-[11px] font-medium text-[#9b9b9b] lg:text-[14px]",
-    composer: "flex flex-col gap-2 px-4 pt-2 pb-4 sm:px-6 lg:gap-3 lg:px-[30px] lg:pb-[30px]",
-    composerRow: "flex items-center gap-2.5 lg:gap-[14px]",
-    photoBtn: "flex size-12 shrink-0 items-center justify-center rounded-full bg-ink text-white hover:bg-ink/90 disabled:opacity-50 lg:size-[61px]",
-    photoIcon: "size-5 lg:size-[25px]",
-    input: "h-12 min-w-0 flex-1 rounded-full bg-[#e9e9e9] px-5 text-[15px] font-medium text-[#262626] outline-none placeholder:text-[#a3a3a3] focus-visible:ring-3 focus-visible:ring-sky-blue/35 lg:h-[61px] lg:px-[26px] lg:text-[20px]",
-    send: "h-12 shrink-0 rounded-full bg-sky-blue px-6 text-[15px] font-semibold text-white hover:bg-sky-periwinkle disabled:opacity-50 lg:h-[61px] lg:px-[34px] lg:text-[20px]",
-    card: "flex w-full max-w-[440px] items-center gap-3.5 rounded-[18px] bg-[#f4f4f4] p-3 pr-4 hover:bg-[#ececec] lg:max-w-[660px] lg:gap-[20px] lg:rounded-[22px] lg:p-[16px] lg:pr-[26px]",
-    cardThumb: "lg:[&>span]:size-[71px] lg:[&>span]:rounded-[19px]",
-    cardText: "flex min-w-0 flex-1 flex-col gap-0.5 leading-tight lg:gap-[5px]",
-    cardTitle: "truncate text-[15px] font-semibold lg:text-[21px]",
-    cardLine: "truncate text-[13px] font-medium text-[#9b9b9b] lg:text-[17px]",
-  },
-  seller: {
-    page: "flex flex-col gap-5",
-    title: "text-[28px] font-medium tracking-[-0.02em] text-text-strong sm:text-[40px]",
-    subtitle: "text-base text-text-muted",
-    filter: "flex h-10 items-center gap-2 rounded-full border px-4 text-[15px] leading-none",
-    filterOn: "border-text-strong bg-text-strong text-white",
-    filterOff: "border-line text-text-strong hover:bg-black/4",
-    filterCount: "text-xs",
-    grid: "grid gap-5 lg:h-[calc(100dvh/0.85-250px)] lg:min-h-[520px] lg:grid-cols-[minmax(300px,380px)_1fr]",
-    aside: "flex min-h-0 flex-col gap-3 rounded-[24px] bg-panel p-4",
-    search: "flex h-11 items-center gap-2.5 rounded-full bg-surface px-4",
-    searchIcon: "size-4 text-text-muted",
-    searchInput: "min-w-0 flex-1 bg-transparent text-[15px] text-text-strong outline-none placeholder:text-text-subtle",
-    note: "px-2 py-10 text-center text-[15px] text-text-muted",
-    list: "flex min-h-0 flex-col gap-1 overflow-y-auto",
-    item: "flex w-full items-center gap-3 rounded-[16px] px-3 py-3 text-left hover:bg-surface",
-    itemOn: "bg-surface",
-    avatar: "flex size-11 shrink-0 items-center justify-center rounded-full bg-surface text-sm font-medium text-text-strong",
-    avatarUnread: "",
-    itemText: "flex min-w-0 flex-1 flex-col gap-1 leading-[normal]",
-    itemName: "min-w-0 flex-1 truncate text-[15px] font-medium text-text-strong",
-    itemTime: "shrink-0 text-xs text-text-subtle",
-    itemPreview: "min-w-0 flex-1 truncate text-[13px] text-text-muted",
-    badge: "flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-side-accent px-1.5 text-[11px] font-semibold text-white",
-    choose: "hidden items-center justify-center rounded-[24px] bg-panel p-10 text-center text-[15px] text-text-muted lg:flex",
-    thread: "flex h-[calc(100dvh-240px)] min-h-[420px] min-w-0 flex-col overflow-hidden rounded-[24px] bg-panel lg:h-auto lg:min-h-0",
-    header: "flex items-center gap-3 border-b border-line px-4 py-3.5 sm:px-6",
-    headAvatar: "flex size-11 shrink-0 items-center justify-center rounded-full bg-surface text-sm font-medium",
-    headText: "flex min-w-0 flex-1 flex-col gap-0.5 leading-[normal]",
-    headName: "truncate text-[17px] font-medium text-text-strong",
-    headSub: "truncate text-[13px] text-text-muted",
-    requestLink: "shrink-0 rounded-full border border-line px-3.5 py-2 text-sm font-medium text-text-strong hover:bg-black/4 sm:px-4",
-    messages: "flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-5 sm:px-6",
-    bubble: "rounded-[18px] px-4 py-2.5 text-[15px] leading-normal break-words whitespace-pre-wrap",
-    mine: "rounded-br-[6px] bg-text-strong text-white",
-    theirs: "rounded-bl-[6px] bg-surface text-text-strong",
-    time: "px-1 text-[11px] text-text-subtle",
-    composer: "flex flex-col gap-2 border-t border-line px-4 py-3.5 sm:px-6",
-    composerRow: "flex items-center gap-2.5",
-    photoBtn: "flex size-11 shrink-0 items-center justify-center rounded-full text-text-body hover:bg-surface disabled:opacity-50",
-    photoIcon: "size-5",
-    input: "h-12 min-w-0 flex-1 rounded-full bg-surface px-5 text-[15px] text-text-strong outline-none placeholder:text-text-subtle focus-visible:ring-3 focus-visible:ring-brand-blue/30",
-    send: "h-12 shrink-0 rounded-full bg-side-accent px-6 text-[15px] font-semibold text-white hover:opacity-90 disabled:opacity-50",
-    card: "flex w-full max-w-[440px] items-center gap-3.5 rounded-[18px] border border-line bg-surface/60 p-3 pr-4 hover:bg-surface",
-    cardThumb: "",
-    cardText: "flex min-w-0 flex-1 flex-col gap-0.5 leading-[normal]",
-    cardTitle: "truncate text-[15px] font-medium text-text-strong",
-    cardLine: "truncate text-[13px] text-text-muted",
-  },
-} satisfies Record<PortalSide, Record<string, string>>;
-
-/** The buyer dashboard's status chips: pale green, grey and red with a dot. */
-const BUYER_CHIP = {
-  done: { chip: "bg-[#d6efd1] text-[#3d7a35]", dot: "bg-[#3d7a35]" },
-  neutral: { chip: "bg-[#e5e5e5] text-[#7a7a7a]", dot: "bg-[#8e8e8e]" },
-  closed: { chip: "bg-[#fcd6d6] text-[#a73a3a]", dot: "bg-[#a73a3a]" },
-} as const;
-
-function BuyerChip({ status }: { status: ReturnType<typeof buyerStatus> }) {
-  const look = BUYER_CHIP[status.tone === "done" ? "done" : status.tone === "closed" ? "closed" : "neutral"];
-  return (
-    <span className={cn("inline-flex h-[30px] shrink-0 items-center gap-2 rounded-[10px] px-3 text-[13px] font-semibold whitespace-nowrap lg:h-[40px] lg:gap-[12px] lg:rounded-[13px] lg:px-[20px] lg:text-[18px]", look.chip)}>
-      <span aria-hidden className={cn("size-1.5 rounded-full lg:size-[8px]", look.dot)} />
-      {status.label}
-    </span>
-  );
-}
-
 export function MessengerPage({ side }: { side: PortalSide }) {
   const chat = useChatClient(side);
-  const L = LOOK[side];
   return (
-    <section className={L.page}>
+    <section className="flex flex-col gap-5">
       <header className="flex flex-col gap-1.5 leading-[normal]">
-        <h1 className={L.title}>Messenger</h1>
-        <p className={L.subtitle}>{side === "buyer" ? "Chat with sellers about your quote requests." : "Chat with buyers about their quote requests."}</p>
+        <h1 className="text-[28px] font-medium tracking-[-0.02em] text-text-strong sm:text-[40px]">Messenger</h1>
+        <p className="text-base text-text-muted">{side === "buyer" ? "Chat with sellers about your quote requests." : "Chat with buyers about their quote requests."}</p>
       </header>
       {chat.status === "connecting" ? (
         <LogoLoader label="Connecting to chat" className="py-24" />
@@ -220,7 +96,6 @@ function Inbox({ side, client, userId, pending }: { side: PortalSide; client: St
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [query, setQuery] = useState("");
   const names = useCounterparts(side);
-  const L = LOOK[side];
 
   // The caller's conversations, live. Only the API can add them to one (see the API chat module).
   useEffect(() => {
@@ -309,39 +184,39 @@ function Inbox({ side, client, userId, pending }: { side: PortalSide; client: St
             aria-pressed={filter === key}
             onClick={() => setFilter(key)}
             className={cn(
-              L.filter,
-              filter === key ? L.filterOn : L.filterOff,
+              "flex h-10 items-center gap-2 rounded-full border px-4 text-[15px] leading-none",
+              filter === key ? "border-text-strong bg-text-strong text-white" : "border-line text-text-strong hover:bg-black/4",
               focusRing,
             )}
           >
             {key === "all" ? "All" : "Unread"}
-            <span className={cn(L.filterCount, filter === key ? "text-white/70" : "text-text-muted")}>{key === "all" ? (channels?.length ?? 0) : unreadCount}</span>
+            <span className={cn("text-xs", filter === key ? "text-white/70" : "text-text-muted")}>{key === "all" ? (channels?.length ?? 0) : unreadCount}</span>
           </button>
         ))}
       </div>
 
-      <div className={L.grid}>
+      <div className="grid gap-5 lg:h-[calc(100dvh/0.85-250px)] lg:min-h-[520px] lg:grid-cols-[minmax(300px,380px)_1fr]">
         {/* Conversations (hidden on phones while one is open). */}
-        <aside className={cn(L.aside, active && "max-lg:hidden")}>
-          <label className={L.search}>
-            <Search aria-hidden className={L.searchIcon} />
+        <aside className={cn("flex min-h-0 flex-col gap-3 rounded-[24px] bg-panel p-4", active && "max-lg:hidden")}>
+          <label className="flex h-11 items-center gap-2.5 rounded-full bg-surface px-4">
+            <Search aria-hidden className="size-4 text-text-muted" />
             <span className="sr-only">Search conversations</span>
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               maxLength={60}
               placeholder="Search by name, part or RQ number"
-              className={L.searchInput}
+              className="min-w-0 flex-1 bg-transparent text-[15px] text-text-strong outline-none placeholder:text-text-subtle"
             />
           </label>
           {loadError ? (
-            <p role="alert" className={L.note}>
+            <p role="alert" className="px-2 py-10 text-center text-[15px] text-text-muted">
               Could not load your conversations. Check your connection and reload the page.
             </p>
           ) : channels === null ? (
             <LogoLoader label="Loading conversations" className="py-16" />
           ) : sorted.length === 0 ? (
-            <p className={L.note}>
+            <p className="px-2 py-10 text-center text-[15px] text-text-muted">
               {(channels?.length ?? 0) === 0
                 ? side === "buyer"
                   ? "No conversations yet. Ask a seller for a quote and your chat starts here."
@@ -349,7 +224,7 @@ function Inbox({ side, client, userId, pending }: { side: PortalSide; client: St
                 : "Nothing matches."}
             </p>
           ) : (
-            <ul className={L.list}>
+            <ul className="flex min-h-0 flex-col gap-1 overflow-y-auto">
               {sorted.map((channel) => {
                 const who = names.data?.get(channel.id ?? "");
                 const last = channel.state.messages.at(-1);
@@ -361,20 +236,20 @@ function Inbox({ side, client, userId, pending }: { side: PortalSide; client: St
                       type="button"
                       onClick={() => open(channel.id ?? null)}
                       aria-current={channel.id === activeId ? "true" : undefined}
-                      className={cn(L.item, channel.id === activeId && L.itemOn, focusRing)}
+                      className={cn("flex w-full items-center gap-3 rounded-[16px] px-3 py-3 text-left hover:bg-surface", channel.id === activeId && "bg-surface", focusRing)}
                     >
-                      <span className={cn(L.avatar, unread > 0 && L.avatarUnread)}>
+                      <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-surface text-sm font-medium text-text-strong">
                         {initials(who?.name ?? "?")}
                       </span>
-                      <span className={L.itemText}>
+                      <span className="flex min-w-0 flex-1 flex-col gap-1 leading-[normal]">
                         <span className="flex items-center gap-2">
-                          <span className={L.itemName}>{who?.name ?? "Conversation"}</span>
-                          {channel.state.last_message_at ? <span className={L.itemTime}>{shortAge(new Date(channel.state.last_message_at).toISOString())}</span> : null}
+                          <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-text-strong">{who?.name ?? "Conversation"}</span>
+                          {channel.state.last_message_at ? <span className="shrink-0 text-xs text-text-subtle">{shortAge(new Date(channel.state.last_message_at).toISOString())}</span> : null}
                         </span>
                         <span className="flex items-center gap-2">
-                          <span className={L.itemPreview}>{preview || `${who?.reference ?? ""} · ${who?.partName ?? ""}`}</span>
+                          <span className="min-w-0 flex-1 truncate text-[13px] text-text-muted">{preview || `${who?.reference ?? ""} · ${who?.partName ?? ""}`}</span>
                           {unread > 0 ? (
-                            <span className={L.badge}>{unread}</span>
+                            <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-side-accent px-1.5 text-[11px] font-semibold text-white">{unread}</span>
                           ) : null}
                         </span>
                       </span>
@@ -389,7 +264,7 @@ function Inbox({ side, client, userId, pending }: { side: PortalSide; client: St
         {active ? (
           <Thread key={active.cid} side={side} channel={active} userId={userId} who={names.data?.get(active.id ?? "")} onBack={() => open(null)} />
         ) : (
-          <div className={L.choose}>
+          <div className="hidden items-center justify-center rounded-[24px] bg-panel p-10 text-center text-[15px] text-text-muted lg:flex">
             {activeId && channels ? "This conversation is still being set up. It appears here in a moment." : "Choose a conversation."}
           </div>
         )}
@@ -407,7 +282,6 @@ function Thread({ side, channel, userId, who, onBack }: { side: PortalSide; chan
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const rfqId = channel.id ?? "";
-  const L = LOOK[side];
 
   // The history (the list loaded only the last message), then live: new, edited and deleted messages; read as they arrive.
   useEffect(() => {
@@ -476,24 +350,24 @@ function Thread({ side, channel, userId, who, onBack }: { side: PortalSide; chan
 
   return (
     // Phones: a fixed-height thread that scrolls inside, so the message box stays on screen.
-    <article className={L.thread}>
-      <header className={L.header}>
+    <article className="flex h-[calc(100dvh-240px)] min-h-[420px] min-w-0 flex-col overflow-hidden rounded-[24px] bg-panel lg:h-auto lg:min-h-0">
+      <header className="flex items-center gap-3 border-b border-line px-4 py-3.5 sm:px-6">
         <button type="button" onClick={onBack} aria-label="Back to conversations" className={cn("flex size-9 items-center justify-center rounded-full hover:bg-surface lg:hidden", focusRing)}>
           <ArrowLeft aria-hidden className="size-5" />
         </button>
-        <span className={L.headAvatar}>{initials(who?.name ?? "?")}</span>
-        <div className={L.headText}>
-          <p className={L.headName}>{who?.name ?? "Conversation"}</p>
-          <p className={L.headSub}>{who ? `${who.reference} · ${who.partName}` : ""}</p>
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-surface text-sm font-medium">{initials(who?.name ?? "?")}</span>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5 leading-[normal]">
+          <p className="truncate text-[17px] font-medium text-text-strong">{who?.name ?? "Conversation"}</p>
+          <p className="truncate text-[13px] text-text-muted">{who ? `${who.reference} · ${who.partName}` : ""}</p>
         </div>
-        <Link href={requestHref} className={cn(L.requestLink, focusRing)}>
+        <Link href={requestHref} className={cn("shrink-0 rounded-full border border-line px-3.5 py-2 text-sm font-medium text-text-strong hover:bg-black/4 sm:px-4", focusRing)}>
           <span className="sm:hidden">Request</span>
           <span className="max-sm:hidden">View request</span>
         </Link>
       </header>
 
-      <div ref={listRef} className={L.messages} aria-live="polite">
-        {messages.length === 0 ? <p className={L.note}>No messages yet. Say hello.</p> : null}
+      <div ref={listRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-5 sm:px-6" aria-live="polite">
+        {messages.length === 0 ? <p className="py-10 text-center text-[15px] text-text-muted">No messages yet. Say hello.</p> : null}
         {messages.map((message) => {
           const mine = message.user?.id === userId;
           const card = message.attachments?.find((item) => item.type === CHAT_ATTACHMENT.rfq);
@@ -507,20 +381,20 @@ function Thread({ side, channel, userId, who, onBack }: { side: PortalSide; chan
               ) : (
                 <p
                   className={cn(
-                    L.bubble,
-                    mine ? L.mine : L.theirs,
+                    "rounded-[18px] px-4 py-2.5 text-[15px] leading-normal break-words whitespace-pre-wrap",
+                    mine ? "rounded-br-[6px] bg-text-strong text-white" : "rounded-bl-[6px] bg-surface text-text-strong",
                   )}
                 >
                   {message.text}
                 </p>
               )}
-              <span className={L.time}>{at}</span>
+              <span className="px-1 text-[11px] text-text-subtle">{at}</span>
             </div>
           );
         })}
       </div>
 
-      <form onSubmit={send} className={L.composer}>
+      <form onSubmit={send} className="flex flex-col gap-2 border-t border-line px-4 py-3.5 sm:px-6">
         {warned ? (
           <div role="alert" className="flex flex-wrap items-center gap-3 rounded-[16px] bg-[#fff4e5] px-4 py-3 text-sm text-text-strong">
             <ShieldAlert aria-hidden className="size-5 shrink-0 text-[#b45309]" />
@@ -537,16 +411,16 @@ function Thread({ side, channel, userId, who, onBack }: { side: PortalSide; chan
             {error}
           </p>
         ) : null}
-        <div className={L.composerRow}>
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={sending}
             aria-label="Send a photo"
             title="Send a photo"
-            className={cn(L.photoBtn, focusRing)}
+            className={cn("flex size-11 shrink-0 items-center justify-center rounded-full text-text-body hover:bg-surface disabled:opacity-50", focusRing)}
           >
-            {sending ? <Loader2 aria-hidden className={cn(L.photoIcon, "animate-spin")} /> : <ImagePlus aria-hidden className={L.photoIcon} />}
+            {sending ? <Loader2 aria-hidden className="size-5 animate-spin" /> : <ImagePlus aria-hidden className="size-5" />}
           </button>
           <input
             ref={fileRef}
@@ -573,12 +447,12 @@ function Thread({ side, channel, userId, who, onBack }: { side: PortalSide; chan
             maxLength={2000}
             autoComplete="off"
             placeholder="Write a message…"
-            className={L.input}
+            className="h-12 min-w-0 flex-1 rounded-full bg-surface px-5 text-[15px] text-text-strong outline-none placeholder:text-text-subtle focus-visible:ring-3 focus-visible:ring-brand-blue/30"
           />
           <button
             type="submit"
             disabled={!draft.trim() || sending}
-            className={cn(L.send, focusRing)}
+            className={cn("h-12 shrink-0 rounded-full bg-side-accent px-6 text-[15px] font-semibold text-white hover:opacity-90 disabled:opacity-50", focusRing)}
           >
             Send
           </button>
@@ -597,7 +471,6 @@ function BuyerRequestCard({ rfqId, at }: { rfqId: string; at: string }) {
   const rfq = useBuyerRfq(rfqId).data;
   return rfq ? (
     <CardView
-      side="buyer"
       href={`/buyer/requests?id=${encodeURIComponent(rfq.id)}`}
       photo={rfq.product.photoUrl}
       title={`Quote request · ${rfq.reference}`}
@@ -612,7 +485,6 @@ function SellerRequestCard({ rfqId, at }: { rfqId: string; at: string }) {
   const rfq = useSellerRfq(rfqId).data;
   return rfq ? (
     <CardView
-      side="seller"
       href={`/seller/rfq-inbox?id=${encodeURIComponent(rfq.id)}`}
       photo={rfq.product.photoUrl}
       title={`Quote request · ${rfq.reference}`}
@@ -624,7 +496,6 @@ function SellerRequestCard({ rfqId, at }: { rfqId: string; at: string }) {
 }
 
 function CardView({
-  side,
   href,
   photo,
   title,
@@ -632,7 +503,6 @@ function CardView({
   status,
   at,
 }: {
-  side: PortalSide;
   href: string;
   photo: string | null;
   title: string;
@@ -640,24 +510,21 @@ function CardView({
   status: ReturnType<typeof buyerStatus>;
   at: string;
 }) {
-  const L = LOOK[side];
   return (
-    <div className="flex w-full flex-col items-center gap-1 self-center">
-      <Link href={href} className={cn(L.card, focusRing)}>
-        <span className={cn("shrink-0", L.cardThumb)}>
-          <Thumb src={photo} size="sm" />
-        </span>
-        <span className={L.cardText}>
-          <span className={L.cardTitle}>{title}</span>
+    <div className="flex flex-col items-center gap-1 self-center">
+      <Link href={href} className={cn("flex w-full max-w-[440px] items-center gap-3.5 rounded-[18px] border border-line bg-surface/60 p-3 pr-4 hover:bg-surface", focusRing)}>
+        <Thumb src={photo} size="sm" />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-[normal]">
+          <span className="truncate text-[15px] font-medium text-text-strong">{title}</span>
           {lines.map((line) => (
-            <span key={line} className={L.cardLine}>
+            <span key={line} className="truncate text-[13px] text-text-muted">
               {line}
             </span>
           ))}
         </span>
-        {side === "buyer" ? <BuyerChip status={status} /> : <RfqChip tone={status.tone}>{status.label}</RfqChip>}
+        <RfqChip tone={status.tone}>{status.label}</RfqChip>
       </Link>
-      <span className={L.time}>{at}</span>
+      <span className="text-[11px] text-text-subtle">{at}</span>
     </div>
   );
 }
