@@ -1,4 +1,5 @@
 import {
+  CHAT_QUEUE,
   GCC_COUNTRY_NAMES,
   RFQ_EXPIRY_DAYS,
   RFQ_LIMITS,
@@ -15,7 +16,7 @@ import {
 } from "../../schemas";
 import type { RfqRow } from "../../db/schema";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/errors";
-import { wakeWorker } from "../../shared/jobs";
+import { enqueueJob, wakeWorker } from "../../shared/jobs";
 import { logger } from "../../shared/logger";
 import { getIdentificationPhotoUpload } from "../ai";
 import { getUsersByIds } from "../auth";
@@ -192,6 +193,8 @@ export async function createRfq(buyerUserId: string, input: RfqCreateInput, now 
       },
       tx,
     );
+    // The buyer–seller chat (Day 10) is opened by a background job, queued with the request.
+    await enqueueJob(CHAT_QUEUE, "open-rfq-chat", { rfqId: created.id }, { dedupeKey: `chat-open-${created.id}`, maxAttempts: 8, tx });
     return created;
   });
 
@@ -323,3 +326,31 @@ function decodeCursor(cursor: string | undefined): repo.ListCursor | null {
     throw badRequest("This page link is not valid. Go back to the first page.");
   }
 }
+
+// ---------------------------------------------------------------- for the chat module (Day 10)
+
+/** What the chat needs about a request: who its two sides are. Undefined if it does not exist. */
+export async function getRfqForChat(
+  id: string,
+): Promise<{ id: string; reference: string; buyerUserId: string; sellerUserId: string; partName: string; chatOpenedAt: Date | null } | undefined> {
+  const row = await repo.findRfq(id);
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    reference: reference(row.number),
+    buyerUserId: row.buyerUserId,
+    sellerUserId: row.sellerUserId,
+    partName: row.partName,
+    chatOpenedAt: row.chatOpenedAt,
+  };
+}
+
+export async function markRfqChatOpened(id: string, at = new Date()): Promise<void> {
+  await repo.markChatOpened(id, at);
+}
+
+/** The caller's requests whose chat is not open yet (newest first). */
+export async function listRfqsWithoutChat(side: "buyer" | "seller", userId: string, limit = 50): Promise<string[]> {
+  return repo.listWithoutChat(side, userId, limit);
+}
+

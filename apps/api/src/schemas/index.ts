@@ -11,3 +11,4 @@ export * from "./maintenance";
 export * from "./search";
 export * from "./rfq";
 export * from "./ai";
+export * from "./chat";

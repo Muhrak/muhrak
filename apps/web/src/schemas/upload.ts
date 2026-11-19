@@ -19,7 +19,8 @@ import { z } from "zod";
  * photo search. Private: re-encoded (metadata dropped) and kept under
  * `files/`, seen only by its owner through short-lived links.
  */
-export const uploadPurposeSchema = z.enum(["seller_logo", "seller_document", "product_photo", "part_photo"]);
+/** chat_photo (Day 10): a photo sent in a buyer–seller chat. Private, cleaned, like part_photo. */
+export const uploadPurposeSchema = z.enum(["seller_logo", "seller_document", "product_photo", "part_photo", "chat_photo"]);
 export type UploadPurpose = z.infer<typeof uploadPurposeSchema>;
 
 export const uploadContentTypeSchema = z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
@@ -35,6 +36,7 @@ export const UPLOAD_RULES: Record<UploadPurpose, { types: UploadContentType[]; m
   product_photo: { types: ["image/jpeg", "image/png", "image/webp"], maxBytes: 10 * MB },
   // Re-encoded too, but kept private (only the buyer who took it sees it).
   part_photo: { types: ["image/jpeg", "image/png", "image/webp"], maxBytes: 10 * MB },
+  chat_photo: { types: ["image/jpeg", "image/png", "image/webp"], maxBytes: 10 * MB },
 };
 
 export const createUploadSchema = z.object({

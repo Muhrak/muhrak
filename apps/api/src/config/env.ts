@@ -76,6 +76,17 @@ const envSchema = z.object({
    * manual form.
    */
   AI_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  /**
+   * Stream Chat (Day 10, buyer–seller chat). Chat is off without all three;
+   * the secret never leaves the server (it signs chat tokens).
+   */
+  STREAM_APP_ID: z.string().trim().optional().transform((value) => value || undefined),
+  STREAM_API_KEY: z.string().trim().optional().transform((value) => value || undefined),
+  STREAM_API_SECRET: z
+    .string()
+    .optional()
+    .transform((value) => value?.trim() || undefined)
+    .refine((value) => value === undefined || value.length >= 32, "STREAM_API_SECRET looks too short"),
   GEMINI_API_KEY: z
     .string()
     .optional()

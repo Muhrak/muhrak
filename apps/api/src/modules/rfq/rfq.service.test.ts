@@ -27,7 +27,7 @@ vi.mock("../auth", () => ({ getUsersByIds: vi.fn() }));
 vi.mock("../catalog", () => ({ getLiveProductForRfq: vi.fn(), getProductSnapshots: vi.fn() }));
 vi.mock("../notification", () => ({ sendNewRfqEmail: vi.fn() }));
 vi.mock("../seller", () => ({ getSellerCompanies: vi.fn(), isSellerVerified: vi.fn() }));
-vi.mock("../../shared/jobs", () => ({ wakeWorker: vi.fn() }));
+vi.mock("../../shared/jobs", () => ({ wakeWorker: vi.fn(), enqueueJob: vi.fn(async () => true) }));
 vi.mock("../ai", () => ({ getIdentificationPhotoUpload: vi.fn() }));
 vi.mock("../upload", () => ({ getDownloadLink: vi.fn() }));
 
@@ -85,6 +85,7 @@ function row(overrides: Partial<RfqRow> = {}): RfqRow {
     deliveryCity: "Muscat",
     note: null,
     buyerPhotoUploadId: null,
+    chatOpenedAt: null,
     status: "open",
     sellerSeenAt: null,
     declineReason: null,
@@ -128,6 +129,9 @@ describe("createRfq", () => {
       TX,
     );
     expect(rfq).toMatchObject({ reference: "RQ-1001", status: "open", seller: { companyName: "Najd Equipment", countryName: "Saudi Arabia" } });
+    // Day 10: the chat is opened by a job queued in the same transaction, once per request.
+    const { enqueueJob } = await import("../../shared/jobs");
+    expect(enqueueJob).toHaveBeenCalledWith("chat", "open-rfq-chat", { rfqId: RFQ }, expect.objectContaining({ dedupeKey: `chat-open-${RFQ}`, tx: TX }));
   });
 
   it("a double submit (same request key) returns the first request: no second row, no second email", async () => {

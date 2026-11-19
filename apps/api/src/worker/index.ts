@@ -1,8 +1,9 @@
-import { AI_QUEUE, EMAIL_QUEUE } from "../schemas";
+import { AI_QUEUE, CHAT_QUEUE, EMAIL_QUEUE } from "../schemas";
 import { env } from "../config/env";
 import { claimDueJobs, markJobDone, markJobFailed, onJobAdded, releaseStaleJobs } from "../shared/jobs";
 import { logger } from "../shared/logger";
 import { failAiJob, PermanentAiJobError, runAiJob } from "../modules/ai";
+import { PermanentChatJobError, runChatJob } from "../modules/chat";
 import { expireDueRfqs } from "../modules/rfq";
 import type { EmailProvider } from "./email/email-provider";
 import { createConsoleProvider } from "./email/providers/console";
@@ -94,6 +95,26 @@ async function drainAi(): Promise<void> {
   }
 }
 
+/** Open buyer–seller chats for new quote requests (Day 10), a few at a time. */
+async function drainChat(): Promise<void> {
+  for (;;) {
+    const batch = await claimDueJobs(CHAT_QUEUE, AI_BATCH);
+    if (batch.length === 0) return;
+    await Promise.all(
+      batch.map(async (job) => {
+        try {
+          await runChatJob(job);
+          await markJobDone(job.id);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          const outcome = await markJobFailed(job, message, err instanceof PermanentChatJobError);
+          logger.error(`Chat job ${job.dedupeKey} failed, attempt ${job.attempts}, ${outcome}: ${message}`);
+        }
+      }),
+    );
+  }
+}
+
 /** Close expired quote requests, at most once a minute. Safe with several API copies (SKIP LOCKED). */
 async function sweep(): Promise<void> {
   if (Date.now() - lastSweep < SWEEP_MS) return;
@@ -120,6 +141,7 @@ function tick(): void {
       await releaseStaleJobs(STALE_MS);
       if (provider) await drainEmails(provider);
       await drainAi();
+      await drainChat();
     } catch (err) {
       logger.warn({ err: { message: err instanceof Error ? err.message : String(err) } }, "Background jobs pass failed");
     }

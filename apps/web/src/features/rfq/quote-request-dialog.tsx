@@ -31,7 +31,7 @@ import { neededByLabel, quantityLabel } from "./parts";
  * ("Filled in by Muhrak AI", "Looks right" / "Please check" chips) are left
  * out; the fields are plain inputs prefilled from the product. Added from
  * the Day 9 plan: delivery city and country, and a note. "Go to messenger"
- * becomes "See my requests" until the messenger exists (Day 10).
+ * opens the request's chat (Day 10).
  *
  * The browser makes a request key when the dialog opens; sending the form
  * twice returns the first request (no duplicate for the seller).
@@ -79,7 +79,7 @@ export function QuoteRequestDialog({ result, photo, onClose }: { result: QuoteTa
   const [sent, setSent] = useState<BuyerRfq | null>(null);
 
   // No close() on unmount: that fires "close" -> onClose, which would undo a
-  // navigation made from inside the dialog ("See my requests"). Leaving the
+  // navigation made from inside the dialog ("Go to messenger"). Leaving the
   // page removes the dialog, which takes it out of the top layer.
   useEffect(() => {
     const dialog = ref.current;
@@ -392,8 +392,8 @@ function SentView({ rfq, onClose }: { rfq: BuyerRfq; onClose: () => void }) {
         <button type="button" onClick={onClose} className={cn("flex-1 rounded-full border border-black/40 py-[15px] text-[15px] leading-[normal] font-medium hover:bg-black/4", focus)}>
           Back to results
         </button>
-        <Link href={`/buyer/requests?id=${rfq.id}`} className={cn("flex flex-1 justify-center rounded-full bg-ink py-[15px] text-[15px] leading-[normal] font-medium text-white hover:opacity-90", focus)}>
-          See my requests
+        <Link href={`/buyer/messages?rfq=${rfq.id}`} className={cn("flex flex-1 justify-center rounded-full bg-ink py-[15px] text-[15px] leading-[normal] font-medium text-white hover:opacity-90", focus)}>
+          Go to messenger
         </Link>
       </div>
     </div>

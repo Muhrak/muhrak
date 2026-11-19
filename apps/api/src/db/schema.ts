@@ -133,7 +133,7 @@ export const jobs = pgTable(
  * Muhrak AI photo search. "seller_cover" stays in the database enum because removing an enum
  * value means rebuilding the type; nothing can create one any more.
  */
-export const uploadPurpose = pgEnum("upload_purpose", ["seller_logo", "seller_cover", "seller_document", "product_photo", "part_photo"]);
+export const uploadPurpose = pgEnum("upload_purpose", ["seller_logo", "seller_cover", "seller_document", "product_photo", "part_photo", "chat_photo"]);
 export const uploadStatus = pgEnum("upload_status", ["pending", "ready", "rejected"]);
 
 /**
@@ -509,6 +509,8 @@ export const rfqs = pgTable(
      * can view it, through a short-lived link.
      */
     buyerPhotoUploadId: uuid("buyer_photo_upload_id").references(() => uploads.id),
+    /** When its buyer–seller chat was opened (Day 10); null until the background job has done it. */
+    chatOpenedAt: timestamp("chat_opened_at", { withTimezone: true }),
     status: rfqStatus("status").notNull().default("open"),
     sellerSeenAt: timestamp("seller_seen_at", { withTimezone: true }),
     declineReason: text("decline_reason"),
@@ -608,3 +610,31 @@ export type RefreshTokenRow = typeof refreshTokens.$inferSelect;
 export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;
 export type EmailVerificationTokenRow = typeof emailVerificationTokens.$inferSelect;
 export type JobRow = typeof jobs.$inferSelect;
+
+// ---------------------------------------------------------------- chat
+
+/**
+ * Photos sent in a buyer–seller chat (Day 10). Each belongs to exactly one
+ * quote request's conversation; the API gives a short-lived link only to that
+ * request's buyer or seller. Never deleted.
+ */
+export const chatPhotos = pgTable(
+  "chat_photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    rfqId: uuid("rfq_id")
+      .notNull()
+      .references(() => rfqs.id),
+    uploadId: uuid("upload_id")
+      .notNull()
+      .unique()
+      .references(() => uploads.id),
+    senderUserId: uuid("sender_user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("chat_photos_rfq_idx").on(table.rfqId, table.createdAt)],
+);
+export type ChatPhotoRow = typeof chatPhotos.$inferSelect;
+

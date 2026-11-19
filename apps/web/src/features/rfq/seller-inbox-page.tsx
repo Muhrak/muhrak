@@ -230,6 +230,13 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
         </Link>
       </div>
 
+      <Link
+        href={`/seller/messages?rfq=${encodeURIComponent(rfq.id)}`}
+        className={cn("w-fit rounded-full border border-line px-5 py-2.5 text-[15px] font-medium text-text-strong hover:bg-black/4", focusRing)}
+      >
+        Open chat with {rfq.buyer.name}
+      </Link>
+
       <div className="h-px w-full bg-line" />
       <Footer rfq={rfq} />
     </article>

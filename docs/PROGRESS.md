@@ -3,7 +3,7 @@
 Read this first in every new session, then `CLAUDE.md`, `docs/PLAN.md` and
 `docs/ARCHITECTURE.md`. Update it whenever a piece of work is committed.
 
-Last updated: Thu 19 Nov 2026 (Day 9 finished: buyer photo on requests, end-to-end check). Branch `develop`.
+Last updated: Thu 19 Nov 2026 (Day 10: buyer–seller chat on Stream). Branch `develop`.
 
 ## Status
 
@@ -382,6 +382,56 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   with the form open and pre-filled → sent (RQ-…) → saved with the right
   seller and product; a second request for the same part is refused
   ("You already have an open request…"). Test data removed.
+
+### Day 10: buyer–seller chat (Thu 19 Nov)
+- Developer decisions (19 Nov): **Stream Chat** kept (Stream app "Muhrak",
+  app id 1734996; keys in `apps/api/.env` as `STREAM_APP_ID`,
+  `STREAM_API_KEY`, `STREAM_API_SECRET`); web dependency `stream-chat`
+  9.54.4 (exact; the 10.x major was 2 days old); **photos through our own
+  private uploads**; **warn** (not block) on phone numbers / emails /
+  messenger names. The secret was pasted in chat: rotate it before launch.
+- API module `chat` (Stream over plain REST, no SDK). One conversation per
+  quote request (channel id = request id) with exactly that buyer and
+  seller, opened by a background job (`chat` queue) queued in the same
+  transaction as the request; the card is posted from the buyer with only
+  `{ type: "muhrak_rfq", rfq_id }`. Older requests get their conversation
+  when their user connects. `rfqs.chat_opened_at`, `chat_photos` table,
+  upload purpose `chat_photo` (buyer and seller; cleaned, private
+  `files/chat_photo/`). Migration `0015`, additive.
+- Security: Muhrak's own Stream channel type `rfq` (set up by the API):
+  normal users cannot create conversations, add members, upload files or
+  post attachments; members can read, write, react, reply, flag and mute.
+  Uploads and link previews off, 2,000 characters max. Each side gets its
+  own 1-hour chat token for its own user (`/v1/{buyer|seller}/chat/token`);
+  buyer and seller use separate chat clients. Photos: `POST
+  /v1/{side}/chat/:rfqId/photos` (owner's ready chat photo, used once, tied
+  to that request; the API posts it), links `GET .../photos/:uploadId` only
+  for that request's buyer or seller and only for its own photos. Names on
+  screen come from our API (Stream names can be changed by their owner).
+- Web: `/buyer/messages` and `/seller/messages` (Figma "Buyer – Messenger
+  (Dark)" 380:690 and the flow frames, converted to light): All / Unread,
+  search, conversation list with unread counts, thread with the quote
+  request card (from the API), text, photos, the contact-details warning
+  bar (no pop-ups in the zoomed Centres), "View request". Phones: list and
+  thread swap; the thread scrolls inside. "Go to messenger" on the Request
+  sent screen; "Open chat with …" in the RFQ inbox and My requests. CSP
+  allows `chat.stream-io-api.com` (https and wss).
+- Tested: 299 API tests (new: token for own user only, wrong side, chat off,
+  job opens the conversation with exactly the two members and posts the card
+  once, refused vs. retried failures, photos from outside the conversation
+  or of another conversation = 404, unusable upload refused, contact
+  pattern). Live in two real browsers against the Stream app: a real request
+  opened its conversation by itself; text both ways live (~2 s); a seller
+  photo through our uploads reached the buyer; the warning showed and "Send
+  anyway" delivered; desktop and phone. Test data removed (our DB and Stream).
+- Fixed while testing: Stream's client gives up after 3 s by default (the
+  first load timed out); now 15 s. The messenger pages needed
+  `instant = false` like the other Centre pages.
+- **Developer action before staging chat works:** add `STREAM_APP_ID`,
+  `STREAM_API_KEY`, `STREAM_API_SECRET` on Railway (service `muhrak`).
+  Without them staging chat answers "not available" (nothing breaks).
+- Not built: a sidebar unread badge for chat (it would need a chat
+  connection on every Centre page); Muhrak support conversations.
 
 ### Day 9 finished: the buyer's photo on a request + end-to-end check (Thu 19 Nov)
 - A request started from a Muhrak AI result can carry the buyer's OWN

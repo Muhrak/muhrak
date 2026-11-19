@@ -13,7 +13,7 @@ export function inTransaction<T>(work: (tx: Tx) => Promise<T>): Promise<T> {
 
 export type NewRfq = Omit<
   typeof rfqs.$inferInsert,
-  "id" | "number" | "status" | "sellerSeenAt" | "declineReason" | "closedAt" | "createdAt" | "updatedAt"
+  "id" | "number" | "status" | "sellerSeenAt" | "declineReason" | "closedAt" | "chatOpenedAt" | "createdAt" | "updatedAt"
 > & { at: Date };
 
 /**
@@ -186,3 +186,22 @@ export async function expireDue(now: Date, limit: number): Promise<number> {
   `);
   return result.rowCount ?? 0;
 }
+
+// ---------------------------------------------------------------- chat (Day 10)
+
+export async function markChatOpened(id: string, at: Date): Promise<void> {
+  await db.update(rfqs).set({ chatOpenedAt: at }).where(and(eq(rfqs.id, id), isNull(rfqs.chatOpenedAt)));
+}
+
+/** This user's newest requests whose chat is not open yet (requests sent before chat existed, or a failed job). */
+export async function listWithoutChat(side: "buyer" | "seller", userId: string, limit: number): Promise<string[]> {
+  const owner = side === "buyer" ? eq(rfqs.buyerUserId, userId) : eq(rfqs.sellerUserId, userId);
+  const rows = await db
+    .select({ id: rfqs.id })
+    .from(rfqs)
+    .where(and(owner, isNull(rfqs.chatOpenedAt)))
+    .orderBy(desc(rfqs.createdAt))
+    .limit(limit);
+  return rows.map((row) => row.id);
+}
+

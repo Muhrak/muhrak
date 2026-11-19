@@ -31,6 +31,11 @@ export function partPhotoKey(uploadId: string): string {
   return `files/part_photo/${uploadId}.webp`;
 }
 
+/** Where a chat photo's cleaned copy lives (Day 10): private (`files/`), never public. */
+export function chatPhotoKey(uploadId: string): string {
+  return `files/chat_photo/${uploadId}.webp`;
+}
+
 /** Private files the API wrote itself: never cached by browsers or proxies. */
 const PRIVATE_FILE_CACHE = "private, no-store";
 
@@ -53,6 +58,8 @@ const PURPOSE_ROLES: Record<UploadPurpose, Role[]> = {
   seller_document: ["seller"],
   product_photo: ["seller"],
   part_photo: ["buyer"],
+  // Both sides of a chat send photos; each upload is then tied to one conversation by the chat module.
+  chat_photo: ["buyer", "seller"],
 };
 
 const EXTENSION: Record<UploadContentType, string> = {
@@ -87,11 +94,7 @@ function toUpload(row: UploadRow): Upload {
   };
 }
 
-export async function createUpload(
-  user: { userId: string; role: Role },
-  input: CreateUploadInput,
-  now = new Date(),
-): Promise<CreateUploadResponse> {
+export async function createUpload(user: { userId: string; role: Role }, input: CreateUploadInput, now = new Date()): Promise<CreateUploadResponse> {
   if (!PURPOSE_ROLES[input.purpose].includes(user.role)) {
     throw forbidden("You cannot upload this kind of file");
   }
@@ -120,15 +123,13 @@ export async function createUpload(
         ? productPhotoKeys(id).large
         : input.purpose === "part_photo"
           ? partPhotoKey(id)
-          : input.purpose === "seller_logo"
-          ? logoKey(id)
-            : `files/${input.purpose}/${id}.${EXTENSION[input.contentType]}`,
+          : input.purpose === "chat_photo"
+            ? chatPhotoKey(id)
+            : input.purpose === "seller_logo"
+              ? logoKey(id)
+              : `files/${input.purpose}/${id}.${EXTENSION[input.contentType]}`,
   });
-  const link = await storage.createUploadUrl(
-    pendingKey(row.id),
-    { contentType: row.contentType, sizeBytes: row.sizeBytes },
-    UPLOAD_LINK_SECONDS,
-  );
+  const link = await storage.createUploadUrl(pendingKey(row.id), { contentType: row.contentType, sizeBytes: row.sizeBytes }, UPLOAD_LINK_SECONDS);
   return {
     uploadId: row.id,
     uploadUrl: link.url,
@@ -195,12 +196,15 @@ export async function completeUpload(userId: string, uploadId: string, now = new
       if (error instanceof PhotoRejected) throw await reject(error.message, error.userMessage);
       throw error;
     }
-  } else if (row.purpose === "part_photo") {
-    // A buyer's photo for photo search: cleaned the same way (GPS and other
-    // metadata gone), but written to the PRIVATE folder only.
+  } else if (row.purpose === "part_photo" || row.purpose === "chat_photo") {
+    // A buyer's photo for photo search, or a photo sent in a chat: cleaned the
+    // same way (GPS and other metadata gone), but written to the PRIVATE folder only.
     try {
       const photo = await processProductPhoto(await storage.read(source, stored.etag));
-      await storage.put(partPhotoKey(row.id), photo.large, { contentType: "image/webp", cacheControl: PRIVATE_FILE_CACHE });
+      await storage.put(row.purpose === "part_photo" ? partPhotoKey(row.id) : chatPhotoKey(row.id), photo.large, {
+        contentType: "image/webp",
+        cacheControl: PRIVATE_FILE_CACHE,
+      });
     } catch (error) {
       if (error instanceof PhotoRejected) throw await reject(error.message, error.userMessage);
       throw error;
@@ -304,7 +308,11 @@ export async function getOwnedPartPhotoLink(userId: string, uploadId: string, ex
   if (!row || row.ownerUserId !== userId || row.status !== "ready" || row.purpose !== "part_photo") {
     throw notFound("Photo not found");
   }
-  const url = await getStorage().createDownloadUrl(partPhotoKey(row.id), { contentType: "image/webp", fileName: "part-photo.webp" }, expiresInSeconds);
+  const url = await getStorage().createDownloadUrl(
+    partPhotoKey(row.id),
+    { contentType: "image/webp", fileName: "part-photo.webp" },
+    expiresInSeconds,
+  );
   return { url, expiresAt: new Date(now.getTime() + expiresInSeconds * 1000).toISOString() };
 }
 

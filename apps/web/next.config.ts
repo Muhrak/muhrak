@@ -42,10 +42,12 @@ const STORAGE_ORIGIN = (() => {
  * everything is 'self'. Script files also carry build-time integrity
  * hashes (SRI, below).
  * - connect-src 'self': scripts can only talk to this site (the API is
- *   proxied under /api), so injected code has nowhere to send data.
+ *   proxied under /api), storage uploads and the Stream Chat connection.
  * - frame-ancestors 'none': no clickjacking.
  * Dev only: 'unsafe-eval' (React dev tooling) and ws: (hot reload).
  */
+const STREAM_CHAT_ORIGINS = "https://chat.stream-io-api.com wss://chat.stream-io-api.com";
+
 const csp = [
   "default-src 'self'",
   // 'unsafe-inline' is needed: Next.js streams page data in inline <script>
@@ -57,7 +59,9 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob:${STORAGE_ORIGIN ? ` ${STORAGE_ORIGIN}` : ""}`,
   "font-src 'self'",
-  `connect-src 'self'${STORAGE_ORIGIN ? ` ${STORAGE_ORIGIN}` : ""}${isDev ? " ws:" : ""}`,
+  // Stream Chat (Day 10): the buyer–seller chat's live connection (REST + WebSocket). Only
+  // messages travel there; photos and the quote request card come from our own API.
+  `connect-src 'self'${STORAGE_ORIGIN ? ` ${STORAGE_ORIGIN}` : ""} ${STREAM_CHAT_ORIGINS}${isDev ? " ws:" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
