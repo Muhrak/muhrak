@@ -195,7 +195,13 @@ function Inbox({ side, client, userId, pending }: { side: PortalSide; client: St
         ))}
       </div>
 
-      <div className="grid gap-5 lg:h-[calc(100dvh/0.85-250px)] lg:min-h-[520px] lg:grid-cols-[minmax(300px,380px)_1fr]">
+      {/* Fills the screen: the seller page is zoomed to 85% (so its height is divided by 0.85), the buyer page is not. */}
+      <div
+        className={cn(
+          "grid gap-5 lg:min-h-[520px] lg:grid-cols-[minmax(300px,380px)_1fr]",
+          side === "seller" ? "lg:h-[calc(100dvh/0.85-250px)]" : "lg:h-[calc(100dvh-213px)]",
+        )}
+      >
         {/* Conversations (hidden on phones while one is open). */}
         <aside className={cn("flex min-h-0 flex-col gap-3 rounded-[24px] bg-panel p-4", active && "max-lg:hidden")}>
           <label className="flex h-11 items-center gap-2.5 rounded-full bg-surface px-4">

@@ -855,6 +855,11 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   at 85% (`zoom: 0.85` on `<main>` in `portal-shell.tsx`), like a
   zoomed-out browser. Buyer Centre pages have no pop-up dialogs (a zoomed
   parent would misplace them); keep it that way or revisit.
+- **Undone on Thu 19 Nov (developer request):** the Buyer Centre is at
+  full size again. The zoom stays on the Seller Centre only (`side ===
+  "seller"` in `portal-shell.tsx`); the messenger's height formula is per
+  side (seller divided by 0.85, buyer not). Checked on screen at 1440:
+  dashboard and messenger fit.
 
 ### Sellers page arranged like a shop listing (Tue 17 Nov, developer request)
 - `/sellers`: the aurora hero, shortened to 320 px on desktop by squashing
