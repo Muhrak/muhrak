@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowUp, Camera, ChevronLeft, ChevronRight, ClipboardList, House, ImageIcon, Loader2, Pencil, Plus, RotateCcw, Store, X } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, use, useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
@@ -594,11 +593,14 @@ const AI_NAV = [
 function AiHeader() {
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 bg-white/75 px-4 backdrop-blur-md sm:h-[72px] sm:px-8">
-      <Link href="/" aria-label="Muhrak home" className="flex shrink-0 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-        <Image src="/auth/muhrak-logo.svg" alt="Muhrak" width={128} height={24.44} priority />
+      {/* One Muhrak AI logo (developer, 21 Nov 2026): mark and name share a slowly flowing blue gradient with a soft glow. */}
+      <Link href="/ai" aria-label="Muhrak AI" className="ai-logo relative isolate flex shrink-0 items-center gap-2 rounded-full py-1 pr-1 outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+        <span aria-hidden className="ai-logo-glow" />
+        <span aria-hidden className="ai-logo-mark size-[30px] shrink-0 sm:size-[34px]" />
+        <span aria-hidden className="ai-logo-text text-[21px] leading-none font-bold tracking-[-0.02em] whitespace-nowrap sm:text-[23px]">
+          Muhrak AI
+        </span>
       </Link>
-      <span aria-hidden className="h-5 w-px bg-black/12" />
-      <span className="text-[15px] font-semibold whitespace-nowrap text-sky-blue">Muhrak AI</span>
       <div className="flex-1" />
       <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
         {AI_NAV.map(({ href, label, icon: Icon }) => (
