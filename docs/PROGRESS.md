@@ -480,12 +480,18 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
 - A short two-note chime (`features/chat/bell.ts`, Web Audio, no sound
   file) plays for every message from the other side, on any Centre page.
   Not for your own messages, not for the conversation you are reading,
-  at most once per 1.5 s. Browsers allow sound only after a first click
-  or key press on the page.
-- Checked end to end: rings on the dashboard and RFQ Inbox, silent for
-  own messages, Messenger still loads.
+  at most once per 1.5 s.
+- Browsers allow sound in a tab only after a click there since it loaded
+  (developer saw no ring on staging for that reason). So: a message that
+  could not ring shows a corner prompt "New message · Turn on sound" (one
+  click turns sound on and rings once); the sidebar has a "Message sound"
+  switch (on / off / "Turn on message sound" when blocked), remembered in
+  this browser.
+- Checked end to end (13 checks): blocked → prompt → one click rings;
+  rings on the dashboard and RFQ Inbox; silent for own messages and when
+  muted; mute remembered after reload; Messenger still loads.
 - Not built yet (discussed): Messages unread badge, live RFQ updates
-  (SSE), chat email after a delay, mute switch.
+  (SSE), chat email after a delay.
 
 ### Muhrak AI page touches (Sat 21 Nov, developer requests)
 - Search box: only the black send button, shown once something is typed

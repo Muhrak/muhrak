@@ -3,8 +3,9 @@
 import { createContext, useContext, useEffect, type ReactNode } from "react";
 import type { Event } from "stream-chat";
 import type { PortalSide } from "@/features/auth/paths";
+import { BellRing } from "lucide-react";
 import { useChatClient, type ChatState } from "./api";
-import { ringBell, unlockBell } from "./bell";
+import { ringBell, turnOnSoundAndRing, unlockBell, useMissedRing } from "./bell";
 
 /**
  * One chat connection per side for the whole Buyer or Seller Centre
@@ -20,15 +21,16 @@ export function ChatProvider({ side, children }: { side: PortalSide; children: R
   const client = chat.status === "ready" ? chat.client : null;
   const userId = chat.status === "ready" ? chat.userId : null;
 
-  // Sound is allowed only after a click or key press on the page.
+  // Sound is allowed only after a click, tap or key press in this tab (phones count "touchend" and "click").
   useEffect(() => {
-    const unlock = () => unlockBell();
-    window.addEventListener("pointerdown", unlock);
-    window.addEventListener("keydown", unlock);
-    return () => {
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
+    // The prompt below handles its own click (it also rings once), so skip it here.
+    const unlock = (event: globalThis.Event) => {
+      if (event.target instanceof Element && event.target.closest("[data-sound-prompt]")) return;
+      unlockBell();
     };
+    const events = ["pointerdown", "click", "touchend", "keydown"] as const;
+    events.forEach((type) => window.addEventListener(type, unlock, { capture: true }));
+    return () => events.forEach((type) => window.removeEventListener(type, unlock, { capture: true }));
   }, []);
 
   // Ring for messages from the other side. Watched conversations (Messenger open) send "message.new"; the rest
@@ -50,7 +52,12 @@ export function ChatProvider({ side, children }: { side: PortalSide; children: R
     return () => subs.forEach((sub) => sub.unsubscribe());
   }, [client, userId]);
 
-  return <ChatContext.Provider value={chat}>{children}</ChatContext.Provider>;
+  return (
+    <ChatContext.Provider value={chat}>
+      {children}
+      <MissedRingPrompt />
+    </ChatContext.Provider>
+  );
 }
 
 /** This side's chat connection (from the Centre's ChatProvider). */
@@ -58,4 +65,28 @@ export function useChat(): ChatState {
   const chat = useContext(ChatContext);
   if (!chat) throw new Error("useChat needs a ChatProvider (the Buyer or Seller Centre layout).");
   return chat;
+}
+
+/**
+ * A message came in but the browser blocked the bell (no click in this tab
+ * yet): a small prompt in the corner. One click turns sound on and rings
+ * once; any click elsewhere on the page also turns it on and hides this.
+ */
+function MissedRingPrompt() {
+  const missed = useMissedRing();
+  if (!missed) return null;
+  return (
+    <button
+      type="button"
+      data-sound-prompt
+      onClick={turnOnSoundAndRing}
+      className="fixed right-4 bottom-4 z-50 flex items-center gap-2.5 rounded-full bg-text-strong py-2.5 pr-4 pl-3 text-sm font-medium text-white shadow-[0_12px_30px_-10px_rgba(10,11,18,0.45)] outline-none hover:opacity-95 focus-visible:ring-3 focus-visible:ring-brand-blue/40"
+    >
+      <span className="relative flex">
+        <BellRing aria-hidden className="size-[18px]" strokeWidth={1.75} />
+        <span aria-hidden className="absolute -top-0.5 -right-0.5 size-2 animate-pulse rounded-full bg-seller-orange" />
+      </span>
+      New message · Turn on sound
+    </button>
+  );
 }

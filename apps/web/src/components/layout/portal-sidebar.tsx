@@ -1,5 +1,6 @@
 "use client";
 
+import { Bell, BellOff, BellRing } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -8,6 +9,7 @@ import { useCurrentUser, useSignOut } from "@/features/auth/hooks";
 import { LANDING_PATH, type PortalSide } from "@/features/auth/paths";
 import { initials } from "@/features/auth/user-display";
 import { useSellerUnseenRfqs } from "@/features/rfq/api";
+import { setMessageSound, useBellState } from "@/features/chat/bell";
 import { cn } from "@/lib/utils";
 import { Icon } from "./icon";
 import { isGroup, PORTAL_NAV, type NavGroup, type NavLink } from "./portal-nav";
@@ -107,6 +109,8 @@ export function PortalSidebar({ side, onNavigate }: { side: PortalSide; onNaviga
       </nav>
 
       <div className="min-h-6 flex-1" />
+
+      <MessageSoundSwitch className={style.item} />
 
       <div className={cn("flex items-center gap-3 rounded-[20px] p-3.5", style.accountCard)}>
         <span
@@ -231,5 +235,34 @@ function UnseenRfqBadge() {
       {count > 99 ? "99+" : count}
       <span className="sr-only"> unread</span>
     </span>
+  );
+}
+
+/**
+ * New-message bell on/off (developer request, 21 Nov 2026). Browsers allow
+ * sound in a tab only after a click there, so "blocked" asks for that click.
+ */
+function MessageSoundSwitch({ className }: { className: string }) {
+  const state = useBellState();
+  const label = state === "on" ? "Message sound on" : state === "off" ? "Message sound off" : "Turn on message sound";
+  const Glyph = state === "on" ? Bell : state === "off" ? BellOff : BellRing;
+  return (
+    <button
+      type="button"
+      aria-pressed={state === "on"}
+      title={state === "blocked" ? "Your browser needs one click in this tab before it can play sounds" : undefined}
+      onClick={() => setMessageSound(state !== "on")}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-full px-3.5 text-left leading-[1.2] outline-none transition-colors hover:bg-white/5 focus-visible:ring-3 focus-visible:ring-white/30",
+        state === "blocked" ? "text-white" : "text-sidebar-text hover:text-white",
+        className,
+      )}
+    >
+      <span className="relative flex shrink-0">
+        <Glyph aria-hidden className="size-[18px]" strokeWidth={1.75} />
+        {state === "blocked" ? <span aria-hidden className="absolute -top-0.5 -right-0.5 size-2 animate-pulse rounded-full bg-seller-orange" /> : null}
+      </span>
+      <span className="flex-1">{label}</span>
+    </button>
   );
 }
