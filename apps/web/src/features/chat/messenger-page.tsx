@@ -21,7 +21,8 @@ import { focusRing } from "@/features/seller/parts";
 import { acceptFor, checkFile } from "@/features/upload/upload-file";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { sendChatPhoto, useChatClient, useChatPhoto } from "./api";
+import { sendChatPhoto, useChatPhoto } from "./api";
+import { useChat } from "./chat-provider";
 
 
 /**
@@ -88,7 +89,7 @@ function dayLabel(date: Date, now = new Date()): string {
 const PAGE = 30;
 
 export function MessengerPage({ side }: { side: PortalSide }) {
-  const chat = useChatClient(side);
+  const chat = useChat(); // the Centre's connection (opened by the layout, kept between pages)
   return (
     // One panel that fills the screen (no page scroll), shared with Inquiries & RFQs and the RFQ Inbox.
     <WorkspacePanel

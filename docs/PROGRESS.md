@@ -473,6 +473,32 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   and decision, DB checks (name and bank proof switched, old file kept,
   still verified, audit row, email).
 
+### New-message bell (Sat 21 Nov, developer request)
+- The chat connection now lives in the Buyer and Seller Centre layout
+  (`features/chat/chat-provider.tsx`, one per side, kept between pages);
+  the Messenger uses it (`useChat`), so it opens already connected.
+- A short two-note chime (`features/chat/bell.ts`, Web Audio, no sound
+  file) plays for every message from the other side, on any Centre page.
+  Not for your own messages, not for the conversation you are reading,
+  at most once per 1.5 s. Browsers allow sound only after a first click
+  or key press on the page.
+- Checked end to end: rings on the dashboard and RFQ Inbox, silent for
+  own messages, Messenger still loads.
+- Not built yet (discussed): Messages unread badge, live RFQ updates
+  (SSE), chat email after a delay, mute switch.
+
+### Muhrak AI page touches (Sat 21 Nov, developer requests)
+- Search box: only the black send button, shown once something is typed
+  (no browser "x", hidden site-wide in `globals.css`; no grey icon).
+- One logo: a four-point sparkle in the Muhrak blues (colours drift, it
+  breathes; still with reduced motion) + bold "Muhrak AI"; plain
+  background behind it.
+
+### Staging data (Sat 21 Nov, developer request)
+- 10 filter products added to DQC (dqc@gmail.com) through the API,
+  15-FB-04 to 15-FB-13, with AI-made photos (Figma file "Muhrak product
+  photos"); replace with real photos before real buyers.
+
 ### Inquiries & RFQs and RFQ Inbox: same full-height workspace (Sat 21 Nov, developer request)
 - Shared layout in `components/layout/workspace.tsx`: `WorkspacePanel`
   (one panel filling the screen, compact title + description, header
