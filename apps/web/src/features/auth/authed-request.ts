@@ -1,6 +1,6 @@
 import { authResponseSchema } from "@/schemas";
 import type { ZodType } from "zod";
-import { ApiError, apiRequest, apiRequestNoContent, type RequestOptions } from "@/lib/api";
+import { ApiError, apiRequest, apiRequestFile, apiRequestNoContent, type RequestOptions } from "@/lib/api";
 import type { AuthSide } from "./paths";
 import { clearSession, getAccessToken, getSession, saveSession } from "./session";
 
@@ -128,4 +128,9 @@ export function authedRequestNoContent(
   options: Omit<RequestOptions, "accessToken"> = {},
 ): Promise<void> {
   return withAuth(side, (accessToken) => apiRequestNoContent(path, { ...options, accessToken }));
+}
+
+/** Download a file as the signed-in user of `side` (e.g. a quotation PDF). */
+export function authedFile(side: AuthSide, path: string): Promise<{ blob: Blob; filename: string | null }> {
+  return withAuth(side, (accessToken) => apiRequestFile(path, { accessToken }));
 }

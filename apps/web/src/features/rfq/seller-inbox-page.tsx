@@ -12,13 +12,17 @@ import { useDeclineRfq, useSellerRfq, useSellerRfqs } from "./api";
 import { BuyerPhotos, closesIn, DetailTiles, neededByLabel, quantityLabel, RfqChip, sellerStatus, sentAgo, shortAge, Thumb } from "./parts";
 import { LogoLoader } from "@/components/ui/logo-loader";
 import { useToast } from "@/components/ui/toast";
+import { useRfqQuotes } from "@/features/quotation/api";
+import { RfqQuotes } from "@/features/quotation/quote-view";
+import { SendQuoteDialog } from "@/features/quotation/send-quote-dialog";
 
 /**
  * /seller/rfq-inbox: Figma "Seller – RFQ Inbox (Dark)" (177:731), converted
  * to the light Seller Centre palette (as "Seller – Products"). Left out: the
  * theme toggle (light only), "Condition" (requests do not ask for one) and
- * "Photo from buyer" (comes with the AI photo route). The "Send quote"
- * fields come with quotations (Day 11); today a seller can read and decline.
+ * "Photo from buyer" (comes with the AI photo route). "Send quote" (Day 11)
+ * opens the quotation form; the request then shows its quotations (PDF,
+ * withdraw, revise).
  *
  * Tabs: All / New (waiting for your reply) / Replied / Closed. The open
  * request is in the URL (?id=), so the link in the seller's email opens it.
@@ -237,6 +241,8 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
         Open chat with {rfq.buyer.name}
       </Link>
 
+      <RfqQuotes side="seller" rfqId={rfq.id} />
+
       <div className="h-px w-full bg-line" />
       <Footer rfq={rfq} />
     </article>
@@ -248,13 +254,33 @@ function Footer({ rfq }: { rfq: SellerRfq }) {
   const toast = useToast();
   const [asking, setAsking] = useState(false);
   const [reason, setReason] = useState("");
+  const [quoting, setQuoting] = useState(false);
+  const quotes = useRfqQuotes("seller", rfq.id);
+  const active = quotes.data?.find((quote) => quote.status === "active");
+  const dialog = quoting ? <SendQuoteDialog rfq={rfq} revising={active} onClose={() => setQuoting(false)} /> : null;
 
   if (rfq.status === "declined") {
     return <p className="text-sm text-text-muted">You declined this request{rfq.declineReason ? `: “${rfq.declineReason}”` : "."}</p>;
   }
   if (rfq.status === "cancelled") return <p className="text-sm text-text-muted">The buyer cancelled this request.</p>;
   if (rfq.status === "expired") return <p className="text-sm text-text-muted">This request closed after 7 days without a reply.</p>;
-  if (rfq.status === "quoted") return <p className="text-sm text-text-muted">You replied with a quote.</p>;
+  if (rfq.status === "quoted") {
+    return (
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="min-w-0 flex-1 text-sm text-text-muted">
+          {active ? "You replied with a quotation. Send a revised one if the price or terms change." : "Your quotation is no longer valid. Send a new one if you can still supply."}
+        </p>
+        <button
+          type="button"
+          onClick={() => setQuoting(true)}
+          className={cn("h-11 rounded-full border border-line px-5 text-[15px] font-medium text-text-strong hover:bg-black/4", focusRing)}
+        >
+          {active ? "Send revised quotation" : "Send new quotation"}
+        </button>
+        {dialog}
+      </div>
+    );
+  }
 
   const error = decline.error instanceof ApiError ? decline.error.message : decline.error ? "Something went wrong. Please try again." : null;
 
@@ -303,6 +329,13 @@ function Footer({ rfq }: { rfq: SellerRfq }) {
           <p className="flex-1 text-sm text-text-muted">{closesIn(rfq.expiresAt)} if you do not reply.</p>
           <button
             type="button"
+            onClick={() => setQuoting(true)}
+            className={cn("h-11 rounded-full bg-side-accent px-6 text-[15px] font-semibold text-white hover:opacity-90", focusRing)}
+          >
+            Send quote
+          </button>
+          <button
+            type="button"
             onClick={() => {
               decline.reset();
               setAsking(true);
@@ -318,6 +351,7 @@ function Footer({ rfq }: { rfq: SellerRfq }) {
           {error}
         </p>
       ) : null}
+      {dialog}
     </div>
   );
 }

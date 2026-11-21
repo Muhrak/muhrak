@@ -3,6 +3,7 @@
  */
 export {
   sendAccountExistsEmail,
+  sendNewQuoteEmail,
   sendNewRfqEmail,
   sendPasswordResetEmail,
   sendSellerChangesNeededEmail,

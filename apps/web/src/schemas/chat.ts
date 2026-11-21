@@ -20,6 +20,8 @@ export const CHAT_ATTACHMENT = {
   rfq: "muhrak_rfq",
   /** A photo sent through Muhrak's uploads: `{ type, upload_id }`. */
   photo: "muhrak_photo",
+  /** A quotation card (Day 11): `{ type, quote_id }`, posted from the seller; drawn from the API. */
+  quote: "muhrak_quote",
 } as const;
 
 /** GET /v1/{buyer|seller}/chat/token: connect this side's chat. */

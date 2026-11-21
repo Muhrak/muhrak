@@ -9,6 +9,7 @@ import { authRouter } from "./modules/auth";
 import { catalogRouter, sellerProductsRouter } from "./modules/catalog";
 import { healthRouter } from "./modules/health/health.routes";
 import { maintenanceGate, statusRouter } from "./modules/maintenance";
+import { buyerQuoteRouter, sellerQuoteRouter } from "./modules/quotation";
 import { buyerRfqRouter, sellerRfqRouter } from "./modules/rfq";
 import { sellerRouter } from "./modules/seller";
 import { partSearchRouter, storefrontRouter } from "./modules/storefront";
@@ -46,9 +47,11 @@ export function createApp() {
   v1.use("/parts", partSearchRouter);
   // The signed-in buyer's own data.
   v1.use("/buyer/rfqs", buyerRfqRouter);
+  v1.use("/buyer/quotes", buyerQuoteRouter);
   // Before /seller: these sub-routers have their own auth and limits.
   v1.use("/seller/products", sellerProductsRouter);
   v1.use("/seller/rfqs", sellerRfqRouter);
+  v1.use("/seller/quotes", sellerQuoteRouter);
   v1.use("/seller/ai", sellerAiRouter);
   v1.use("/buyer/ai", buyerAiRouter);
   v1.use("/buyer/chat", buyerChatRouter);

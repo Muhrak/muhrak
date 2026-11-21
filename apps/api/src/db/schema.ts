@@ -568,6 +568,115 @@ export const rfqBuyerPhotos = pgTable(
 
 export type RfqBuyerPhotoRow = typeof rfqBuyerPhotos.$inferSelect;
 
+// ---------------------------------------------------------------- quotation (Day 11)
+
+export const quotationStatus = pgEnum("quotation_status", ["active", "withdrawn", "superseded", "expired"]);
+
+/**
+ * A seller's priced answer to a quote request (Day 11, 21 Nov 2026). Never
+ * deleted and never edited after it is sent: a revision is a NEW row and
+ * the old one becomes "superseded". Status changes only through
+ * QUOTE_TRANSITIONS in quotation.service.ts, as conditional updates.
+ *
+ * - Money: whole baisa (bigint) with the currency; every amount computed by
+ *   the server. total = subtotal + shipping + vat (checked here too).
+ * - (seller, quote_key) is unique: a double submit returns the first one.
+ * - At most one ACTIVE quotation per request.
+ * - Names and places are copied when it is sent, so the document (and its
+ *   PDF) never changes afterwards. No email or phone of either side.
+ */
+export const quotations = pgTable(
+  "quotations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Human reference "QT-<number>". */
+    number: integer("number").notNull().generatedAlwaysAsIdentity({ startWith: 1001 }),
+    rfqId: uuid("rfq_id")
+      .notNull()
+      .references(() => rfqs.id),
+    sellerUserId: uuid("seller_user_id")
+      .notNull()
+      .references(() => users.id),
+    buyerUserId: uuid("buyer_user_id")
+      .notNull()
+      .references(() => users.id),
+    quoteKey: uuid("quote_key").notNull(),
+    status: quotationStatus("status").notNull().default("active"),
+    currency: text("currency").notNull(),
+    subtotalAmount: bigint("subtotal_amount", { mode: "number" }).notNull(),
+    shippingAmount: bigint("shipping_amount", { mode: "number" }).notNull(),
+    vatRateBp: integer("vat_rate_bp").notNull(),
+    vatAmount: bigint("vat_amount", { mode: "number" }).notNull(),
+    totalAmount: bigint("total_amount", { mode: "number" }).notNull(),
+    deliveryDays: integer("delivery_days").notNull(),
+    validDays: integer("valid_days").notNull(),
+    validUntil: timestamp("valid_until", { withTimezone: true, precision: 3 }).notNull(),
+    terms: text("terms"),
+    notes: text("notes"),
+    /** Copies taken when it was sent (the document never changes). */
+    sellerCompanyName: text("seller_company_name").notNull(),
+    sellerCity: text("seller_city").notNull(),
+    sellerCountry: text("seller_country").notNull(),
+    buyerName: text("buyer_name").notNull(),
+    deliveryCity: text("delivery_city").notNull(),
+    deliveryCountry: text("delivery_country").notNull(),
+    closedAt: timestamp("closed_at", { withTimezone: true, precision: 3 }),
+    // Millisecond precision (like JavaScript dates) so list cursors are exact.
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("quotations_number_idx").on(table.number),
+    uniqueIndex("quotations_seller_key_idx").on(table.sellerUserId, table.quoteKey),
+    uniqueIndex("quotations_one_active_per_rfq_idx")
+      .on(table.rfqId)
+      .where(sql`${table.status} = 'active'`),
+    // A request's quotations, newest first (keyset cursor on created_at, id).
+    index("quotations_rfq_created_idx").on(table.rfqId, table.createdAt, table.id),
+    // The expiry sweep: active quotations by end of validity.
+    index("quotations_active_valid_idx")
+      .on(table.validUntil)
+      .where(sql`${table.status} = 'active'`),
+    check("quotations_currency", sql`${table.currency} = 'OMR'`),
+    check(
+      "quotations_amounts",
+      sql`${table.subtotalAmount} > 0 AND ${table.shippingAmount} >= 0 AND ${table.vatAmount} >= 0 AND ${table.totalAmount} = ${table.subtotalAmount} + ${table.shippingAmount} + ${table.vatAmount} AND ${table.totalAmount} <= 10000000000`,
+    ),
+    check("quotations_vat_rate", sql`${table.vatRateBp} IN (0, 500)`),
+    check("quotations_delivery_days", sql`${table.deliveryDays} BETWEEN 1 AND 365`),
+    check("quotations_valid_days", sql`${table.validDays} BETWEEN 1 AND 30`),
+    check("quotations_closed_at", sql`(${table.status} = 'active') = (${table.closedAt} IS NULL)`),
+    check("quotations_buyer_not_seller", sql`${table.buyerUserId} <> ${table.sellerUserId}`),
+  ],
+);
+
+export type QuotationRow = typeof quotations.$inferSelect;
+
+/** The items of a quotation, in order (positions 1-50). Written once with the quotation; never changed. */
+export const quotationItems = pgTable(
+  "quotation_items",
+  {
+    quotationId: uuid("quotation_id")
+      .notNull()
+      .references(() => quotations.id),
+    position: integer("position").notNull(),
+    partNumber: text("part_number"),
+    description: text("description").notNull(),
+    details: text("details"),
+    quantity: integer("quantity").notNull(),
+    unitPriceAmount: bigint("unit_price_amount", { mode: "number" }).notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.quotationId, table.position] }),
+    check("quotation_items_position", sql`${table.position} BETWEEN 1 AND 50`),
+    check("quotation_items_quantity", sql`${table.quantity} BETWEEN 1 AND 100000`),
+    check("quotation_items_amount", sql`${table.unitPriceAmount} > 0 AND ${table.amount} = ${table.unitPriceAmount} * ${table.quantity}`),
+  ],
+);
+
+export type QuotationItemRow = typeof quotationItems.$inferSelect;
+
 // ---------------------------------------------------------------- ai
 
 export const aiIdentificationStatus = pgEnum("ai_identification_status", ["pending", "running", "done", "failed"]);

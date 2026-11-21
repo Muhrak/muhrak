@@ -7,6 +7,7 @@ export {
   getSellerForAdmin,
   getSellerStatsForAdmin,
   getSellerCompanies,
+  getSellerForQuote,
   getVerifiedSellerProfile,
   getVerifiedSellerProfiles,
   isSellerVerified,

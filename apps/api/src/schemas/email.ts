@@ -73,5 +73,23 @@ export const emailJobSchema = z.discriminatedUnion("template", [
       inboxUrl: z.string().url(),
     }),
   }),
+  z.object({
+    /** A seller sent the buyer a quotation (Day 11). */
+    template: z.literal("quote-new"),
+    to: z.string().email(),
+    data: z.object({
+      fullName: z.string(),
+      quoteReference: z.string(),
+      rfqReference: z.string(),
+      sellerName: z.string(),
+      partName: z.string(),
+      itemCount: z.number().int().positive(),
+      total: z.string(),
+      deliveryDays: z.number().int().positive(),
+      validUntil: z.string(),
+      revised: z.boolean(),
+      requestUrl: z.string().url(),
+    }),
+  }),
 ]);
 export type EmailJob = z.infer<typeof emailJobSchema>;

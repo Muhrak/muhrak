@@ -13,12 +13,14 @@ import { useBuyerRfq, useBuyerRfqs, useCancelRfq } from "./api";
 import { BuyerPhotos, buyerStatus, closesIn, DetailTiles, neededByLabel, quantityLabel, RfqChip, sentAgo } from "./parts";
 import { LogoLoader } from "@/components/ui/logo-loader";
 import { useToast } from "@/components/ui/toast";
+import { RfqQuotes } from "@/features/quotation/quote-view";
 
 /**
  * /buyer/requests: Figma "Buyer – Inquiries & RFQs (Dark)" (304:12),
  * converted to the light Buyer Centre palette. Each request went to one
  * seller (developer decision, 15 Nov 2026), so the detail shows that
- * seller instead of a list of quotes; quotes arrive with Day 11. Filters:
+ * seller; the seller's quotations (Day 11) show under it, newest first, each
+ * with its PDF. Filters:
  * All / Open / Quoted / Closed (there are no separate "inquiries" yet).
  * Left out: the theme toggle (light only) and the AI block (text search
  * requests have no photo).
@@ -248,6 +250,8 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
         Open chat with {rfq.seller.companyName}
       </Link>
 
+      <RfqQuotes side="buyer" rfqId={rfq.id} />
+
       <div className="h-px w-full bg-line" />
       <Outcome rfq={rfq} />
     </article>
@@ -283,7 +287,9 @@ function Outcome({ rfq }: { rfq: BuyerRfq }) {
       </div>
     );
   }
-  if (rfq.status === "quoted") return <p className="text-[15px] text-text-body">{rfq.seller.companyName} sent you a quote.</p>;
+  if (rfq.status === "quoted") {
+    return <p className="text-[15px] text-text-body">{rfq.seller.companyName} sent you a quotation. Ask them anything about it in the chat.</p>;
+  }
 
   return (
     <div className="flex flex-col gap-3">

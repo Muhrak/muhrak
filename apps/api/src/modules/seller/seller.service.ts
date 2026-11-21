@@ -562,3 +562,17 @@ export async function getSellerCompanies(userIds: string[]): Promise<Map<string,
   const rows = await repo.findProfilesByIds([...new Set(userIds)]);
   return new Map(rows.map((row) => [row.userId, { companyName: row.companyName, city: row.city, country: row.country as GccCountry }]));
 }
+
+// ---------------------------------------------------------------- for the quotation module (Day 11)
+
+/**
+ * What a quotation needs about its seller, ONLY while the seller is verified
+ * (an unverified seller cannot send quotations). Never email or phone.
+ */
+export async function getSellerForQuote(
+  userId: string,
+): Promise<{ companyName: string; city: string; country: GccCountry; vatRegistered: boolean } | undefined> {
+  const row = await repo.findProfile(userId);
+  if (!row || row.verificationStatus !== "approved") return undefined;
+  return { companyName: row.companyName, city: row.city, country: row.country as GccCountry, vatRegistered: row.vatRegistered };
+}

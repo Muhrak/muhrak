@@ -233,5 +233,50 @@ export function renderEmail(job: EmailJob): RenderedEmail {
         ),
       };
     }
+    case "quote-new": {
+      const { fullName, quoteReference, rfqReference, sellerName, partName, itemCount, total, deliveryDays, validUntil, revised, requestUrl } = job.data;
+      const url = escapeHtml(requestUrl);
+      const rows: [string, string][] = [
+        ["From", sellerName],
+        ["For", itemCount > 1 ? `${partName} and ${itemCount - 1} more item${itemCount > 2 ? "s" : ""}` : partName],
+        ["Total", total],
+        ["Delivery", `${deliveryDays} day${deliveryDays === 1 ? "" : "s"} after payment`],
+        ["Valid until", validUntil],
+      ];
+      const rowHtml = rows
+        .map(
+          ([label, value]) =>
+            `<tr><td style="font-size:13px;color:#6b6b73;padding:6px 16px 6px 0;white-space:nowrap;vertical-align:top;">${escapeHtml(label)}</td><td style="font-size:14px;color:#0a0a0a;padding:6px 0;${label === "Total" ? "font-weight:bold;" : ""}">${escapeHtml(value)}</td></tr>`,
+        )
+        .join("");
+      const intro = revised
+        ? `${sellerName} sent you a revised quotation (${quoteReference}) for your request ${rfqReference}. It replaces their earlier one.`
+        : `${sellerName} sent you a quotation (${quoteReference}) for your request ${rfqReference}.`;
+      return {
+        subject: `${revised ? "Revised quotation" : "New quotation"} ${quoteReference} from ${sellerName}`,
+        text: [
+          `Hi ${fullName},`,
+          "",
+          intro,
+          "",
+          ...rows.map(([label, value]) => `${label}: ${value}`),
+          "",
+          `See the quotation and download the PDF: ${requestUrl}`,
+          "",
+          "Pay only on Muhrak. Payments made outside Muhrak are not protected.",
+        ].join("\n"),
+        html: layout(
+          revised ? "Revised quotation" : "New quotation",
+          `<tr><td style="font-size:15px;line-height:1.5;color:#3a3a40;padding-bottom:16px;">
+            Hi ${escapeHtml(fullName)}, ${escapeHtml(intro)}
+          </td></tr>
+          <tr><td style="padding-bottom:20px;"><table role="presentation" cellpadding="0" cellspacing="0">${rowHtml}</table></td></tr>
+          <tr><td style="padding-bottom:16px;">
+            <a href="${url}" style="display:inline-block;background:#0a0b12;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold;padding:14px 28px;border-radius:999px;">See the quotation</a>
+          </td></tr>
+          <tr><td style="font-size:13px;line-height:1.5;color:#6b6b73;">Pay only on Muhrak. Payments made outside Muhrak are not protected.</td></tr>`,
+        ),
+      };
+    }
   }
 }

@@ -104,3 +104,11 @@ export async function apiRequest<T>(path: string, schema: ZodType<T>, options: R
 export async function apiRequestNoContent(path: string, options: RequestOptions = {}): Promise<void> {
   await send(path, options);
 }
+
+/** Call an endpoint that returns a file (e.g. a quotation PDF): the bytes and the file name the API suggests. */
+export async function apiRequestFile(path: string, options: RequestOptions = {}): Promise<{ blob: Blob; filename: string | null }> {
+  const response = await send(path, options);
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename="([^"]+)"/.exec(disposition);
+  return { blob: await response.blob(), filename: match?.[1] ?? null };
+}

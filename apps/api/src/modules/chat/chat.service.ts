@@ -6,6 +6,7 @@ import { AppError, notFound } from "../../shared/errors";
 import { enqueueJob, wakeWorker } from "../../shared/jobs";
 import { logger } from "../../shared/logger";
 import { getUsersByIds } from "../auth";
+import { getQuoteForChat } from "../quotation";
 import { getRfqForChat, listRfqsWithoutChat, markRfqChatOpened } from "../rfq";
 import { getSellerCompanies } from "../seller";
 import { attachUpload, getDownloadLink } from "../upload";
@@ -181,9 +182,49 @@ export class PermanentChatJobError extends Error {
 }
 
 const jobPayloadSchema = z.object({ rfqId: z.string().uuid() });
+const quoteCardPayloadSchema = z.object({ quoteId: z.string().uuid() });
+
+/** Run one chat job: open a request's conversation, or post a quotation card (Day 11). */
+export async function runChatJob(job: Pick<JobRow, "id" | "payload"> & { name?: string }, now = new Date()): Promise<void> {
+  if (job.name === "post-quote-card") return postQuoteCard(job);
+  return openRfqChat(job, now);
+}
+
+/**
+ * Post a quotation card into its request's conversation, from the seller.
+ * Only the quotation id travels; the web app draws the card from the API
+ * (owner-checked), so nobody can show a different price. Safe to repeat
+ * (fixed message id). Waits (retries) until the conversation is open.
+ */
+async function postQuoteCard(job: Pick<JobRow, "id" | "payload">): Promise<void> {
+  const payload = quoteCardPayloadSchema.safeParse(job.payload);
+  if (!payload.success) throw new PermanentChatJobError(`Invalid chat job ${job.id}`);
+  const quote = await getQuoteForChat(payload.data.quoteId);
+  if (!quote) throw new PermanentChatJobError(`Quotation ${payload.data.quoteId} not found`);
+  const rfq = await getRfqForChat(quote.rfqId);
+  if (!rfq || rfq.sellerUserId !== quote.sellerUserId) throw new PermanentChatJobError(`Quotation ${quote.id} does not match its request`);
+  // The conversation is opened by its own job; try again later.
+  if (!rfq.chatOpenedAt) throw new Error("Conversation not open yet");
+  const chat = getProvider();
+  if (!chat) throw new Error("Chat is not configured");
+  try {
+    await ensureSetup(chat);
+    await chat.sendMessage({
+      channelId: rfq.id,
+      userId: quote.sellerUserId,
+      messageId: `quote-${quote.id}`,
+      text: `Quotation ${quote.reference}`,
+      attachments: [{ type: CHAT_ATTACHMENT.quote, quote_id: quote.id }],
+    });
+  } catch (error) {
+    if (error instanceof ChatProviderError && !error.retryable) throw new PermanentChatJobError(error.message);
+    throw error;
+  }
+  logger.info({ quoteId: quote.id, rfqId: rfq.id }, "Quotation card posted in chat");
+}
 
 /** Open a request's conversation: both users, the conversation, then the quote request card. Safe to repeat. */
-export async function runChatJob(job: Pick<JobRow, "id" | "payload">, now = new Date()): Promise<void> {
+async function openRfqChat(job: Pick<JobRow, "id" | "payload">, now: Date): Promise<void> {
   const payload = jobPayloadSchema.safeParse(job.payload);
   if (!payload.success) throw new PermanentChatJobError(`Invalid chat job ${job.id}`);
   const rfq = await getRfqForChat(payload.data.rfqId);

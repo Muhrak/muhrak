@@ -178,6 +178,23 @@ export async function transition(input: {
   return rows[0];
 }
 
+/**
+ * The quote transition, in the caller's transaction: open (not expired) or
+ * already quoted, for this seller only. The UPDATE locks the row until the
+ * transaction ends. True when the request is now quoted.
+ */
+export async function markQuoted(tx: Tx, input: { id: string; sellerUserId: string; from: RfqStatus[]; to: RfqStatus; at: Date }): Promise<boolean> {
+  const allowed = input.from.map((status) =>
+    status === "open" ? sql`(${rfqs.status} = 'open' AND ${rfqs.expiresAt} > ${input.at})` : sql`${rfqs.status} = ${status}`,
+  );
+  const rows = await tx
+    .update(rfqs)
+    .set({ status: input.to, updatedAt: input.at })
+    .where(and(eq(rfqs.id, input.id), eq(rfqs.sellerUserId, input.sellerUserId), sql`(${sql.join(allowed, sql` OR `)})`))
+    .returning({ id: rfqs.id });
+  return rows.length === 1;
+}
+
 /** First time the seller opens a request (the unread dot). No-op afterwards. */
 export async function markSeen(id: string, sellerUserId: string, at: Date): Promise<RfqRow | undefined> {
   const rows = await db

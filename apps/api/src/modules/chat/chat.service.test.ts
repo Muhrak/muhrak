@@ -11,12 +11,14 @@ vi.mock("./chat.repository", () => ({ insertPhoto: vi.fn(), findPhoto: vi.fn() }
 vi.mock("../auth", () => ({ getUsersByIds: vi.fn() }));
 vi.mock("../rfq", () => ({ getRfqForChat: vi.fn(), listRfqsWithoutChat: vi.fn(), markRfqChatOpened: vi.fn() }));
 vi.mock("../seller", () => ({ getSellerCompanies: vi.fn() }));
+vi.mock("../quotation", () => ({ getQuoteForChat: vi.fn() }));
 vi.mock("../upload", () => ({ attachUpload: vi.fn(), getDownloadLink: vi.fn() }));
 vi.mock("../../shared/jobs", () => ({ enqueueJob: vi.fn(async () => true), wakeWorker: vi.fn() }));
 
 const repo = await import("./chat.repository");
 const { getUsersByIds } = await import("../auth");
 const rfqModule = await import("../rfq");
+const { getQuoteForChat } = await import("../quotation");
 const { getSellerCompanies } = await import("../seller");
 const upload = await import("../upload");
 const jobs = await import("../../shared/jobs");
@@ -132,6 +134,42 @@ describe("opening a conversation (background job)", () => {
     vi.mocked(rfqModule.getRfqForChat).mockResolvedValue(undefined);
     await expect(service.runChatJob({ id: "j1", payload: { rfqId: RFQ } }, now)).rejects.toBeInstanceOf(service.PermanentChatJobError);
     await expect(service.runChatJob({ id: "j1", payload: { rfqId: "not-a-uuid" } }, now)).rejects.toBeInstanceOf(service.PermanentChatJobError);
+  });
+});
+
+describe("quotation card (Day 11, background job)", () => {
+  const QUOTE = "66666666-6666-4666-8666-666666666666";
+  const job = { id: "j2", name: "post-quote-card", payload: { quoteId: QUOTE } };
+
+  it("is posted once, from the seller, into its request's conversation, carrying only the quotation id", async () => {
+    vi.mocked(getQuoteForChat).mockResolvedValue({ id: QUOTE, reference: "QT-1001", rfqId: RFQ, sellerUserId: SELLER });
+    await service.runChatJob(job, now);
+    expect(chat.sendMessage).toHaveBeenCalledWith({
+      channelId: RFQ,
+      userId: SELLER,
+      messageId: `quote-${QUOTE}`,
+      text: "Quotation QT-1001",
+      attachments: [{ type: "muhrak_quote", quote_id: QUOTE }],
+    });
+    expect(chat.openChannel).not.toHaveBeenCalled();
+  });
+
+  it("waits (retries) while the conversation is not open yet", async () => {
+    vi.mocked(getQuoteForChat).mockResolvedValue({ id: QUOTE, reference: "QT-1001", rfqId: RFQ, sellerUserId: SELLER });
+    vi.mocked(rfqModule.getRfqForChat).mockResolvedValue(rfq({ chatOpenedAt: null }));
+    const error = await service.runChatJob(job, now).catch((caught: Error) => caught);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(service.PermanentChatJobError);
+    expect(chat.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("stops on a missing quotation, a bad payload, or a quotation whose seller is not the request's seller", async () => {
+    vi.mocked(getQuoteForChat).mockResolvedValue(undefined);
+    await expect(service.runChatJob(job, now)).rejects.toBeInstanceOf(service.PermanentChatJobError);
+    await expect(service.runChatJob({ ...job, payload: { quoteId: "x" } }, now)).rejects.toBeInstanceOf(service.PermanentChatJobError);
+    vi.mocked(getQuoteForChat).mockResolvedValue({ id: QUOTE, reference: "QT-1001", rfqId: RFQ, sellerUserId: STRANGER });
+    await expect(service.runChatJob(job, now)).rejects.toBeInstanceOf(service.PermanentChatJobError);
+    expect(chat.sendMessage).not.toHaveBeenCalled();
   });
 });
 

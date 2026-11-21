@@ -1,16 +1,18 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ImagePlus, Loader2, Search, ShieldAlert } from "lucide-react";
+import { ArrowLeft, FileText, ImagePlus, Loader2, Search, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Channel, StreamChat } from "stream-chat";
-import { buyerRfqListResponseSchema, CHAT_ATTACHMENT, CHAT_CHANNEL_TYPE, containsContactDetails, sellerRfqListResponseSchema } from "@/schemas";
+import { buyerRfqListResponseSchema, CHAT_ATTACHMENT, CHAT_CHANNEL_TYPE, containsContactDetails, formatMoney, sellerRfqListResponseSchema } from "@/schemas";
 import { LogoLoader } from "@/components/ui/logo-loader";
 import { authedRequest } from "@/features/auth/authed-request";
 import type { PortalSide } from "@/features/auth/paths";
 import { useSession } from "@/features/auth/session";
+import { useQuote } from "@/features/quotation/api";
+import { itemCountLabel, quoteDate, quoteStatus } from "@/features/quotation/quote-view";
 import { useBuyerRfq, useSellerRfq } from "@/features/rfq/api";
 import { buyerStatus, neededByLabel, quantityLabel, RfqChip, sellerStatus, shortAge, Thumb } from "@/features/rfq/parts";
 import { focusRing } from "@/features/seller/parts";
@@ -377,9 +379,11 @@ function Thread({ side, channel, userId, who, onBack }: { side: PortalSide; chan
         {messages.map((message) => {
           const mine = message.user?.id === userId;
           const card = message.attachments?.find((item) => item.type === CHAT_ATTACHMENT.rfq);
+          const quoteCard = message.attachments?.find((item) => item.type === CHAT_ATTACHMENT.quote);
           const photo = message.attachments?.find((item) => item.type === CHAT_ATTACHMENT.photo);
           const at = message.created_at ? timeFormat.format(new Date(message.created_at)) : "";
           if (card) return <RequestCard key={message.id} side={side} rfqId={String((card as Record<string, unknown>).rfq_id ?? "")} at={at} />;
+          if (quoteCard) return <QuoteCard key={message.id} side={side} rfqId={rfqId} quoteId={String((quoteCard as Record<string, unknown>).quote_id ?? "")} at={at} />;
           return (
             <div key={message.id} className={cn("flex max-w-[78%] flex-col gap-1", mine ? "self-end items-end" : "self-start items-start")}>
               {photo ? (
@@ -501,25 +505,51 @@ function SellerRequestCard({ rfqId, at }: { rfqId: string; at: string }) {
   ) : null;
 }
 
+/**
+ * A quotation card (Day 11): only the quotation id travels in chat; the
+ * numbers come from the API, which checks the caller is this request's buyer
+ * or seller. A card from another conversation (tampered) is not shown.
+ */
+function QuoteCard({ side, rfqId, quoteId, at }: { side: PortalSide; rfqId: string; quoteId: string; at: string }) {
+  const quote = useQuote(side, quoteId).data;
+  if (!quote || quote.rfqId !== rfqId) return null;
+  const href = side === "buyer" ? `/buyer/requests?id=${encodeURIComponent(rfqId)}` : `/seller/rfq-inbox?id=${encodeURIComponent(rfqId)}`;
+  return (
+    <CardView
+      href={href}
+      icon={<FileText aria-hidden className="size-5 text-text-strong" />}
+      title={`Quotation · ${quote.reference}`}
+      lines={[
+        `${itemCountLabel(quote)} · Total ${formatMoney(quote.total)}`,
+        quote.status === "active" ? `Valid until ${quoteDate(quote.validUntil)} · Delivery ${quote.deliveryDays} days` : `Delivery ${quote.deliveryDays} days`,
+      ]}
+      status={quoteStatus(quote.status)}
+      at={at}
+    />
+  );
+}
+
 function CardView({
   href,
   photo,
+  icon,
   title,
   lines,
   status,
   at,
 }: {
   href: string;
-  photo: string | null;
+  photo?: string | null;
+  icon?: ReactNode;
   title: string;
   lines: string[];
-  status: ReturnType<typeof buyerStatus>;
+  status: { label: string; tone: Parameters<typeof RfqChip>[0]["tone"] };
   at: string;
 }) {
   return (
     <div className="flex flex-col items-center gap-1 self-center">
       <Link href={href} className={cn("flex w-full max-w-[440px] items-center gap-3.5 rounded-[18px] border border-line bg-surface/60 p-3 pr-4 hover:bg-surface", focusRing)}>
-        <Thumb src={photo} size="sm" />
+        {icon ? <span className="flex size-11 shrink-0 items-center justify-center rounded-[10px] bg-[#ededf0]">{icon}</span> : <Thumb src={photo ?? null} size="sm" />}
         <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-[normal]">
           <span className="truncate text-[15px] font-medium text-text-strong">{title}</span>
           {lines.map((line) => (

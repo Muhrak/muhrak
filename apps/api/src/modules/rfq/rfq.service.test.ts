@@ -293,8 +293,10 @@ describe("ownership", () => {
 });
 
 describe("transitions", () => {
-  it("only an open request can change, and only to the listed status", () => {
-    for (const t of Object.values(service.RFQ_TRANSITIONS)) expect(t.from).toEqual(["open"]);
+  it("only an open request can change, and only to the listed status (a quoted one only by a revised quotation)", () => {
+    const { quote, ...others } = service.RFQ_TRANSITIONS;
+    for (const t of Object.values(others)) expect(t.from).toEqual(["open"]);
+    expect(quote).toMatchObject({ by: "seller", from: ["open", "quoted"], to: "quoted" });
     expect(service.RFQ_TRANSITIONS.cancel).toMatchObject({ by: "buyer", to: "cancelled" });
     expect(service.RFQ_TRANSITIONS.decline).toMatchObject({ by: "seller", to: "declined" });
   });

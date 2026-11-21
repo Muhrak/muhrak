@@ -152,3 +152,38 @@ export async function sendNewRfqEmail(
     tx,
   );
 }
+
+/**
+ * Tell a buyer about a new quotation (Day 11). Pass the transaction that
+ * saves the quotation, so the email exists only if the quotation does.
+ * `dedupeKey`: the quotation id.
+ */
+export async function sendNewQuoteEmail(
+  input: {
+    to: string;
+    fullName: string;
+    quoteId: string;
+    quoteReference: string;
+    rfqId: string;
+    rfqReference: string;
+    sellerName: string;
+    partName: string;
+    itemCount: number;
+    total: string;
+    deliveryDays: number;
+    validUntil: string;
+    revised: boolean;
+  },
+  tx?: JobExecutor,
+): Promise<void> {
+  const { to, quoteId, rfqId, ...data } = input;
+  await enqueueEmail(
+    {
+      template: "quote-new",
+      to,
+      data: { ...data, requestUrl: `${env.WEB_APP_URL}/buyer/requests?id=${encodeURIComponent(rfqId)}` },
+    },
+    `quote-new-${quoteId}`,
+    tx,
+  );
+}

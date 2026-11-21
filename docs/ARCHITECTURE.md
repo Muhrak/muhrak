@@ -47,7 +47,7 @@ muhrak/
 │   │           ├── ai/            Day 6-8
 │   │           ├── rfq/           Day 10
 │   │           ├── chat/          Day 11
-│   │           ├── quotation/     Day 12
+│   │           ├── quotation/     Day 11 (quotations, PDF)
 │   │           ├── order/         Day 12, 14
 │   │           ├── payment/       Day 12-13 (gateway behind providers/)
 │   │           ├── ledger/        Day 12, 15 (append-only money entries)

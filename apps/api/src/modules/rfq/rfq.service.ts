@@ -51,8 +51,12 @@ const PRODUCT_GONE = "This part is no longer listed. Search again to find it fro
 
 /** The one place that says which status changes are allowed, and who may make them. */
 export const RFQ_TRANSITIONS = {
-  /** Day 11: the seller sends a quotation. */
-  quote: { by: "seller", from: ["open"], to: "quoted" },
+  /**
+   * Day 11: the seller sends a quotation (quotation module, in the same
+   * transaction). From "quoted" too: a revised quotation keeps it quoted.
+   * An open request must not have expired; a quoted one has had its answer.
+   */
+  quote: { by: "seller", from: ["open", "quoted"], to: "quoted" },
   decline: { by: "seller", from: ["open"], to: "declined" },
   cancel: { by: "buyer", from: ["open"], to: "cancelled" },
   /** The expiry sweep (rfq.repository expireDue applies exactly this). */
@@ -358,3 +362,48 @@ export async function listRfqsWithoutChat(side: "buyer" | "seller", userId: stri
   return repo.listWithoutChat(side, userId, limit);
 }
 
+
+// ---------------------------------------------------------------- for the quotation module (Day 11)
+
+/** What a quotation needs about its request. Undefined if it does not exist. */
+export async function getRfqForQuote(id: string, now = new Date()): Promise<
+  | {
+      id: string;
+      reference: string;
+      status: RfqStatus;
+      buyerUserId: string;
+      sellerUserId: string;
+      partName: string;
+      partNumber: string | null;
+      quantity: number;
+      deliveryCity: string;
+      deliveryCountry: GccCountry;
+    }
+  | undefined
+> {
+  const row = await repo.findRfq(id);
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    reference: reference(row.number),
+    status: effective(row, now).status,
+    buyerUserId: row.buyerUserId,
+    sellerUserId: row.sellerUserId,
+    partName: row.partName,
+    partNumber: row.partNumber,
+    quantity: row.quantity,
+    deliveryCity: row.deliveryCity,
+    deliveryCountry: row.deliveryCountry as GccCountry,
+  };
+}
+
+/**
+ * Inside the quotation's transaction: move the request to "quoted" (only for
+ * its seller, only from RFQ_TRANSITIONS.quote.from, an open one only before
+ * it expires). The row stays locked until the transaction ends, so two
+ * quotations for one request are written one after the other. False when not allowed.
+ */
+export async function markRfqQuoted(tx: repo.Tx, input: { rfqId: string; sellerUserId: string; at: Date }): Promise<boolean> {
+  const t = RFQ_TRANSITIONS.quote;
+  return repo.markQuoted(tx, { id: input.rfqId, sellerUserId: input.sellerUserId, from: [...t.from], to: t.to, at: input.at });
+}

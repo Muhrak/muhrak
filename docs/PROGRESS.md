@@ -3,7 +3,7 @@
 Read this first in every new session, then `CLAUDE.md`, `docs/PLAN.md` and
 `docs/ARCHITECTURE.md`. Update it whenever a piece of work is committed.
 
-Last updated: Thu 19 Nov 2026 (Day 10: buyer–seller chat on Stream). Branch `develop`.
+Last updated: Sat 21 Nov 2026 (Day 11: quotations, PDF like the developer's reference). Branch `develop`.
 
 ## Status
 
@@ -437,6 +437,70 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   with the form open and pre-filled → sent (RQ-…) → saved with the right
   seller and product; a second request for the same part is refused
   ("You already have an open request…"). Test data removed.
+
+### Day 11: quotations (Sat 21 Nov, one day late)
+- Reference: `refs/seller quotation .pdf` (developer, 21 Nov 2026): the
+  quotation layout, laid out exactly in the PDF. Developer decisions (21 Nov):
+  **pdfkit** on the API (new dependency, pinned 0.20.2; 0.21.0 was 1 day
+  old; audit clean; `@types/pdfkit` 0.17.7 dev); **several items per
+  quotation** (first filled in from the request); **Muhrak contact details
+  only** in From/To (`info@muhrak.com`, `+968 799 833 13`, from the
+  reference; no buyer or seller email/phone); **VAT 5% of items + shipping
+  only when the seller is VAT registered**, computed by the server. My
+  defaults (not yet confirmed): one ACTIVE quotation per request, a revision
+  replaces it (old one "superseded"); valid 15 days by default, 30 max;
+  Muhrak's standard terms first (validity, 100% advance payment through
+  Muhrak, delivery days, VAT), then the seller's own lines; numbers QT-1001+.
+- API module `quotation` (`/v1/seller/quotes`: send, list by request, get,
+  PDF, withdraw; `/v1/buyer/quotes`: list, get, PDF). Tables `quotations`
+  + `quotation_items` (migration `0017`, additive). Integer baisa (bigint)
+  with currency (OMR only); amounts in BigInt then capped at 10,000,000 OMR;
+  DB checks: total = subtotal + shipping + VAT, item amount = rate × qty,
+  VAT rate 0 or 500, one active per request (partial unique index), form
+  key unique per seller. Names/places copied when sent, so the document never
+  changes. `QUOTE_TRANSITIONS` in one place (withdraw, supersede, expire);
+  sweep closes expired quotations every minute (worker).
+- Sending locks the request row (rfq `markRfqQuoted`, same transaction):
+  `RFQ_TRANSITIONS.quote` is now open|quoted → quoted (an open request only
+  before it expires). Twin submits wait for the lock and return the first
+  quotation; a key reused for another request undoes the transaction.
+  Only the request's own VERIFIED seller can send (`getSellerForQuote`).
+  20 quotations per request cap; 30/hour and 200/day per seller; PDF 60 per
+  15 min per user.
+- Same transaction queues the buyer's email (`quote-new`, "Revised
+  quotation" for a revision) and the chat job `post-quote-card`: the card
+  is posted from the seller with only `{ type: "muhrak_quote", quote_id }`;
+  the web draws it from the API (owner check; a card from another
+  conversation is ignored). Retries until the conversation is open.
+- PDF (`quotation.pdf.ts`): A4, measurements and colours read from the
+  reference PDF (blue #2544AF, rows tinted 20%, Open Sans in
+  `apps/api/assets/fonts` (OFL licence included), Muhrak "Part Source" logo
+  taken from the reference); long items continue on the next page; table
+  header repeated; dashed footer with "Page x of y". Drawn from the saved
+  quotation on every download; a withdrawn/replaced/expired one gets a red
+  stamp. `Cache-Control: private, no-store`. Latin script only (Open Sans).
+  The sample with the reference's 15 items gives exactly the reference
+  totals (VAT OMR 105.689, total OMR 2,219.474).
+- Web: seller RFQ Inbox "Send quote" (dialog: items with part number,
+  description, extra lines, qty, rate; shipping; delivery days; valid days;
+  terms; notes; live total preview, VAT from the company profile) and the
+  quotation under the request (items, totals, delivery, terms, notes, PDF,
+  Withdraw, "Send revised quotation", earlier quotations folded). Buyer
+  "Inquiries & RFQs": the same quotation view with PDF. Messenger: the
+  quotation card on both sides. `authedFile` downloads with the side's own
+  session.
+- Tested: 351 API tests (34 new quotation tests incl. the reference totals,
+  half-up VAT, cap, wrong seller/buyer/side, closed request, unverified
+  seller, double submit, key race, revision, withdraw rules, expiry, PDF
+  owner check; 3 chat card tests). Live run against the local API (37
+  checks: 401/403/404 for no token, wrong side, other buyer/seller; tampered
+  totals/currency ignored; two identical submits at once → one quotation;
+  two revisions at once → one active; DB refuses a wrong total; email and
+  real Stream card). Screens in headless Chrome, desktop and phone (two
+  phone layout fixes made). All test data removed from the local DB and
+  the Stream app; quotation numbers reset to 1001 locally.
+- Not built (later days): buyer "Accept and pay" (Day 12), the seller
+  "Quotations" sidebar page (still "Coming soon"), a buyer "decline quote".
 
 ### Day 10: buyer–seller chat (Thu 19 Nov)
 - Developer decisions (19 Nov): **Stream Chat** kept (Stream app "Muhrak",
@@ -1078,11 +1142,14 @@ Still open (Day 4 admin):
 
 ## Next up, see `docs/PLAN.md`
 
-- Day 8 is done (text and photo search). Next: Day 10 (Stream Chat; needs
-  a Stream account) or Day 11 (Send quote; no outside service, the `quote`
-  transition already exists in `RFQ_TRANSITIONS`).
-- Staging: migration `0013` runs on the next deploy (start command runs
-  migrations).
+- Day 11 is done (21 Nov, a day late). Next: Day 12, payment foundation
+  (order from an accepted ACTIVE quotation, fake gateway provider, webhook,
+  ledger). Day 13 needs a chosen gateway's sandbox keys.
+- Staging: migration `0017` (quotations) runs on the next deploy. No new
+  environment variables.
+- Developer to confirm: the Muhrak contact lines on the PDF
+  (`MUHRAK_CONTACT` in `quotation.pdf.ts`, from the reference), and the
+  Day 11 defaults listed in the Day 11 section.
 - Before launch: a PAID Gemini key (`GEMINI_TIER=paid`); set the AI
   variables on Railway.
 - Without the key, Day 11 (Send quote; the `quote` transition already
