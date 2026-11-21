@@ -593,12 +593,9 @@ const AI_NAV = [
 function AiHeader() {
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 bg-white/75 px-4 backdrop-blur-md sm:h-[72px] sm:px-8">
-      {/* Muhrak AI logo (developer reference, 21 Nov 2026): a glowing four-point sparkle in the Muhrak blues + bold name. */}
+      {/* Muhrak AI logo (developer reference, 21 Nov 2026): a four-point sparkle in the Muhrak blues + bold name; plain background. */}
       <Link href="/ai" aria-label="Muhrak AI" className="relative isolate flex shrink-0 items-center gap-2 rounded-full py-1 pr-1 outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-        <span aria-hidden className="relative flex h-[26px] w-[36px] shrink-0 items-center justify-center sm:h-[29px] sm:w-[40px]">
-          <span className="ai-sparkle-glow" />
-          <span className="ai-sparkle size-full" />
-        </span>
+        <span aria-hidden className="ai-sparkle h-[26px] w-[36px] shrink-0 sm:h-[29px] sm:w-[40px]" />
         <span className="text-[21px] leading-none font-bold tracking-[-0.03em] whitespace-nowrap text-ink sm:text-[23px]">Muhrak AI</span>
       </Link>
       <div className="flex-1" />

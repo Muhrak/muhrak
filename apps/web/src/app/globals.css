@@ -391,18 +391,6 @@
   }
 }
 
-@keyframes ai-logo-glow {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scale(0.96);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.04);
-  }
-}
-
 @keyframes ai-shimmer {
   from {
     background-position: 100% 0;
@@ -484,34 +472,23 @@
 
   /*
    * Muhrak AI logo (developer reference, 21 Nov 2026): a four-point sparkle
-   * filled with the Muhrak blues; the colours drift, the sparkle breathes and
-   * a soft blue glow pulses behind it.
+   * filled with the Muhrak blues; the colours drift and the sparkle
+   * breathes. No glow behind it (developer, 21 Nov 2026).
    */
   .ai-sparkle {
     background: linear-gradient(120deg, #577fba 0%, #4a88c1 25%, #63b6e2 45%, #84c9e8 52%, #519ed2 65%, #577fba 85%, #4a88c1 100%);
     background-size: 400% 100%;
     mask: url(/ai/sparkle.svg) center / contain no-repeat;
     -webkit-mask: url(/ai/sparkle.svg) center / contain no-repeat;
-    filter: drop-shadow(0 0 6px rgba(99, 182, 226, 0.55));
     animation:
       ai-logo-flow 6s ease-in-out infinite alternate,
       ai-sparkle-breathe 3.2s ease-in-out infinite;
-  }
-  .ai-sparkle-glow {
-    position: absolute;
-    inset: -10px -8px;
-    z-index: -1;
-    border-radius: 9999px;
-    background: radial-gradient(closest-side, rgba(99, 182, 226, 0.55), rgba(87, 127, 186, 0.22) 55%, transparent);
-    filter: blur(8px);
-    animation: ai-logo-glow 3.2s ease-in-out infinite;
   }
 
   @media (prefers-reduced-motion: reduce) {
     .ai-mark-working,
     .ai-shimmer,
-    .ai-sparkle,
-    .ai-sparkle-glow {
+    .ai-sparkle {
       animation: none;
     }
     .ai-shimmer {
