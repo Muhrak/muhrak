@@ -123,6 +123,8 @@ function Inbox({ side, client, userId, pending }: { side: PortalSide; client: St
   const activeId = params.get("rfq");
   const [channels, setChannels] = useState<Channel[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  /** "Try again" after every automatic retry failed. */
+  const [retryKey, setRetryKey] = useState(0);
   const [, setTick] = useState(0);
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [query, setQuery] = useState("");
@@ -136,6 +138,9 @@ function Inbox({ side, client, userId, pending }: { side: PortalSide; client: St
     let latest = 0;
     let loadedOnce = false;
     let count = 0;
+    // Stream can be slow or drop a first request: retry quietly (spinner stays) before showing an error.
+    let attempt = 0;
+    let retryTimer: number | undefined;
     const load = async () => {
       const mine = ++latest;
       try {
@@ -154,7 +159,10 @@ function Inbox({ side, client, userId, pending }: { side: PortalSide; client: St
       } catch (error) {
         // The reason, for support; no tokens or message text in it.
         console.warn("Chat: could not load conversations", error instanceof Error ? error.message : error);
-        if (!cancelled && mine === latest && !loadedOnce) setLoadError(true);
+        if (cancelled || mine !== latest || loadedOnce) return;
+        attempt += 1;
+        if (attempt < 4) retryTimer = window.setTimeout(() => void load(), 1500 * attempt);
+        else setLoadError(true);
       }
     };
     void load();
@@ -183,9 +191,10 @@ function Inbox({ side, client, userId, pending }: { side: PortalSide; client: St
     return () => {
       cancelled = true;
       if (timer) window.clearInterval(timer);
+      if (retryTimer) window.clearTimeout(retryTimer);
       changed.unsubscribe();
     };
-  }, [client, userId, pending]);
+  }, [client, userId, pending, retryKey]);
 
   const sorted = useMemo(() => {
     const list = [...(channels ?? [])].sort(
@@ -240,10 +249,20 @@ function Inbox({ side, client, userId, pending }: { side: PortalSide; client: St
             ))}
           </div>
         </div>
-        {loadError ? (
-          <p role="alert" className="px-5 py-10 text-center text-sm text-text-muted">
-            Could not load your conversations. Check your connection and reload the page.
-          </p>
+        {channels === null && loadError ? (
+          <div role="alert" className="flex flex-col items-center gap-3 px-5 py-10 text-center text-sm text-text-muted">
+            <p>Could not load your conversations. Check your connection.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setLoadError(false);
+                setRetryKey((key) => key + 1);
+              }}
+              className={cn("rounded-full border border-line px-4 py-1.5 text-[13px] font-medium text-text-strong hover:bg-black/4", focusRing)}
+            >
+              Try again
+            </button>
+          </div>
         ) : channels === null ? (
           <Spinner label="Loading conversations" className="py-16" />
         ) : sorted.length === 0 ? (
@@ -300,6 +319,9 @@ function Inbox({ side, client, userId, pending }: { side: PortalSide; client: St
 
       {active ? (
         <Thread key={active.cid} side={side} channel={active} userId={userId} who={names.data?.get(active.id ?? "")} onBack={() => open(null)} />
+      ) : channels === null ? (
+        // Still loading the conversations: a spinner, not "Choose a conversation" (developer request, 21 Nov 2026).
+        <Spinner label="Loading" className="bg-surface/50 max-lg:hidden" />
       ) : (
         <div className="hidden flex-col items-center justify-center gap-2 bg-surface/50 p-10 text-center lg:flex">
           <span className="flex size-14 items-center justify-center rounded-full bg-panel text-text-muted ring-1 ring-line">
