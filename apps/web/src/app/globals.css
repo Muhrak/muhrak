@@ -235,6 +235,12 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* No browser "x" in search boxes: our boxes have their own controls (developer, 21 Nov 2026). */
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+  }
   body {
     @apply bg-background text-foreground;
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowUp, Camera, ChevronLeft, ChevronRight, ClipboardList, House, ImageIcon, Loader2, Pencil, Plus, RotateCcw, Search, Store, X } from "lucide-react";
+import { ArrowUp, Camera, ChevronLeft, ChevronRight, ClipboardList, House, ImageIcon, Loader2, Pencil, Plus, RotateCcw, Store, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -512,20 +512,22 @@ export function MuhrakAiPage() {
               <input
                 ref={textRef}
                 id="ai-text"
-                type="search"
+                type="text"
+                inputMode="search"
+                enterKeyHint="search"
+                autoComplete="off"
                 value={draft}
                 maxLength={80}
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder="Part number or name…"
                 className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-[#8b8d96] sm:text-lg"
               />
-              {draft.trim().length >= 2 ? (
+              {/* One control only: the black send button, shown once something is typed (developer, 21 Nov 2026). */}
+              {draft.trim().length > 0 ? (
                 <button type="submit" aria-label="Search" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink text-white hover:opacity-90 sm:size-12">
                   <ArrowUp aria-hidden className="size-5" />
                 </button>
-              ) : (
-                <Search aria-hidden className="mr-3 size-5 shrink-0 text-ink-placeholder" />
-              )}
+              ) : null}
             </div>
             <button
               type="button"
@@ -596,7 +598,7 @@ function AiHeader() {
         <Image src="/auth/muhrak-logo.svg" alt="Muhrak" width={128} height={24.44} priority />
       </Link>
       <span aria-hidden className="h-5 w-px bg-black/12" />
-      <span className="text-[15px] font-medium whitespace-nowrap text-ink-secondary">Muhrak AI</span>
+      <span className="text-[15px] font-semibold whitespace-nowrap text-sky-blue">Muhrak AI</span>
       <div className="flex-1" />
       <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
         {AI_NAV.map(({ href, label, icon: Icon }) => (
