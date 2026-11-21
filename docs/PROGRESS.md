@@ -473,6 +473,17 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   and decision, DB checks (name and bank proof switched, old file kept,
   still verified, audit row, email).
 
+### Inquiries & RFQs and RFQ Inbox: same full-height workspace (Sat 21 Nov, developer request)
+- Shared layout in `components/layout/workspace.tsx`: `WorkspacePanel`
+  (one panel filling the screen, compact title + description, header
+  actions; buttons wrap under the title on phones), `WorkspaceSplit` (list
+  left, detail right, each scrolls on its own; phones show one at a time),
+  `FilterChips` (small chips with counts) and `workspaceButton`.
+- Used by buyer Inquiries & RFQs, seller RFQ Inbox and the Messenger.
+  Checked with no page scroll at 1920×911, 1440×900, 1366×768, phone and
+  the 85%-zoomed Seller Centre; long request details scroll inside.
+- Use `WorkspacePanel` for any new list + detail tool screen.
+
 ### Messenger redesign: one full-height panel, WhatsApp-style thread (Sat 21 Nov, developer request)
 - One panel filling the screen (no page scroll; checked 1920×911,
   1440×900, 1366×768, phone, and the 85%-zoomed Seller Centre): compact

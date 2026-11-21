@@ -9,6 +9,7 @@ import type { Channel, StreamChat } from "stream-chat";
 import { buyerRfqListResponseSchema, CHAT_ATTACHMENT, CHAT_CHANNEL_TYPE, containsContactDetails, formatMoney, sellerRfqListResponseSchema } from "@/schemas";
 import { PageLoader } from "@/components/ui/logo-loader";
 import { Spinner } from "@/components/ui/spinner";
+import { FilterChips, WorkspacePanel } from "@/components/layout/workspace";
 import { authedRequest } from "@/features/auth/authed-request";
 import type { PortalSide } from "@/features/auth/paths";
 import { useSession } from "@/features/auth/session";
@@ -89,21 +90,12 @@ const PAGE = 30;
 export function MessengerPage({ side }: { side: PortalSide }) {
   const chat = useChatClient(side);
   return (
-    // One panel that fills the screen (no page scroll): title, then the conversations and the open chat side by side.
-    // The Seller Centre is zoomed to 85%, so its screen height is divided by 0.85.
-    <section
-      className={cn(
-        "flex min-h-[520px] flex-col overflow-hidden rounded-[24px] bg-panel",
-        "h-[calc(100dvh-108px)]",
-        side === "seller" ? "lg:h-[calc(100dvh/0.85-58px)]" : "lg:h-[calc(100dvh-58px)]",
-      )}
+    // One panel that fills the screen (no page scroll), shared with Inquiries & RFQs and the RFQ Inbox.
+    <WorkspacePanel
+      side={side}
+      title="Messenger"
+      description={side === "buyer" ? "Chat with sellers about your quote requests." : "Chat with buyers about their quote requests."}
     >
-      <header className="flex shrink-0 items-baseline gap-3 border-b border-line px-5 py-3.5">
-        <h1 className="text-xl leading-[normal] font-medium tracking-[-0.01em] text-text-strong">Messenger</h1>
-        <p className="truncate text-[13px] text-text-muted max-sm:hidden">
-          {side === "buyer" ? "Chat with sellers about your quote requests." : "Chat with buyers about their quote requests."}
-        </p>
-      </header>
       {chat.status === "connecting" ? (
         <PageLoader label="Connecting to chat" className="min-h-0" />
       ) : chat.status === "unavailable" ? (
@@ -113,7 +105,7 @@ export function MessengerPage({ side }: { side: PortalSide }) {
       ) : (
         <Inbox side={side} client={chat.client} userId={chat.userId} pending={chat.pending} />
       )}
-    </section>
+    </WorkspacePanel>
   );
 }
 
@@ -230,24 +222,15 @@ function Inbox({ side, client, userId, pending }: { side: PortalSide; client: St
               className="min-w-0 flex-1 bg-transparent text-sm text-text-strong outline-none placeholder:text-text-subtle"
             />
           </label>
-          <div className="flex gap-1.5" role="group" aria-label="Show">
-            {(["all", "unread"] as const).map((key) => (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={filter === key}
-                onClick={() => setFilter(key)}
-                className={cn(
-                  "flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] leading-none font-medium",
-                  filter === key ? "bg-text-strong text-white" : "bg-surface text-text-strong hover:bg-black/6",
-                  focusRing,
-                )}
-              >
-                {key === "all" ? "All" : "Unread"}
-                <span className={cn("text-xs font-normal", filter === key ? "text-white/70" : "text-text-muted")}>{key === "all" ? (channels?.length ?? 0) : unreadCount}</span>
-              </button>
-            ))}
-          </div>
+          <FilterChips
+            label="Show"
+            value={filter}
+            onChange={setFilter}
+            items={[
+              { key: "all" as const, label: "All", count: channels?.length ?? 0 },
+              { key: "unread" as const, label: "Unread", count: unreadCount },
+            ]}
+          />
         </div>
         {channels === null && loadError ? (
           <div role="alert" className="flex flex-col items-center gap-3 px-5 py-10 text-center text-sm text-text-muted">
