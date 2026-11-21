@@ -10,7 +10,7 @@ import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useProductList, useProductStatus } from "./api";
 import { priceLabel, ProductStatusChip, STATUS_DONE, stockLabel } from "./parts";
-import { LogoLoader } from "@/components/ui/logo-loader";
+import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 
 /**
@@ -127,7 +127,7 @@ export function ProductsPage() {
         </div>
 
         {list.isPending ? (
-<LogoLoader label="Loading your products" className="py-10" />
+<Spinner label="Loading your products" className="py-10" />
         ) : list.isError ? (
           <p role="alert" className="py-10 text-center text-sm text-destructive">
             Could not load your products. Reload the page to try again.

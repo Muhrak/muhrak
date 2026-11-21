@@ -7,7 +7,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Channel, StreamChat } from "stream-chat";
 import { buyerRfqListResponseSchema, CHAT_ATTACHMENT, CHAT_CHANNEL_TYPE, containsContactDetails, formatMoney, sellerRfqListResponseSchema } from "@/schemas";
-import { LogoLoader } from "@/components/ui/logo-loader";
+import { PageLoader } from "@/components/ui/logo-loader";
+import { Spinner } from "@/components/ui/spinner";
 import { authedRequest } from "@/features/auth/authed-request";
 import type { PortalSide } from "@/features/auth/paths";
 import { useSession } from "@/features/auth/session";
@@ -20,6 +21,7 @@ import { acceptFor, checkFile } from "@/features/upload/upload-file";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { sendChatPhoto, useChatClient, useChatPhoto } from "./api";
+
 
 /**
  * Messenger (Day 10): Figma "Buyer – Messenger (Dark)" (380:690) and the
@@ -70,13 +72,13 @@ const timeFormat = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "
 export function MessengerPage({ side }: { side: PortalSide }) {
   const chat = useChatClient(side);
   return (
-    <section className="flex flex-col gap-5">
+    <section className="flex flex-1 flex-col gap-5">
       <header className="flex flex-col gap-1.5 leading-[normal]">
         <h1 className="text-[28px] font-medium tracking-[-0.02em] text-text-strong sm:text-[40px]">Messenger</h1>
         <p className="text-base text-text-muted">{side === "buyer" ? "Chat with sellers about your quote requests." : "Chat with buyers about their quote requests."}</p>
       </header>
       {chat.status === "connecting" ? (
-        <LogoLoader label="Connecting to chat" className="py-24" />
+        <PageLoader label="Connecting to chat" />
       ) : chat.status === "unavailable" ? (
         <p role="alert" className="rounded-[24px] bg-panel px-6 py-10 text-center text-[15px] text-text-muted">
           {chat.message}
@@ -222,7 +224,7 @@ function Inbox({ side, client, userId, pending }: { side: PortalSide; client: St
               Could not load your conversations. Check your connection and reload the page.
             </p>
           ) : channels === null ? (
-            <LogoLoader label="Loading conversations" className="py-16" />
+            <Spinner label="Loading conversations" className="py-16" />
           ) : sorted.length === 0 ? (
             <p className="px-2 py-10 text-center text-[15px] text-text-muted">
               {(channels?.length ?? 0) === 0
@@ -569,7 +571,7 @@ function CardView({
 function ChatPhoto({ side, rfqId, uploadId }: { side: PortalSide; rfqId: string; uploadId: string }) {
   const link = useChatPhoto(side, rfqId, uploadId);
   if (!link.data) {
-    return <span className="flex size-[180px] items-center justify-center rounded-[18px] bg-surface text-[13px] text-text-subtle">{link.isError ? "Photo unavailable" : "Loading…"}</span>;
+    return <span className="flex size-[180px] items-center justify-center rounded-[18px] bg-surface text-[13px] text-text-subtle">{link.isError ? "Photo unavailable" : <Spinner label="Loading photo" />}</span>;
   }
   return (
     <a href={link.data} target="_blank" rel="noreferrer noopener" className={cn("block overflow-hidden rounded-[18px] border border-line", focusRing)}>

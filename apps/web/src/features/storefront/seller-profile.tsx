@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { CONDITION_LABELS, formatMoney, UNIT_LABELS, type PublicProductCard, type PublicSeller } from "@/schemas";
 import { Footer, SiteNav } from "@/components/landing/sections";
-import { LogoLoader } from "@/components/ui/logo-loader";
+import { PageLoader } from "@/components/ui/logo-loader";
+import { Spinner } from "@/components/ui/spinner";
 import { LOGIN_PATH } from "@/features/auth/paths";
 import { useSession } from "@/features/auth/session";
 import { availability, QuoteRequestDialog, type QuoteTarget } from "@/features/rfq/quote-request-dialog";
@@ -32,7 +33,7 @@ export function SellerProfile({ id }: { id: string }) {
   if (seller.isPending) {
     return (
       <Shell>
-        <LogoLoader className="py-32" />
+        <PageLoader className="min-h-[60dvh]" />
       </Shell>
     );
   }
@@ -226,7 +227,7 @@ function Products({
         </div>
       ) : null}
       {products.isPending ? (
-        <LogoLoader label="Loading products" className="py-20" />
+        <Spinner label="Loading products" className="py-20" />
       ) : products.isError ? (
         <p role="alert" className="py-20 text-center text-sm text-destructive">
           Could not load products. Please try again.

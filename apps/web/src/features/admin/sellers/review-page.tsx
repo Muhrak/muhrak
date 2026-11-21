@@ -9,7 +9,7 @@ import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { getDocumentLink, useReviewSeller, useReviewSellerUpdate, useSellerDetail } from "./api";
 import { Avatar, DOCUMENT_STATUS, focusRing, formatDate, Panel, place, StatusChip, VERIFICATION } from "./parts";
-import { LogoLoader } from "@/components/ui/logo-loader";
+import { PageLoader } from "@/components/ui/logo-loader";
 import { useToast } from "@/components/ui/toast";
 
 /**
@@ -27,7 +27,7 @@ export function ReviewPage({ userId }: { userId: string }) {
         Sellers
       </Link>
       {detail.isPending ? (
-        <LogoLoader className="py-16" />
+        <PageLoader />
       ) : detail.isError ? (
         <p role="alert" className="rounded-[12px] bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {detail.error instanceof ApiError && detail.error.status === 404 ? "This seller does not exist." : "Could not load this seller. Reload the page."}

@@ -5,6 +5,7 @@ import { FormError } from "@/features/auth/field";
 import { ApiError } from "@/lib/api";
 import { useProduct } from "./api";
 import { ProductForm } from "./product-form";
+import { PageLoader } from "@/components/ui/logo-loader";
 
 /** /seller/products/[id]: load the seller's own product (404 for anyone else's) and edit it. */
 export function EditProduct({ id }: { id: string }) {
@@ -13,11 +14,7 @@ export function EditProduct({ id }: { id: string }) {
   const publishError = useSearchParams().get("publish");
 
   if (product.isPending) {
-    return (
-      <p role="status" className="text-sm text-text-muted">
-        Loading the product…
-      </p>
-    );
+    return <PageLoader label="Loading the product" />;
   }
   if (product.isError) {
     const missing = product.error instanceof ApiError && product.error.status === 404;

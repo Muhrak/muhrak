@@ -10,7 +10,7 @@ import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useDeclineRfq, useSellerRfq, useSellerRfqs } from "./api";
 import { BuyerPhotos, closesIn, DetailTiles, neededByLabel, quantityLabel, RfqChip, sellerStatus, sentAgo, shortAge, Thumb } from "./parts";
-import { LogoLoader } from "@/components/ui/logo-loader";
+import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { useRfqQuotes } from "@/features/quotation/api";
 import { RfqQuotes } from "@/features/quotation/quote-view";
@@ -92,7 +92,7 @@ export function SellerInboxPage() {
           className={cn("flex w-full shrink-0 flex-col gap-0.5 rounded-[24px] bg-panel p-2.5 lg:sticky lg:top-6 lg:w-[420px]", idParam && "hidden lg:flex")}
         >
           {list.isPending ? (
-<LogoLoader label="Loading requests" className="py-10" />
+<Spinner label="Loading requests" className="py-10" />
           ) : list.isError ? (
             <p role="alert" className="px-4 py-10 text-center text-sm text-destructive">
               Could not load requests. Reload the page to try again.
@@ -177,7 +177,7 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
   if (detail.isPending) {
     return (
-      <LogoLoader className="rounded-[24px] bg-panel p-10" />
+      <Spinner className="min-h-[320px] rounded-[24px] bg-panel p-10" />
     );
   }
   if (!rfq) {

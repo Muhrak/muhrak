@@ -19,6 +19,7 @@ import { useSaveProfile, useSellerAccount } from "./api";
 import { describedBy, FieldBlock, focusRing, initials, inputClass } from "./parts";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmDialog } from "./confirm-dialog";
+import { PageLoader } from "@/components/ui/logo-loader";
 
 /**
  * Figma "Seller – Company Profile" (179:797), dark frame converted to the
@@ -75,7 +76,7 @@ export function CompanyProfile() {
   const account = useSellerAccount();
 
   if (account.isPending) {
-    return <p className="text-sm text-text-muted" role="status">Loading your company profile…</p>;
+    return <PageLoader label="Loading your company profile" />;
   }
   if (account.isError || !user) {
     return <FormError message="Could not load your company profile. Reload the page to try again." />;

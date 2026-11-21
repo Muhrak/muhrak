@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { SellerCard } from "@/schemas";
 import { Footer, SiteNav } from "@/components/landing/sections";
-import { LogoLoader } from "@/components/ui/logo-loader";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { useSellerDirectory } from "./api";
 import { Pagination } from "./parts";
@@ -100,7 +100,7 @@ export function SellersDirectory() {
 
         <div className="mt-8">
           {directory.isPending ? (
-            <LogoLoader label="Loading sellers" className="py-20" />
+            <Spinner label="Loading sellers" className="py-20" />
           ) : directory.isError ? (
             <p role="alert" className="py-20 text-center text-sm text-destructive">
               Could not load sellers. Please try again.

@@ -26,7 +26,8 @@ import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { focusRing, Panel, StatusChip } from "../sellers/parts";
 import { useAdminMaintenance, useMaintenanceAction, useMaintenanceHistory, type MaintenanceAction } from "./api";
-import { LogoLoader } from "@/components/ui/logo-loader";
+import { PageLoader } from "@/components/ui/logo-loader";
+import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 
 /**
@@ -120,7 +121,7 @@ export function MaintenancePage() {
       </div>
 
       {state.isPending ? (
-        <LogoLoader className="py-16" />
+        <PageLoader />
       ) : state.isError ? (
         <p role="alert" className="rounded-[12px] bg-destructive/10 px-4 py-3 text-sm text-destructive">
           Could not load the maintenance status. Reload the page.
@@ -359,7 +360,7 @@ function History({ currentId }: { currentId: string | undefined }) {
     <Panel label="Past windows" className="flex-1">
       <h2 className="pb-2 text-xl leading-[normal] font-medium text-text-strong">Past windows</h2>
       {list.isPending ? (
-        <LogoLoader className="py-8" />
+        <Spinner className="py-8" />
       ) : list.isError ? (
         <p role="alert" className="py-4 text-sm text-destructive">Could not load past windows.</p>
       ) : rows.length === 0 ? (

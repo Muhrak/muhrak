@@ -15,3 +15,16 @@ export function LogoLoader({ size = 104, label = "Loading", className }: { size?
     </span>
   );
 }
+
+/**
+ * A whole page (or tab) loading: the Muhrak logo, centred in the free space
+ * of the page (developer rule, 21 Nov 2026). Anything smaller that loads
+ * inside a page uses <Spinner> instead.
+ */
+export function PageLoader({ label = "Loading", className }: { label?: string; className?: string }) {
+  return (
+    <div className={cn("flex min-h-[50dvh] flex-1 items-center justify-center", className)}>
+      <LogoLoader size={156} label={label} />
+    </div>
+  );
+}

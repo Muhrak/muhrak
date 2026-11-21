@@ -18,6 +18,7 @@ import { getDocumentLink, useSellerAccount, useSubmitDocument, useSubmitForRevie
 import { DOCUMENT_STATUS, focusRing, inputClass, StatusChip, type Tone, VERIFICATION_STATUS } from "./parts";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmDialog } from "./confirm-dialog";
+import { PageLoader } from "@/components/ui/logo-loader";
 
 /**
  * Figma "Seller – Verification" (396:6512), dark frame converted to the
@@ -54,7 +55,7 @@ const BENEFITS = [
 export function Verification() {
   const account = useSellerAccount();
   if (account.isPending) {
-    return <p className="text-sm text-text-muted" role="status">Loading verification…</p>;
+    return <PageLoader label="Loading verification" />;
   }
   if (account.isError) {
     return <FormError message="Could not load your verification. Reload the page to try again." />;

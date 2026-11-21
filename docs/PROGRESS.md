@@ -473,6 +473,17 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   and decision, DB checks (name and bank proof switched, old file kept,
   still verified, audit row, email).
 
+### Loading states: logo for pages, spinner inside pages (Sat 21 Nov, developer rule)
+- The Muhrak logo loader looked cheap repeated in every panel. Rule now:
+  a whole page or tab loading shows the logo, centred in the free space
+  (`PageLoader` in `components/ui/logo-loader.tsx`; the session check keeps
+  the full-screen logo); anything loading inside a page (lists, panels,
+  request details, search results, chat photos) shows a small spinner
+  (`components/ui/spinner.tsx`). Applied on buyer, seller, admin and
+  public pages (messenger connect, admin seller and maintenance pages,
+  public seller page, edit product, company profile and verification use
+  the page loader). Use the same rule for new screens.
+
 ### Seller company profile and buyer dashboard fixes (Sat 21 Nov, developer report)
 - Company profile: the store card's "Products" was hard-coded to 0; it now
   shows the seller's live (published) products. "Store views" removed (not
