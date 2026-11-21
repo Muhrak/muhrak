@@ -473,6 +473,21 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   and decision, DB checks (name and bank proof switched, old file kept,
   still verified, audit row, email).
 
+### Messenger redesign: one full-height panel, WhatsApp-style thread (Sat 21 Nov, developer request)
+- One panel filling the screen (no page scroll; checked 1920×911,
+  1440×900, 1366×768, phone, and the 85%-zoomed Seller Centre): compact
+  "Messenger" title and description in its header, conversations and chat
+  inside. Conversation rows: initials, name, RQ · part, last message,
+  time, unread badge (accent colour).
+- Thread opens at the newest message (`flex-col-reverse`): the newest 30
+  load first (the list's last message shows at once), older pages load on
+  scroll up ("Start of the conversation" at the end); date chips (Today,
+  Yesterday, date); consecutive messages grouped, time inside the bubble;
+  after sending, the thread jumps to the bottom; a reader who scrolled up
+  is not pulled down by new messages. Composer with an icon send button.
+- Design rule saved for all screens: tool screens use the full space with
+  compact titles (no 40 px headings there).
+
 ### Loading states: logo for pages, spinner inside pages (Sat 21 Nov, developer rule)
 - The Muhrak logo loader looked cheap repeated in every panel. Rule now:
   a whole page or tab loading shows the logo, centred in the free space
