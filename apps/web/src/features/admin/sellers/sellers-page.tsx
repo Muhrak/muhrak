@@ -32,6 +32,7 @@ export function SellersPage() {
       </div>
       <Kpis />
       <Queue />
+      <UpdatesQueue />
       <AllSellers />
     </>
   );
@@ -104,6 +105,43 @@ function Queue() {
           ))}
         </ul>
       )}
+      {list.hasNextPage ? <LoadMore onClick={() => list.fetchNextPage()} busy={list.isFetchingNextPage} /> : null}
+    </Panel>
+  );
+}
+
+/**
+ * Verified sellers who replaced a document or asked for new company details
+ * (21 Nov 2026). They stay verified; the admin approves or rejects each update.
+ */
+function UpdatesQueue() {
+  const list = useSellerList("updates", 10);
+  const rows = list.data?.pages.flatMap((page) => page.items) ?? [];
+  if (list.isPending || list.isError || rows.length === 0) return null;
+  return (
+    <Panel label="Updates to review">
+      <div className="flex min-w-0 flex-col gap-1 pb-2.5 leading-[normal]">
+        <h2 className="text-xl font-medium text-text-strong">Updates to review</h2>
+        <p className="text-[13px] text-text-subtle">Verified sellers who replaced a document or changed company details · oldest first · they stay verified</p>
+      </div>
+      <ul className="flex flex-col">
+        {rows.map((seller, index) => (
+          <li key={seller.userId} className={cn("flex flex-wrap items-center gap-3.5 py-3", index > 0 && "border-t border-line")}>
+            <Avatar name={seller.companyName} />
+            <div className="flex min-w-[180px] flex-1 flex-col gap-0.5 leading-[normal]">
+              <p className="text-[15px] font-medium text-text-strong">{seller.companyName}</p>
+              <p className="text-[13px] text-text-subtle">{place(seller.country, seller.city)}</p>
+            </div>
+            <p className="w-32 text-sm text-text-subtle">Waiting {waitingFor(seller.updateSubmittedAt)}</p>
+            <Link
+              href={`/admin/sellers/${seller.userId}`}
+              className={cn("flex h-9 items-center justify-center rounded-full bg-sidebar-bg px-4 text-sm font-medium text-white hover:opacity-90", focusRing)}
+            >
+              Review
+            </Link>
+          </li>
+        ))}
+      </ul>
       {list.hasNextPage ? <LoadMore onClick={() => list.fetchNextPage()} busy={list.isFetchingNextPage} /> : null}
     </Panel>
   );

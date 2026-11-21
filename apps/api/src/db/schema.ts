@@ -197,11 +197,20 @@ export const sellerProfiles = pgTable(
     submittedAt: timestamp("submitted_at", { withTimezone: true, precision: 3 }),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     reviewedBy: uuid("reviewed_by").references(() => users.id),
+    /**
+     * When a VERIFIED seller's oldest update still waiting for review was sent
+     * (a replaced document or new company details, 21 Nov 2026); null when
+     * nothing waits. The admin "Updates" queue, oldest first.
+     */
+    updateSubmittedAt: timestamp("update_submitted_at", { withTimezone: true, precision: 3 }),
     createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   },
   // The admin review queue (Day 4) lists sellers by status, oldest submission first.
   (table) => [
+    index("seller_profiles_update_queue_idx")
+      .on(table.updateSubmittedAt, table.userId)
+      .where(sql`${table.updateSubmittedAt} is not null`),
     index("seller_profiles_status_submitted_idx").on(table.verificationStatus, table.submittedAt),
     // Admin lists: one status, most recently changed first; and all sellers, newest first.
     index("seller_profiles_status_updated_idx").on(table.verificationStatus, table.updatedAt),
@@ -215,6 +224,13 @@ export const sellerProfiles = pgTable(
  * Verification documents. Never deleted: uploading a new file for a type
  * marks the old row superseded, so the review history is kept. At most one
  * current (not superseded) document per seller and type.
+ *
+ * Updates after verification (developer decision, 21 Nov 2026): a verified
+ * seller's new file is an UPDATE (`is_update`), reviewed by an admin while
+ * the current approved document stays in force and the seller stays
+ * verified. At most one open update per type (pending, or rejected until the
+ * seller sends another). Approving it supersedes the old document and makes
+ * the update the current one.
  */
 export const sellerDocuments = pgTable(
   "seller_documents",
@@ -234,15 +250,54 @@ export const sellerDocuments = pgTable(
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     reviewedBy: uuid("reviewed_by").references(() => users.id),
     supersededAt: timestamp("superseded_at", { withTimezone: true }),
+    /** True while this file is an update of a verified seller's document, not yet approved. */
+    isUpdate: boolean("is_update").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex("seller_documents_current_idx")
       .on(table.sellerUserId, table.type)
-      .where(sql`${table.supersededAt} is null`),
+      .where(sql`${table.supersededAt} is null and not ${table.isUpdate}`),
+    uniqueIndex("seller_documents_open_update_idx")
+      .on(table.sellerUserId, table.type)
+      .where(sql`${table.supersededAt} is null and ${table.isUpdate}`),
     index("seller_documents_seller_idx").on(table.sellerUserId, table.createdAt),
   ],
 );
+
+/**
+ * New company name, country or VAT status asked for by a VERIFIED seller
+ * (21 Nov 2026). The approved values stay in force (store, products,
+ * quotations) until an admin approves the change. At most one open request
+ * per seller (pending, or rejected until the seller changes it again).
+ * Never deleted: a newer request supersedes it.
+ */
+export const sellerProfileUpdates = pgTable(
+  "seller_profile_updates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sellerUserId: uuid("seller_user_id")
+      .notNull()
+      .references(() => users.id),
+    companyName: text("company_name").notNull(),
+    country: text("country").notNull(),
+    vatRegistered: boolean("vat_registered").notNull(),
+    status: documentStatus("status").notNull().default("pending"),
+    rejectionReason: text("rejection_reason"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedBy: uuid("reviewed_by").references(() => users.id),
+    supersededAt: timestamp("superseded_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("seller_profile_updates_open_idx")
+      .on(table.sellerUserId)
+      .where(sql`${table.supersededAt} is null`),
+    check("seller_profile_updates_country", sql`${table.country} IN ('OM','AE','SA','QA','KW','BH')`),
+  ],
+);
+
+export type SellerProfileUpdateRow = typeof sellerProfileUpdates.$inferSelect;
 
 /** Every change of a seller's verification status, who made it and why. Append only. */
 export const sellerVerificationEvents = pgTable(

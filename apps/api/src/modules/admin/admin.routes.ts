@@ -5,12 +5,14 @@ import {
   closeMaintenanceSchema,
   maintenanceHistoryQuerySchema,
   reviewSellerSchema,
+  reviewSellerUpdateSchema,
   scheduleMaintenanceSchema,
   startMaintenanceSchema,
   type AdminSellerListQuery,
   type CloseMaintenanceInput,
   type MaintenanceHistoryQuery,
   type ReviewSellerData,
+  type ReviewSellerUpdateData,
   type ScheduleMaintenanceInput,
   type StartMaintenanceInput,
 } from "../../schemas";
@@ -31,6 +33,7 @@ import {
   getSellerStatsForAdmin,
   listSellersForAdmin,
   reviewSeller,
+  reviewSellerUpdate,
 } from "../seller";
 
 /**
@@ -78,6 +81,18 @@ adminRouter.post(
   async (req, res) => {
     const { userId } = sellerParams.parse(req.params);
     res.json(await reviewSeller({ userId: req.auth!.userId, ip: clientIp(req) }, userId, req.body as ReviewSellerData));
+  },
+);
+
+/** Decide on a verified seller's updates (replaced documents, new company details). */
+adminRouter.post(
+  "/sellers/:userId/review-update",
+  limitByUser({ name: "admin-review:user", max: 120, windowMs: 15 * MINUTE }),
+  validateParams(sellerParams),
+  validateBody(reviewSellerUpdateSchema),
+  async (req, res) => {
+    const { userId } = sellerParams.parse(req.params);
+    res.json(await reviewSellerUpdate({ userId: req.auth!.userId, ip: clientIp(req) }, userId, req.body as ReviewSellerUpdateData));
   },
 );
 

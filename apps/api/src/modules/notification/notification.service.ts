@@ -187,3 +187,31 @@ export async function sendNewQuoteEmail(
     tx,
   );
 }
+
+/**
+ * Tell a verified seller what Muhrak decided on their updates (replaced
+ * documents, new company details). `dedupeKey`: unique per decision.
+ */
+export async function sendSellerUpdateReviewedEmail(input: {
+  to: string;
+  fullName: string;
+  companyName: string;
+  approved: string[];
+  rejected: { label: string; reason: string }[];
+  dedupeKey: string;
+}): Promise<void> {
+  await enqueueEmail(
+    {
+      template: "seller-update-reviewed",
+      to: input.to,
+      data: {
+        fullName: input.fullName,
+        companyName: input.companyName,
+        approved: input.approved,
+        rejected: input.rejected,
+        verificationUrl: `${env.WEB_APP_URL}/seller/verification`,
+      },
+    },
+    `seller-update-reviewed-${input.dedupeKey}`,
+  );
+}

@@ -136,13 +136,41 @@ export const verificationSchema = z.object({
   missingDocuments: z.array(documentTypeSchema),
   /** True when the profile and documents are complete and the status allows submitting. */
   canSubmit: z.boolean(),
+  /**
+   * Verified sellers only: a replaced document or new company details are
+   * waiting for Muhrak's review. The seller stays verified meanwhile.
+   */
+  updatePending: z.boolean(),
 });
 export type Verification = z.infer<typeof verificationSchema>;
 
+/**
+ * New company name, country or VAT status asked for by a VERIFIED seller
+ * (21 Nov 2026): reviewed by Muhrak; the approved values stay in force
+ * until then. "rejected" stays visible (with the reason) until the seller
+ * changes the details again.
+ */
+export const sellerProfileUpdateSchema = z.object({
+  id: z.string().uuid(),
+  companyName: z.string(),
+  country: gccCountrySchema,
+  vatRegistered: z.boolean(),
+  status: documentStatusSchema,
+  rejectionReason: z.string().nullable(),
+  submittedAt: z.string(),
+});
+export type SellerProfileUpdate = z.infer<typeof sellerProfileUpdateSchema>;
+
 /** GET /v1/seller/profile and the result of every seller write. */
 export const sellerAccountSchema = z.object({
+  /** The details in force (what buyers see). */
   profile: sellerProfileSchema.nullable(),
+  /** The documents in force. */
   documents: z.array(sellerDocumentSchema),
   verification: verificationSchema,
+  /** Verified sellers: replaced documents under review, or not accepted (one per type at most). */
+  documentUpdates: z.array(sellerDocumentSchema),
+  /** Verified sellers: new company details under review, or not accepted. */
+  profileUpdate: sellerProfileUpdateSchema.nullable(),
 });
 export type SellerAccount = z.infer<typeof sellerAccountSchema>;

@@ -6,6 +6,7 @@ import {
   gccCountrySchema,
   sellerDocumentSchema,
   sellerProfileSchema,
+  sellerProfileUpdateSchema,
   verificationSchema,
   verificationStatusSchema,
 } from "./seller";
@@ -18,6 +19,8 @@ import {
 /** GET /v1/admin/sellers?status=&cursor=&limit= */
 export const adminSellerListQuerySchema = z.object({
   status: verificationStatusSchema.optional(),
+  /** "updates": verified sellers with a replaced document or new details waiting for review, oldest first. */
+  queue: z.enum(["updates"]).optional(),
   cursor: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
@@ -34,6 +37,8 @@ export const adminSellerSummarySchema = z.object({
   /** Required documents the seller has uploaded, e.g. ["commercial_registration", "owner_id"]. */
   documents: z.array(documentTypeSchema),
   submittedAt: z.string().nullable(),
+  /** When the oldest update still waiting for review was sent (verified sellers), or null. */
+  updateSubmittedAt: z.string().nullable(),
   createdAt: z.string(),
 });
 export type AdminSellerSummary = z.infer<typeof adminSellerSummarySchema>;
@@ -54,6 +59,9 @@ export const adminSellerStatsSchema = z.object({
   rejected: z.number().int(),
   /** When the oldest seller in the queue submitted, or null if the queue is empty. */
   oldestPendingAt: z.string().nullable(),
+  /** Verified sellers with an update waiting for review. */
+  updates: z.number().int(),
+  oldestUpdateAt: z.string().nullable(),
 });
 export type AdminSellerStats = z.infer<typeof adminSellerStatsSchema>;
 
@@ -75,6 +83,10 @@ export const adminSellerDetailSchema = z.object({
   documents: z.array(sellerDocumentSchema),
   verification: verificationSchema,
   history: z.array(verificationEventSchema),
+  /** Replaced documents of a verified seller waiting for review, or rejected (one per type at most). */
+  documentUpdates: z.array(sellerDocumentSchema),
+  /** New company details of a verified seller waiting for review, or rejected. */
+  profileUpdate: sellerProfileUpdateSchema.nullable(),
 });
 export type AdminSellerDetail = z.infer<typeof adminSellerDetailSchema>;
 
@@ -108,3 +120,21 @@ export const reviewSellerSchema = z.object({
 });
 export type ReviewSellerInput = z.input<typeof reviewSellerSchema>;
 export type ReviewSellerData = z.output<typeof reviewSellerSchema>;
+
+/**
+ * POST /v1/admin/sellers/:userId/review-update (21 Nov 2026): decide on a
+ * VERIFIED seller's updates. The admin decides on exactly the updates that
+ * are waiting now (else 409); the seller stays verified either way.
+ */
+const updateDecision = z.object({
+  id: z.string().uuid(),
+  status: documentStatusSchema.exclude(["pending"]),
+  /** Required when rejected. Shown to the seller. */
+  reason: reasonText(300).optional().transform((value) => value || null),
+});
+export const reviewSellerUpdateSchema = z.object({
+  profileUpdate: updateDecision.nullable().default(null),
+  documents: z.array(updateDecision).max(10).default([]),
+});
+export type ReviewSellerUpdateInput = z.input<typeof reviewSellerUpdateSchema>;
+export type ReviewSellerUpdateData = z.output<typeof reviewSellerUpdateSchema>;

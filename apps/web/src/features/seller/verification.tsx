@@ -17,11 +17,17 @@ import { cn } from "@/lib/utils";
 import { getDocumentLink, useSellerAccount, useSubmitDocument, useSubmitForReview } from "./api";
 import { DOCUMENT_STATUS, focusRing, inputClass, StatusChip, type Tone, VERIFICATION_STATUS } from "./parts";
 import { useToast } from "@/components/ui/toast";
+import { ConfirmDialog } from "./confirm-dialog";
 
 /**
  * Figma "Seller – Verification" (396:6512), dark frame converted to the
  * light Seller Centre palette: status card, documents list, upload panel
  * and "Why verify".
+ *
+ * Verified sellers (developer decision, 21 Nov 2026): "Replace" first asks
+ * for confirmation, then the new file goes to Muhrak as an update. The
+ * company stays verified and the approved file stays in use until the
+ * update is approved; a new bank proof pauses payouts until then.
  */
 
 const NUMBER_LABEL: Record<DocumentType, { label: string; placeholder: string }> = {
@@ -57,16 +63,34 @@ export function Verification() {
 }
 
 function VerificationView({ account }: { account: SellerAccount }) {
-  const { profile, documents, verification } = account;
+  const { profile, documents, verification, documentUpdates, profileUpdate } = account;
   const submit = useSubmitForReview();
   const toast = useToast();
   const current = new Map(documents.map((doc) => [doc.type, doc]));
+  const updates = new Map(documentUpdates.map((doc) => [doc.type, doc]));
   const [selected, setSelected] = useState<DocumentType>(
     verification.missingDocuments[0] ?? verification.requiredDocuments[0] ?? "commercial_registration",
   );
   const locked = verification.status === "pending";
+  const verified = verification.status === "approved";
   const canChange = Boolean(profile) && !locked;
   const showSubmit = verification.status === "draft" || verification.status === "rejected";
+  /** Verified: the document the seller confirmed replacing (the upload panel shows only after the alert). */
+  const [confirmedType, setConfirmedType] = useState<DocumentType | null>(null);
+  const [asking, setAsking] = useState<DocumentType | null>(null);
+  // Asking to become VAT registered: the VAT certificate is needed for that review too.
+  const rows =
+    verified && profileUpdate?.status === "pending" && profileUpdate.vatRegistered && !verification.requiredDocuments.includes("vat_certificate")
+      ? [...verification.requiredDocuments, "vat_certificate" as const]
+      : verification.requiredDocuments;
+
+  function startUpload(type: DocumentType) {
+    if (verified) {
+      setAsking(type);
+      return;
+    }
+    setSelected(type);
+  }
 
   return (
     <>
@@ -94,29 +118,64 @@ function VerificationView({ account }: { account: SellerAccount }) {
 
       <FormError message={submit.error instanceof ApiError ? submit.error.message : submit.error ? "Could not submit. Please try again." : undefined} />
 
+      {asking ? (
+        <ConfirmDialog
+          title={`Replace ${DOCUMENT_LABELS[asking]}?`}
+          confirmLabel="Continue"
+          onCancel={() => setAsking(null)}
+          onConfirm={() => {
+            setConfirmedType(asking);
+            setAsking(null);
+          }}
+        >
+          <p>Your company stays verified. The Muhrak team reviews the new file before it replaces the current one.</p>
+          <p>Until it is approved, your current document stays in use. We email you when the review is done.</p>
+          {asking === "bank_proof" ? (
+            <p className="rounded-[12px] bg-seller-orange/10 px-3.5 py-2.5 text-sm text-text-strong">
+              Payouts to you are paused until the new bank details are approved. This protects your money if someone else gets into your account.
+            </p>
+          ) : null}
+        </ConfirmDialog>
+      ) : null}
+
       <StatusCard account={account} />
 
       <div className="flex flex-1 flex-col gap-5 lg:flex-row lg:items-stretch">
         <section aria-label="Documents" className="flex min-w-0 flex-1 flex-col rounded-[24px] bg-panel px-5 py-[22px] sm:px-6">
           <h2 className="pb-2.5 text-lg leading-[normal] font-medium text-text-strong">Documents</h2>
           <ul className="flex flex-col">
-            {verification.requiredDocuments.map((type, index) => (
+            {rows.map((type, index) => (
               <DocumentRow
                 key={type}
                 type={type}
                 doc={current.get(type)}
+                update={verified ? updates.get(type) : undefined}
                 submitted={verification.status !== "draft"}
                 divider={index > 0}
                 canChange={canChange}
-                onUpload={() => setSelected(type)}
+                onUpload={() => startUpload(type)}
               />
             ))}
           </ul>
         </section>
 
         <div className="flex w-full shrink-0 flex-col gap-5 lg:w-[360px]">
-          {locked ? null : (
-            <UploadPanel type={selected} hasProfile={Boolean(profile)} replacing={current.has(selected)} />
+          {locked ? null : verified && !confirmedType ? (
+            <section aria-label="Update a document" className="flex flex-col gap-2 rounded-[24px] bg-panel px-6 py-[22px]">
+              <h2 className="text-lg leading-[normal] font-medium text-text-strong">Update a document</h2>
+              <p className="text-sm leading-normal text-text-muted">
+                Click Replace next to a document. Your company stays verified while Muhrak reviews the new file.
+              </p>
+            </section>
+          ) : (
+            <UploadPanel
+              key={verified ? `update-${confirmedType}` : selected}
+              type={verified && confirmedType ? confirmedType : selected}
+              hasProfile={Boolean(profile)}
+              replacing={current.has(verified && confirmedType ? confirmedType : selected)}
+              asUpdate={verified}
+              onDone={verified ? () => setConfirmedType(null) : undefined}
+            />
           )}
           <section aria-label="Why verify" className="flex flex-1 flex-col gap-3 rounded-[24px] bg-panel px-6 py-[22px]">
             <h2 className="text-lg leading-[normal] font-medium text-text-strong">Why verify</h2>
@@ -163,10 +222,12 @@ function StatusCard({ account }: { account: SellerAccount }) {
     },
     approved: {
       title: "Verified seller",
-      text: "Buyers see a verified badge on your store and every product.",
+      text: verification.updatePending
+        ? "An update you sent is being reviewed. Your store, products and quotations stay live meanwhile."
+        : "Buyers see a verified badge on your store and every product.",
       icon: "check-circle",
       tone: "success",
-      hint: "Changing a document starts a new review",
+      hint: "Replaced documents are reviewed; you stay verified",
     },
     rejected: {
       title: "Changes needed",
@@ -240,6 +301,7 @@ function fileSummary(doc: SellerDocument): string {
 function DocumentRow({
   type,
   doc,
+  update,
   submitted,
   divider,
   canChange,
@@ -247,6 +309,8 @@ function DocumentRow({
 }: {
   type: DocumentType;
   doc: SellerDocument | undefined;
+  /** Verified sellers: the new file sent for review (or not accepted). */
+  update?: SellerDocument;
   submitted: boolean;
   divider: boolean;
   canChange: boolean;
@@ -329,11 +393,26 @@ function DocumentRow({
                 focusRing,
               )}
             >
-              {doc ? "Replace" : "Upload"}
+              {doc || update ? "Replace" : "Upload"}
             </button>
           ) : null}
         </div>
       </div>
+      {update ? (
+        <div
+          className={cn(
+            "mb-3 flex flex-wrap items-center gap-2 rounded-[12px] px-3.5 py-2.5 text-[13px] leading-normal sm:ml-[54px]",
+            update.status === "rejected" ? "bg-destructive/8" : "bg-surface",
+          )}
+        >
+          <StatusChip tone={update.status === "rejected" ? "danger" : "warning"}>{update.status === "rejected" ? "Update not accepted" : "Update in review"}</StatusChip>
+          <span className={cn("min-w-0 flex-1", update.status === "rejected" ? "text-destructive" : "text-text-body")}>
+            {update.status === "rejected"
+              ? `${update.rejectionReason ?? "Not accepted."} Your current document stays in use.`
+              : `New file sent ${new Date(update.uploadedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}. The current one stays in use until it is approved.${type === "bank_proof" ? " Payouts are paused until then." : ""}`}
+          </span>
+        </div>
+      ) : null}
       {blockedUrl ? (
         <a href={blockedUrl} target="_blank" rel="noopener noreferrer" onClick={() => setBlockedUrl(undefined)} className="w-fit pb-2 text-[13px] font-medium text-text-strong underline">
           Your browser blocked the new tab. Open the document
@@ -353,10 +432,15 @@ function UploadPanel({
   type,
   hasProfile,
   replacing,
+  asUpdate = false,
+  onDone,
 }: {
   type: DocumentType;
   hasProfile: boolean;
   replacing: boolean;
+  /** Verified seller: the file is sent as an update for review. */
+  asUpdate?: boolean;
+  onDone?: () => void;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const numberId = useId();
@@ -366,6 +450,7 @@ function UploadPanel({
   const [error, setError] = useState<string>();
   const [done, setDone] = useState<string>();
   const submitDocument = useSubmitDocument();
+  const toast = useToast();
   const disabled = !hasProfile || busy;
 
   async function send(file: File) {
@@ -378,6 +463,11 @@ function UploadPanel({
       const uploadId = await uploadFile("seller", "seller_document", file);
       await submitDocument.mutateAsync({ type, uploadId, documentNumber: documentNumber.trim() || null });
       setDocumentNumber("");
+      if (asUpdate) {
+        toast.success(`${DOCUMENT_LABELS[type]} sent for review.`, "Your current one stays in use until it is approved.");
+        onDone?.();
+        return;
+      }
       setDone(`${DOCUMENT_LABELS[type]} uploaded.`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "The upload did not finish. Please try again.");
@@ -402,10 +492,18 @@ function UploadPanel({
 
   return (
     <section aria-label={`Upload ${DOCUMENT_LABELS[type]}`} className="flex flex-col gap-3 rounded-[24px] bg-panel px-6 py-[22px]">
-      <h2 className="text-lg leading-[normal] font-medium text-text-strong">
-        {replacing ? "Replace " : ""}
-        {DOCUMENT_LABELS[type]}
-      </h2>
+      <div className="flex items-start gap-2">
+        <h2 className="min-w-0 flex-1 text-lg leading-[normal] font-medium text-text-strong">
+          {asUpdate ? "New file: " : replacing ? "Replace " : ""}
+          {DOCUMENT_LABELS[type]}
+        </h2>
+        {asUpdate && onDone ? (
+          <button type="button" onClick={onDone} disabled={busy} className={cn("rounded-sm text-[13px] font-medium text-text-muted hover:text-text-strong", focusRing)}>
+            Cancel
+          </button>
+        ) : null}
+      </div>
+      {asUpdate ? <p className="text-[13px] leading-normal text-text-muted">Sent to Muhrak for review. Your current file stays in use until it is approved.</p> : null}
 
       {!hasProfile ? (
         <p className="text-sm leading-normal text-text-muted">

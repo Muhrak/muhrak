@@ -65,13 +65,13 @@ export function SolidPillLink({ href, icon, children }: { href: string; icon?: I
   );
 }
 
-export function StatCards({ stats }: { stats: { label: string; value: number; note: string }[] }) {
+export function StatCards({ stats, fit }: { stats: { label: string; value: number; note: string }[]; fit?: boolean }) {
   return (
-    <div className="grid gap-5 sm:grid-cols-3">
+    <div className="grid shrink-0 gap-5 sm:grid-cols-3">
       {stats.map((stat) => (
-        <div key={stat.label} className="flex flex-col gap-1 rounded-[24px] bg-panel px-6 py-[22px] leading-[normal]">
+        <div key={stat.label} className={cn("flex flex-col gap-1 rounded-[24px] bg-panel px-6 py-[22px] leading-[normal]", fit && "lg:py-[18px]")}>
           <p className="text-[15px] font-medium text-text-body">{stat.label}</p>
-          <p className="text-[52px] font-light tracking-[-0.03em] text-text-strong">{stat.value}</p>
+          <p className={cn("text-[52px] font-light tracking-[-0.03em] text-text-strong", fit && "lg:text-[44px]")}>{stat.value}</p>
           <p className="text-sm text-text-subtle">{stat.note}</p>
         </div>
       ))}
@@ -86,15 +86,18 @@ export function EmptyPanel({
   icon,
   emptyTitle,
   emptyText,
+  fit,
 }: {
   title: string;
   link: { href: string; label: string };
   icon: IconName;
   emptyTitle: string;
   emptyText: string;
+  /** Desktop: shrink to the space left on a one-screen dashboard. */
+  fit?: boolean;
 }) {
   return (
-    <section aria-label={title} className="flex min-h-[260px] flex-1 flex-col rounded-[24px] bg-panel px-6 py-[22px]">
+    <section aria-label={title} className={cn("flex min-h-[260px] flex-1 flex-col rounded-[24px] bg-panel px-6 py-[22px]", fit && "lg:min-h-0 lg:overflow-hidden")}>
       <div className="flex items-center gap-2">
         <h2 className="flex-1 text-xl leading-[normal] font-medium tracking-[-0.01em] text-text-strong">{title}</h2>
         <Link href={link.href} className={cn("flex items-center gap-1.5 rounded-sm text-[15px] leading-[normal] font-medium text-text-strong hover:underline", focusRing)}>
@@ -102,7 +105,7 @@ export function EmptyPanel({
           <Icon name="arrow-right" className="size-[15px]" />
         </Link>
       </div>
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
+      <div className={cn("flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center", fit && "lg:py-3")}>
         <span className="mb-1 flex size-[52px] items-center justify-center rounded-full bg-surface text-text-body">
           <Icon name={icon} className="size-[22px]" />
         </span>
@@ -113,14 +116,14 @@ export function EmptyPanel({
   );
 }
 
-export function PanelRow({ children }: { children: ReactNode }) {
-  return <div className="flex flex-1 flex-col gap-5 lg:flex-row">{children}</div>;
+export function PanelRow({ children, fit }: { children: ReactNode; fit?: boolean }) {
+  return <div className={cn("flex flex-1 flex-col gap-5 lg:flex-row", fit && "lg:min-h-0")}>{children}</div>;
 }
 
 /** A dashboard panel with rows (the filled version of EmptyPanel). */
-export function ListPanel({ title, link, children }: { title: string; link: { href: string; label: string }; children: ReactNode }) {
+export function ListPanel({ title, link, children, fit }: { title: string; link: { href: string; label: string }; children: ReactNode; fit?: boolean }) {
   return (
-    <section aria-label={title} className="flex min-h-[260px] flex-1 flex-col rounded-[24px] bg-panel px-6 py-[22px]">
+    <section aria-label={title} className={cn("flex min-h-[260px] flex-1 flex-col rounded-[24px] bg-panel px-6 py-[22px]", fit && "lg:min-h-0")}>
       <div className="flex items-center gap-2">
         <h2 className="flex-1 text-xl leading-[normal] font-medium tracking-[-0.01em] text-text-strong">{title}</h2>
         <Link
@@ -131,7 +134,8 @@ export function ListPanel({ title, link, children }: { title: string; link: { hr
           <Icon name="arrow-right" className="size-[15px]" />
         </Link>
       </div>
-      <ul className="mt-3 flex flex-col">{children}</ul>
+      {/* One-screen dashboard: a long list scrolls inside the panel, not the page. */}
+      <ul className={cn("mt-3 flex flex-col", fit && "lg:min-h-0 lg:overflow-y-auto")}>{children}</ul>
     </section>
   );
 }

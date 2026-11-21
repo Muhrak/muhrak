@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Icon } from "@/components/layout/icon";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { getDocumentLink, useReviewSeller, useSellerDetail } from "./api";
+import { getDocumentLink, useReviewSeller, useReviewSellerUpdate, useSellerDetail } from "./api";
 import { Avatar, DOCUMENT_STATUS, focusRing, formatDate, Panel, place, StatusChip, VERIFICATION } from "./parts";
 import { LogoLoader } from "@/components/ui/logo-loader";
 import { useToast } from "@/components/ui/toast";
@@ -34,7 +34,15 @@ export function ReviewPage({ userId }: { userId: string }) {
         </p>
       ) : (
         // Re-mount the form when the server data changes, so stale choices never survive.
-        <Review key={detail.data.verification.status + detail.data.documents.map((d) => d.id + d.status).join()} seller={detail.data} />
+        <Review
+          key={[
+            detail.data.verification.status,
+            ...detail.data.documents.map((d) => d.id + d.status),
+            ...detail.data.documentUpdates.map((d) => d.id + d.status),
+            detail.data.profileUpdate ? detail.data.profileUpdate.id + detail.data.profileUpdate.status : "",
+          ].join()}
+          seller={detail.data}
+        />
       )}
     </>
   );
@@ -102,7 +110,9 @@ function Review({ seller }: { seller: AdminSellerDetail }) {
               <p className="pb-2 text-sm text-text-muted">
                 {verification.status === "draft"
                   ? "The seller has not submitted for review yet."
-                  : "Decisions can only be made while the seller is in review."}
+                  : verification.status === "approved"
+                    ? "The documents in force. Files the seller replaces appear under Updates to review."
+                    : "Decisions can only be made while the seller is in review."}
               </p>
             ) : null}
             <ul className="flex flex-col">
@@ -124,6 +134,8 @@ function Review({ seller }: { seller: AdminSellerDetail }) {
               </p>
             ) : null}
           </Panel>
+
+          {verification.status === "approved" ? <UpdatesPanel seller={seller} /> : null}
 
           {pending ? (
             <Panel label="Decision" className="gap-4">
@@ -240,6 +252,153 @@ function Review({ seller }: { seller: AdminSellerDetail }) {
   );
 }
 
+/**
+ * A verified seller's updates (21 Nov 2026): replaced documents and new
+ * company details, each approved or rejected with a reason. The seller stays
+ * verified either way; an approved document replaces the old one.
+ */
+function UpdatesPanel({ seller }: { seller: AdminSellerDetail }) {
+  const { user, profile, documentUpdates, profileUpdate } = seller;
+  const waitingDocs = documentUpdates.filter((doc) => doc.status === "pending");
+  const waitingProfile = profileUpdate?.status === "pending" ? profileUpdate : null;
+  const review = useReviewSellerUpdate(user.id);
+  const toast = useToast();
+  const [choices, setChoices] = useState<Record<string, Choice>>(() =>
+    Object.fromEntries([...waitingDocs.map((doc) => doc.id), ...(waitingProfile ? [waitingProfile.id] : [])].map((id) => [id, { status: null, reason: "" }])),
+  );
+  const [localError, setLocalError] = useState<string>();
+  if (waitingDocs.length === 0 && !waitingProfile) {
+    const rejected = [...documentUpdates.filter((doc) => doc.status === "rejected").map((doc) => DOCUMENT_LABELS[doc.type]), ...(profileUpdate?.status === "rejected" ? ["Company details"] : [])];
+    return rejected.length ? (
+      <Panel label="Updates">
+        <h2 className="pb-1 text-lg leading-[normal] font-medium text-text-strong">Updates</h2>
+        <p className="text-sm text-text-muted">Not accepted, waiting for the seller: {rejected.join(", ")}.</p>
+      </Panel>
+    ) : null;
+  }
+  const ids = Object.keys(choices);
+  const decided = ids.every((id) => choices[id]?.status);
+  const missingReason = ids.some((id) => choices[id]?.status === "rejected" && !choices[id]?.reason.trim());
+
+  function submit() {
+    setLocalError(undefined);
+    if (!decided) return setLocalError("Approve or reject every update first.");
+    if (missingReason) return setLocalError("Give a reason for every rejected update.");
+    const decision = (id: string) => ({ id, status: choices[id]!.status!, reason: choices[id]!.status === "rejected" ? choices[id]!.reason.trim() : undefined });
+    review.mutate(
+      { profileUpdate: waitingProfile ? decision(waitingProfile.id) : null, documents: waitingDocs.map((doc) => decision(doc.id)) },
+      { onSuccess: () => toast.success("Updates decided.", "The seller gets an email. They stay verified.") },
+    );
+  }
+  const serverError = review.error ? (review.error instanceof ApiError ? review.error.message : "Something went wrong. Please try again.") : undefined;
+
+  return (
+    <Panel label="Updates to review" className="gap-3">
+      <div className="flex flex-col gap-1 leading-[normal]">
+        <h2 className="text-lg font-medium text-text-strong">Updates to review</h2>
+        <p className="text-[13px] text-text-subtle">The seller stays verified. Approving a document replaces the one in force; rejecting keeps it.</p>
+      </div>
+      <ul className="flex flex-col">
+        {waitingProfile ? (
+          <li className="flex flex-col gap-2.5 py-3.5">
+            <div className="flex flex-wrap items-center gap-3.5">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-surface text-text-body">
+                <Icon name="file" className="size-[18px]" />
+              </span>
+              <div className="flex min-w-[160px] flex-1 flex-col gap-1 text-sm leading-[normal]">
+                <p className="font-medium text-text-strong">Company details</p>
+                <ChangeLine label="Name" from={profile.companyName} to={waitingProfile.companyName} />
+                <ChangeLine label="Country" from={GCC_COUNTRY_NAMES[profile.country]} to={GCC_COUNTRY_NAMES[waitingProfile.country]} />
+                <ChangeLine label="VAT registered" from={profile.vatRegistered ? "Yes" : "No"} to={waitingProfile.vatRegistered ? "Yes" : "No"} />
+              </div>
+              <DecisionToggle
+                label="Company details"
+                choice={choices[waitingProfile.id]!}
+                onChange={(choice) => setChoices((previous) => ({ ...previous, [waitingProfile.id]: choice }))}
+              />
+            </div>
+            {choices[waitingProfile.id]?.status === "rejected" ? (
+              <ReasonInput label="Company details" choice={choices[waitingProfile.id]!} onChange={(choice) => setChoices((previous) => ({ ...previous, [waitingProfile.id]: choice }))} />
+            ) : null}
+          </li>
+        ) : null}
+        {waitingDocs.map((doc, index) => (
+          <DocumentRow
+            key={doc.id}
+            sellerId={user.id}
+            doc={doc}
+            divider={index > 0 || Boolean(waitingProfile)}
+            editable
+            choice={choices[doc.id]!}
+            onChange={(choice) => setChoices((previous) => ({ ...previous, [doc.id]: choice }))}
+            note={doc.type === "bank_proof" ? "New bank details: payouts to this seller are paused until approved." : "Replaces the document in force."}
+          />
+        ))}
+      </ul>
+      {localError || serverError ? (
+        <p role="alert" className="rounded-[12px] bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {localError ?? serverError}
+        </p>
+      ) : null}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          disabled={review.isPending}
+          onClick={submit}
+          className={cn("h-11 rounded-full bg-sidebar-bg px-5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60", focusRing)}
+        >
+          {review.isPending ? "Saving…" : "Save decisions"}
+        </button>
+      </div>
+    </Panel>
+  );
+}
+
+function ChangeLine({ label, from, to }: { label: string; from: string; to: string }) {
+  if (from === to) return <p className="text-text-subtle">{label}: {from}</p>;
+  return (
+    <p className="text-text-body">
+      {label}: <span className="text-text-subtle line-through">{from}</span> → <span className="font-medium text-text-strong">{to}</span>
+    </p>
+  );
+}
+
+function DecisionToggle({ label, choice, onChange }: { label: string; choice: Choice; onChange: (choice: Choice) => void }) {
+  return (
+    <div role="radiogroup" aria-label={`Decision for ${label}`} className="flex gap-1 rounded-full bg-surface p-1">
+      {(["approved", "rejected"] as const).map((status) => (
+        <button
+          key={status}
+          type="button"
+          role="radio"
+          aria-checked={choice.status === status}
+          onClick={() => onChange({ ...choice, status })}
+          className={cn(
+            "rounded-full px-3.5 py-1.5 text-[13px] font-medium",
+            choice.status === status ? (status === "approved" ? "bg-sidebar-bg text-white" : "bg-destructive text-white") : "text-text-muted hover:text-text-strong",
+            focusRing,
+          )}
+        >
+          {status === "approved" ? "Approve" : "Reject"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ReasonInput({ label, choice, onChange }: { label: string; choice: Choice; onChange: (choice: Choice) => void }) {
+  return (
+    <input
+      aria-label={`Why ${label} is rejected`}
+      value={choice.reason}
+      maxLength={300}
+      onChange={(event) => onChange({ ...choice, reason: event.target.value })}
+      placeholder="Reason the seller will see"
+      className={cn("h-10 w-full rounded-[10px] border border-line px-3.5 text-sm text-text-strong placeholder:text-text-subtle sm:ml-[54px] sm:w-[calc(100%-54px)]", focusRing)}
+    />
+  );
+}
+
 function DocumentRow({
   sellerId,
   doc,
@@ -247,6 +406,7 @@ function DocumentRow({
   editable,
   choice,
   onChange,
+  note,
 }: {
   sellerId: string;
   doc: SellerDocument;
@@ -254,6 +414,8 @@ function DocumentRow({
   editable: boolean;
   choice: Choice;
   onChange: (choice: Choice) => void;
+  /** Extra line under the file details (updates). */
+  note?: string;
 }) {
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState<string>();
@@ -295,6 +457,7 @@ function DocumentRow({
         <div className="flex min-w-[160px] flex-1 flex-col gap-[3px] leading-[normal]">
           <p className="text-sm font-medium text-text-strong">{DOCUMENT_LABELS[doc.type]}</p>
           <p className="text-xs text-text-subtle">{[doc.documentNumber, fileType, size, formatDate(doc.uploadedAt)].filter(Boolean).join(" · ")}</p>
+          {note ? <p className="text-xs text-text-body">{note}</p> : null}
         </div>
         {!editable ? <StatusChip tone={DOCUMENT_STATUS[doc.status].tone}>{DOCUMENT_STATUS[doc.status].label}</StatusChip> : null}
         <button

@@ -16,4 +16,6 @@ export {
   type PublicSellerProfile,
   listSellersForAdmin,
   reviewSeller,
+  reviewSellerUpdate,
+  hasPendingBankProofUpdate,
 } from "./seller.service";

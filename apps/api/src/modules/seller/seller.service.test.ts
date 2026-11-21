@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SellerProfileData, VerificationStatus } from "../../schemas";
-import type { SellerDocumentRow, SellerProfileRow } from "../../db/schema";
+import type { SellerDocumentRow, SellerProfileRow, SellerProfileUpdateRow } from "../../db/schema";
 
 vi.hoisted(() => {
   Object.assign(process.env, {
@@ -19,6 +19,12 @@ vi.mock("./seller.repository", () => ({
   findOwnDocument: vi.fn(),
   supersedeCurrentDocument: vi.fn(),
   insertDocument: vi.fn(),
+  findOpenDocumentUpdates: vi.fn(async () => []),
+  supersedeOpenDocumentUpdate: vi.fn(),
+  findOpenProfileUpdate: vi.fn(async () => undefined),
+  supersedeOpenProfileUpdate: vi.fn(),
+  insertProfileUpdate: vi.fn(),
+  oldestPendingUpdateAt: vi.fn(async () => null),
 }));
 vi.mock("../upload", () => ({
   attachUpload: vi.fn(),
@@ -51,6 +57,7 @@ function profile(overrides: Partial<SellerProfileRow> = {}): SellerProfileRow {
     submittedAt: null,
     reviewedAt: null,
     reviewedBy: null,
+    updateSubmittedAt: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -83,7 +90,25 @@ function doc(type: SellerDocumentRow["type"], status: SellerDocumentRow["status"
     reviewedAt: null,
     reviewedBy: null,
     supersededAt: null,
+    isUpdate: false,
     createdAt: now,
+  };
+}
+
+function profileUpdate(overrides: Partial<SellerProfileUpdateRow> = {}): SellerProfileUpdateRow {
+  return {
+    id: "66666666-6666-4666-8666-666666666666",
+    sellerUserId: SELLER,
+    companyName: "Najd Equipment LLC",
+    country: "OM",
+    vatRegistered: false,
+    status: "pending",
+    rejectionReason: null,
+    reviewedAt: null,
+    reviewedBy: null,
+    supersededAt: null,
+    createdAt: now,
+    ...overrides,
   };
 }
 
@@ -109,7 +134,7 @@ describe("verification state machine", () => {
     const all: VerificationStatus[] = ["draft", "pending", "approved", "rejected"];
     const allowed = all.flatMap((from) => all.filter((to) => service.canTransition(from, to)).map((to) => `${from}->${to}`));
     expect(allowed.sort()).toEqual(
-      ["draft->pending", "pending->approved", "pending->rejected", "approved->pending", "rejected->pending"].sort(),
+      ["draft->pending", "pending->approved", "pending->rejected", "rejected->pending"].sort(),
     );
   });
 
@@ -181,10 +206,36 @@ describe("saveProfile", () => {
     expect(statusChanges()).toEqual([]);
   });
 
-  it("sends an approved seller back to review when the company name changes", async () => {
+  it("keeps a verified seller verified when the company name changes: the new name waits for review", async () => {
     given(profile({ verificationStatus: "approved" }));
+    await service.saveProfile(SELLER, input({ companyName: "Najd Equipment LLC", city: "Sohar" }), now);
+    expect(statusChanges()).toEqual([]);
+    // The approved name stays in force; other fields change at once.
+    const written = vi.mocked(repo.updateProfile).mock.calls.map(([, , values]) => values);
+    expect(written.some((values) => "companyName" in values || "country" in values || "vatRegistered" in values)).toBe(false);
+    expect(written).toContainEqual(expect.objectContaining({ city: "Sohar" }));
+    expect(repo.insertProfileUpdate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ sellerUserId: SELLER, companyName: "Najd Equipment LLC", country: "OM", vatRegistered: false }),
+    );
+  });
+
+  it("does not file the same change twice, and drops it when the seller goes back to the approved values", async () => {
+    given(profile({ verificationStatus: "approved" }));
+    vi.mocked(repo.findOpenProfileUpdate).mockResolvedValue(profileUpdate());
     await service.saveProfile(SELLER, input({ companyName: "Najd Equipment LLC" }), now);
-    expect(statusChanges()).toEqual(["approved->pending"]);
+    expect(repo.insertProfileUpdate).not.toHaveBeenCalled();
+    await service.saveProfile(SELLER, input(), now);
+    expect(repo.supersedeOpenProfileUpdate).toHaveBeenCalledWith(expect.anything(), SELLER, now);
+    expect(repo.insertProfileUpdate).not.toHaveBeenCalled();
+  });
+
+  it("files a new request after a rejected one (the rejected one is kept, replaced)", async () => {
+    given(profile({ verificationStatus: "approved" }));
+    vi.mocked(repo.findOpenProfileUpdate).mockResolvedValue(profileUpdate({ status: "rejected", rejectionReason: "Name does not match the CR" }));
+    await service.saveProfile(SELLER, input({ companyName: "Najd Equipment LLC" }), now);
+    expect(repo.supersedeOpenProfileUpdate).toHaveBeenCalled();
+    expect(repo.insertProfileUpdate).toHaveBeenCalled();
   });
 
   it("keeps an approved seller verified for other edits", async () => {
@@ -234,10 +285,31 @@ describe("submitDocument", () => {
     expect(repo.insertDocument).not.toHaveBeenCalled();
   });
 
-  it("sends an approved seller back to review when a document changes", async () => {
+  it("keeps a verified seller verified: a new document is an update, the approved one stays in force", async () => {
     given(profile({ verificationStatus: "approved" }));
     await service.submitDocument(SELLER, "bank_proof", { uploadId: UPLOAD, documentNumber: null }, now);
-    expect(statusChanges()).toEqual(["approved->pending"]);
+    expect(statusChanges()).toEqual([]);
+    expect(repo.supersedeCurrentDocument).not.toHaveBeenCalled();
+    expect(repo.supersedeOpenDocumentUpdate).toHaveBeenCalledWith(expect.anything(), SELLER, "bank_proof", now);
+    expect(repo.insertDocument).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ type: "bank_proof", isUpdate: true }));
+    // The admin "Updates" queue time is refreshed in the same transaction.
+    expect(repo.updateProfile).toHaveBeenCalledWith(expect.anything(), SELLER, expect.objectContaining({ updateSubmittedAt: null }));
+  });
+
+  it("a verified seller asking to become VAT registered may send a VAT certificate; otherwise not", async () => {
+    given(profile({ verificationStatus: "approved", vatRegistered: false }));
+    await expect(service.submitDocument(SELLER, "vat_certificate", { uploadId: UPLOAD, documentNumber: null }, now)).rejects.toMatchObject({ status: 400 });
+    vi.mocked(repo.findOpenProfileUpdate).mockResolvedValue(profileUpdate({ vatRegistered: true }));
+    await service.submitDocument(SELLER, "vat_certificate", { uploadId: UPLOAD, documentNumber: null }, now);
+    expect(repo.insertDocument).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ type: "vat_certificate", isUpdate: true }));
+  });
+
+  it("shows the seller their open updates only while verified", async () => {
+    given(profile({ verificationStatus: "approved" }), ALL_DOCS);
+    vi.mocked(repo.findOpenDocumentUpdates).mockResolvedValue([{ ...doc("bank_proof"), isUpdate: true }]);
+    const account = await service.getAccount(SELLER);
+    expect(account.verification).toMatchObject({ status: "approved", updatePending: true });
+    expect(account.documentUpdates.map((item) => item.type)).toEqual(["bank_proof"]);
   });
 });
 

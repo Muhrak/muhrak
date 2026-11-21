@@ -278,5 +278,45 @@ export function renderEmail(job: EmailJob): RenderedEmail {
         ),
       };
     }
+
+    case "seller-update-reviewed": {
+      const { fullName, companyName, approved, rejected, verificationUrl } = job.data;
+      const url = escapeHtml(verificationUrl);
+      const someRejected = rejected.length > 0;
+      const approvedHtml = approved.length
+        ? `<tr><td style="font-size:15px;line-height:1.5;color:#3a3a40;padding-bottom:12px;">Approved: ${escapeHtml(approved.join(", "))}. ${approved.includes("Company details") ? "Your store now shows the new details." : "The new files are now in use."}</td></tr>`
+        : "";
+      const rejectedHtml = rejected
+        .map(
+          (item) =>
+            `<tr><td style="font-size:14px;line-height:1.5;color:#0a0a0a;padding:4px 0;"><strong>${escapeHtml(item.label)}:</strong> ${escapeHtml(item.reason)}</td></tr>`,
+        )
+        .join("");
+      return {
+        subject: someRejected ? `Some updates for ${companyName} were not accepted` : `Your updates for ${companyName} are approved`,
+        text: [
+          `Hi ${fullName},`,
+          "",
+          `The Muhrak team reviewed the updates you sent for ${companyName}. Your company stays verified.`,
+          "",
+          ...(approved.length ? [`Approved: ${approved.join(", ")}.`, ""] : []),
+          ...(someRejected
+            ? ["Not accepted (your current approved details and documents stay in use):", ...rejected.map((item) => `- ${item.label}: ${item.reason}`), ""]
+            : []),
+          `Verification page: ${verificationUrl}`,
+        ].join("\n"),
+        html: layout(
+          someRejected ? "Some updates were not accepted" : "Your updates are approved",
+          `<tr><td style="font-size:15px;line-height:1.5;color:#3a3a40;padding-bottom:12px;">
+            Hi ${escapeHtml(fullName)}, the Muhrak team reviewed the updates you sent for ${escapeHtml(companyName)}. Your company stays verified.
+          </td></tr>
+          ${approvedHtml}
+          ${someRejected ? `<tr><td style="font-size:15px;line-height:1.5;color:#3a3a40;padding:4px 0 8px;">Not accepted (your current approved details and documents stay in use):</td></tr>${rejectedHtml}` : ""}
+          <tr><td style="padding:16px 0 8px;">
+            <a href="${url}" style="display:inline-block;background:#0a0b12;color:#ffffff;text-decoration:none;font-size:15px;font-weight:bold;padding:14px 28px;border-radius:999px;">Open verification</a>
+          </td></tr>`,
+        ),
+      };
+    }
   }
 }

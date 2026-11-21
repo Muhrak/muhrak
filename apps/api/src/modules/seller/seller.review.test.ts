@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SellerDocumentRow, SellerProfileRow } from "../../db/schema";
+import type { SellerDocumentRow, SellerProfileRow, SellerProfileUpdateRow } from "../../db/schema";
 
 vi.hoisted(() => {
   Object.assign(process.env, {
@@ -17,6 +17,12 @@ vi.mock("./seller.repository", () => ({
   findOwnDocument: vi.fn(),
   findVerificationEvents: vi.fn(async () => []),
   reviewDocument: vi.fn(async () => true),
+  supersedeCurrentDocument: vi.fn(),
+  findOpenDocumentUpdates: vi.fn(async () => []),
+  findOpenProfileUpdate: vi.fn(async () => undefined),
+  reviewDocumentUpdate: vi.fn(),
+  reviewProfileUpdate: vi.fn(),
+  oldestPendingUpdateAt: vi.fn(async () => null),
 }));
 vi.mock("../upload", () => ({
   attachUpload: vi.fn(),
@@ -24,7 +30,7 @@ vi.mock("../upload", () => ({
   getDownloadLink: vi.fn(async () => ({ url: "https://bucket.example/file?sig", expiresAt: "2026-11-12T10:05:00.000Z" })),
 }));
 vi.mock("../audit", () => ({ recordAudit: vi.fn() }));
-vi.mock("../notification", () => ({ sendSellerVerifiedEmail: vi.fn(), sendSellerChangesNeededEmail: vi.fn() }));
+vi.mock("../notification", () => ({ sendSellerVerifiedEmail: vi.fn(), sendSellerChangesNeededEmail: vi.fn(), sendSellerUpdateReviewedEmail: vi.fn() }));
 vi.mock("../auth", () => ({
   getUsersByIds: vi.fn(async (ids: string[]) =>
     ids.map((id) => ({ id, email: "seller@najd.om", fullName: "Najd Equipment", role: id === ADMIN ? "admin" : "seller", createdAt: "2026-11-12T00:00:00.000Z" })),
@@ -36,7 +42,7 @@ const SELLER = "11111111-1111-4111-8111-111111111111";
 const repo = await import("./seller.repository");
 const { recordAudit } = await import("../audit");
 const notification = await import("../notification");
-const { reviewSeller, getDocumentLinkForAdmin } = await import("./seller.service");
+const { reviewSeller, reviewSellerUpdate, getDocumentLinkForAdmin } = await import("./seller.service");
 
 const now = new Date("2026-11-12T10:00:00Z");
 const admin = { userId: ADMIN, ip: "1.2.3.4" };
@@ -58,6 +64,7 @@ function profile(overrides: Partial<SellerProfileRow> = {}): SellerProfileRow {
     submittedAt: now,
     reviewedAt: null,
     reviewedBy: null,
+    updateSubmittedAt: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -82,6 +89,7 @@ function docs(): SellerDocumentRow[] {
     reviewedAt: null,
     reviewedBy: null,
     supersededAt: null,
+    isUpdate: false,
     createdAt: now,
   }));
 }
@@ -181,5 +189,115 @@ describe("getDocumentLinkForAdmin", () => {
     expect(recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "seller.document_viewed", actorUserId: ADMIN }));
     vi.mocked(repo.findOwnDocument).mockResolvedValue(undefined);
     await expect(getDocumentLinkForAdmin(admin, SELLER, DOC_IDS.owner_id)).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+// ---------------------------------------------------------------- updates of verified sellers (21 Nov 2026)
+
+describe("reviewSellerUpdate", () => {
+  const NEW_BANK = "d0000000-0000-4000-8000-000000000001";
+  const NEW_VAT = "d0000000-0000-4000-8000-000000000002";
+  const DETAILS = "e0000000-0000-4000-8000-000000000001";
+
+  function update(type: SellerDocumentRow["type"], id: string, overrides: Partial<SellerDocumentRow> = {}): SellerDocumentRow {
+    return { ...docs()[0]!, id, type, isUpdate: true, status: "pending", ...overrides };
+  }
+
+  function details(overrides: Partial<SellerProfileUpdateRow> = {}): SellerProfileUpdateRow {
+    return {
+      id: DETAILS,
+      sellerUserId: SELLER,
+      companyName: "Najd Equipment LLC",
+      country: "OM",
+      vatRegistered: false,
+      status: "pending",
+      rejectionReason: null,
+      reviewedAt: null,
+      reviewedBy: null,
+      supersededAt: null,
+      createdAt: now,
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    vi.mocked(repo.findOpenDocumentUpdates).mockResolvedValue([]);
+    vi.mocked(repo.findOpenProfileUpdate).mockResolvedValue(undefined);
+    vi.mocked(repo.reviewDocumentUpdate).mockImplementation(async (_tx, input) => update("bank_proof", input.id, { status: input.status }));
+    vi.mocked(repo.reviewProfileUpdate).mockImplementation(async (_tx, input) => details({ status: input.status }));
+  });
+
+  it("approves a new bank proof: replaces the old one, keeps the seller verified, audit and email", async () => {
+    given(profile({ verificationStatus: "approved" }));
+    vi.mocked(repo.findOpenDocumentUpdates).mockResolvedValue([update("bank_proof", NEW_BANK)]);
+    await reviewSellerUpdate(admin, SELLER, { profileUpdate: null, documents: [{ id: NEW_BANK, status: "approved", reason: null }] }, now);
+    expect(repo.supersedeCurrentDocument).toHaveBeenCalledWith(expect.anything(), SELLER, "bank_proof");
+    expect(repo.reviewDocumentUpdate).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: NEW_BANK, status: "approved", reviewedBy: ADMIN }));
+    expect(repo.insertVerificationEvent).not.toHaveBeenCalled();
+    expect(repo.updateProfile).not.toHaveBeenCalledWith(expect.anything(), SELLER, expect.objectContaining({ verificationStatus: expect.anything() }));
+    expect(recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "seller.update_reviewed", actorUserId: ADMIN }), { tx: true });
+    expect(notification.sendSellerUpdateReviewedEmail).toHaveBeenCalledWith(expect.objectContaining({ approved: ["Bank account proof"], rejected: [] }));
+  });
+
+  it("a rejected update keeps the old document in force", async () => {
+    given(profile({ verificationStatus: "approved" }));
+    vi.mocked(repo.findOpenDocumentUpdates).mockResolvedValue([update("bank_proof", NEW_BANK)]);
+    await reviewSellerUpdate(admin, SELLER, { profileUpdate: null, documents: [{ id: NEW_BANK, status: "rejected", reason: "Account name differs" }] }, now);
+    expect(repo.supersedeCurrentDocument).not.toHaveBeenCalled();
+    expect(notification.sendSellerUpdateReviewedEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ rejected: [{ label: "Bank account proof", reason: "Account name differs" }] }),
+    );
+  });
+
+  it("approved company details move into the profile", async () => {
+    given(profile({ verificationStatus: "approved" }));
+    vi.mocked(repo.findOpenProfileUpdate).mockResolvedValue(details());
+    await reviewSellerUpdate(admin, SELLER, { profileUpdate: { id: DETAILS, status: "approved", reason: null }, documents: [] }, now);
+    expect(repo.updateProfile).toHaveBeenCalledWith(expect.anything(), SELLER, { companyName: "Najd Equipment LLC", country: "OM", vatRegistered: false });
+  });
+
+  it("becoming VAT registered needs a VAT certificate approved with it", async () => {
+    given(profile({ verificationStatus: "approved", vatRegistered: false }));
+    vi.mocked(repo.findOpenProfileUpdate).mockResolvedValue(details({ vatRegistered: true }));
+    vi.mocked(repo.findOpenDocumentUpdates).mockResolvedValue([update("vat_certificate", NEW_VAT)]);
+    const without = { profileUpdate: { id: DETAILS, status: "approved" as const, reason: null }, documents: [{ id: NEW_VAT, status: "rejected" as const, reason: "Unreadable" }] };
+    await expect(reviewSellerUpdate(admin, SELLER, without, now)).rejects.toMatchObject({ status: 400 });
+    const withCert = { profileUpdate: { id: DETAILS, status: "approved" as const, reason: null }, documents: [{ id: NEW_VAT, status: "approved" as const, reason: null }] };
+    await expect(reviewSellerUpdate(admin, SELLER, withCert, now)).resolves.toBeDefined();
+  });
+
+  it("refuses stale decisions: a newer file or a missing item (409), nothing written", async () => {
+    given(profile({ verificationStatus: "approved" }));
+    vi.mocked(repo.findOpenDocumentUpdates).mockResolvedValue([update("bank_proof", NEW_BANK)]);
+    await expect(
+      reviewSellerUpdate(admin, SELLER, { profileUpdate: null, documents: [{ id: NEW_VAT, status: "approved", reason: null }] }, now),
+    ).rejects.toMatchObject({ status: 409 });
+    vi.mocked(repo.findOpenProfileUpdate).mockResolvedValue(details());
+    await expect(
+      reviewSellerUpdate(admin, SELLER, { profileUpdate: null, documents: [{ id: NEW_BANK, status: "approved", reason: null }] }, now),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(repo.reviewDocumentUpdate).not.toHaveBeenCalled();
+    expect(recordAudit).not.toHaveBeenCalled();
+  });
+
+  it("refuses for a seller who is not verified, a rejection without reason, and an empty decision", async () => {
+    given(profile({ verificationStatus: "pending" }));
+    await expect(
+      reviewSellerUpdate(admin, SELLER, { profileUpdate: null, documents: [{ id: NEW_BANK, status: "approved", reason: null }] }, now),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      reviewSellerUpdate(admin, SELLER, { profileUpdate: null, documents: [{ id: NEW_BANK, status: "rejected", reason: null }] }, now),
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(reviewSellerUpdate(admin, SELLER, { profileUpdate: null, documents: [] }, now)).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("a double click: the second decision finds nothing waiting (conditional update) and changes nothing", async () => {
+    given(profile({ verificationStatus: "approved" }));
+    vi.mocked(repo.findOpenDocumentUpdates).mockResolvedValue([update("bank_proof", NEW_BANK)]);
+    vi.mocked(repo.reviewDocumentUpdate).mockResolvedValueOnce(undefined);
+    await expect(
+      reviewSellerUpdate(admin, SELLER, { profileUpdate: null, documents: [{ id: NEW_BANK, status: "approved", reason: null }] }, now),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(notification.sendSellerUpdateReviewedEmail).not.toHaveBeenCalled();
   });
 });

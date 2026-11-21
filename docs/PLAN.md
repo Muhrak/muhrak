@@ -204,6 +204,10 @@ Details in `docs/PROGRESS.md`.
 - Seller "Payouts" page: balance pending, available, paid out, history.
 - Admin payouts: list of sellers with available balance, record a payout
   (bank reference), audit log. (Or gateway split, per decision 3.)
+- **Payout hold (developer decision, 21 Nov 2026):** no payout while the
+  seller's new bank account proof waits for review
+  (`hasPendingBankProofUpdate` in the seller module). Pay only to the bank
+  proof in force.
 - **Aim:** a refund and a payout both reconcile to zero in the ledger.
 
 ### Day 16, Wed 25 Nov: admin and legal

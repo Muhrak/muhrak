@@ -7,6 +7,7 @@ export {
   sendNewRfqEmail,
   sendPasswordResetEmail,
   sendSellerChangesNeededEmail,
+  sendSellerUpdateReviewedEmail,
   sendSellerVerifiedEmail,
   sendVerifyEmail,
 } from "./notification.service";

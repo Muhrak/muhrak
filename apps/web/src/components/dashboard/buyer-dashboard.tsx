@@ -23,9 +23,11 @@ export function BuyerDashboard() {
   const quoted = rfqs.data?.counts.quoted ?? 0;
 
   return (
-    <>
+    // Desktop: the whole dashboard fits one screen, no page scroll (developer request, 21 Nov 2026).
+    // The main area has 30 px above and 28 px below; the panels at the bottom take what is left.
+    <div className="flex flex-1 flex-col gap-5 lg:h-[calc(100dvh-58px)] lg:max-h-[calc(100dvh-58px)] lg:min-h-[600px]">
       {/* Welcome card and Muhrak AI card side by side (developer request, 17 Nov 2026). */}
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid shrink-0 gap-5 lg:grid-cols-2">
         <section aria-label="Your account" className="flex flex-col justify-between gap-6 rounded-[24px] bg-panel px-5 py-6 sm:px-7">
           <div className="flex min-w-0 flex-col gap-2.5 leading-[normal]">
             <h1 className="text-[24px] font-medium tracking-[-0.02em] break-words text-text-strong sm:text-[28px]">Welcome back, {user.fullName}</h1>
@@ -39,6 +41,7 @@ export function BuyerDashboard() {
         <MuhrakAiCard />
       </div>
       <StatCards
+        fit
         stats={[
           { label: "Open requests", value: open, note: open > 0 ? "Waiting for a seller's reply" : "No requests waiting" },
           // Orders start with payment (Day 12); nothing can be in progress before that.
@@ -46,9 +49,9 @@ export function BuyerDashboard() {
           { label: "Quotes received", value: quoted, note: quoted > 0 ? "Sellers replied with a price" : "Quotes from sellers show here" },
         ]}
       />
-      <PanelRow>
+      <PanelRow fit>
         {rfqs.data && rfqs.data.items.length > 0 ? (
-          <ListPanel title="My requests" link={{ href: "/buyer/requests", label: "View all" }}>
+          <ListPanel fit title="My requests" link={{ href: "/buyer/requests", label: "View all" }}>
             {rfqs.data.items.map((rfq) => {
               const status = buyerStatus(rfq.status);
               return (
@@ -65,6 +68,7 @@ export function BuyerDashboard() {
           </ListPanel>
         ) : (
           <EmptyPanel
+            fit
             title="My requests"
             link={{ href: "/buyer/requests", label: "View all" }}
             icon="empty-message"
@@ -73,6 +77,7 @@ export function BuyerDashboard() {
           />
         )}
         <EmptyPanel
+          fit
           title="My orders"
           link={{ href: "/buyer/orders", label: "View all" }}
           icon="empty-box"
@@ -80,7 +85,7 @@ export function BuyerDashboard() {
           emptyText="Orders you confirm with a seller show up here."
         />
       </PanelRow>
-    </>
+    </div>
   );
 }
 

@@ -438,6 +438,50 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   seller and product; a second request for the same part is refused
   ("You already have an open request…"). Test data removed.
 
+### Verified sellers stay verified when they update (Sat 21 Nov, developer decision)
+- Before: a verified seller who replaced a document or changed the company
+  name, country or VAT status went back to "In review" and so disappeared
+  from the directory, could not publish and could not quote. Now
+  (`VERIFICATION_TRANSITIONS.approved` is empty): the change is an UPDATE
+  reviewed by an admin, and the seller stays verified. The approved
+  document and details stay in force (store, products, quotations) until
+  the admin approves.
+- Seller side: "Replace" on a verified company first shows an alert
+  ("Your company stays verified…"; for bank proof: "Payouts are paused
+  until the new bank details are approved"), then the upload panel. Each
+  document shows "Update in review" or "Update not accepted: reason".
+  Company profile: a new name/country/VAT status asks for confirmation,
+  then shows "being reviewed" with the values in force; becoming VAT
+  registered lets the seller send a VAT certificate for the same review.
+- Admin: "Updates to review" queue on Sellers (oldest first) and an
+  "Updates to review" panel on the seller page (company details from → to,
+  new files with View, approve/reject with reason, "Save decisions").
+  Exactly the waiting updates or 409; becoming VAT registered needs a VAT
+  certificate in force or approved with it. Audit `seller.update_reviewed`
+  (with from/to details); email `seller-update-reviewed`.
+- Data: `seller_documents.is_update` (one open update per type),
+  table `seller_profile_updates` (one open per seller),
+  `seller_profiles.update_submitted_at` (queue). Migration `0018`
+  (additive; the unique "current document" index is recreated with the
+  update condition in the same migration). Nothing is deleted: replaced
+  files and requests are kept, marked superseded.
+- Payouts (Day 15) must check `hasPendingBankProofUpdate` (noted in PLAN).
+- Tests: 362 API tests (new: update flow, no status change, VAT
+  certificate rule, stale/double decisions, wrong status). Screens in
+  headless Chrome with temporary accounts and a temporary local admin
+  (removed afterwards): alert, upload panel, profile request, admin queue
+  and decision, DB checks (name and bank proof switched, old file kept,
+  still verified, audit row, email).
+
+### Seller company profile and buyer dashboard fixes (Sat 21 Nov, developer report)
+- Company profile: the store card's "Products" was hard-coded to 0; it now
+  shows the seller's live (published) products. "Store views" removed (not
+  tracked yet; no made-up numbers). "Save changes" is disabled until a
+  field, the brands or the logo actually changes (Enter does nothing too).
+- Buyer dashboard: on desktop (lg+) it fits one screen with no page scroll
+  (checked at 1920×911, 1440×900, 1366×768); the request list scrolls
+  inside its panel when long. Phones unchanged (normal page scroll).
+
 ### Day 11: quotations (Sat 21 Nov, one day late)
 - Reference: `refs/seller quotation .pdf` (developer, 21 Nov 2026): the
   quotation layout, laid out exactly in the PDF. Developer decisions (21 Nov):
@@ -1145,8 +1189,9 @@ Still open (Day 4 admin):
 - Day 11 is done (21 Nov, a day late). Next: Day 12, payment foundation
   (order from an accepted ACTIVE quotation, fake gateway provider, webhook,
   ledger). Day 13 needs a chosen gateway's sandbox keys.
-- Staging: migration `0017` (quotations) runs on the next deploy. No new
-  environment variables.
+- Staging: migration `0018` (verified-seller updates) runs on the next
+  deploy (`0017` quotations went with the Day 11 push). No new environment
+  variables.
 - Developer to confirm: the Muhrak contact lines on the PDF
   (`MUHRAK_CONTACT` in `quotation.pdf.ts`, from the reference), and the
   Day 11 defaults listed in the Day 11 section.

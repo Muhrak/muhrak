@@ -6,17 +6,20 @@ import {
   adminSellerListSchema,
   fileLinkSchema,
   type ReviewSellerInput,
+  type ReviewSellerUpdateInput,
   type VerificationStatus,
 } from "@/schemas";
 import { adminRequest } from "../api";
 
-export function useSellerList(status: VerificationStatus | undefined, pageSize = 20) {
+export function useSellerList(status: VerificationStatus | "updates" | undefined, pageSize = 20) {
   return useInfiniteQuery({
     queryKey: ["admin", "sellers", "list", status ?? "all", pageSize],
     initialPageParam: null as string | null,
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams({ limit: String(pageSize) });
-      if (status) params.set("status", status);
+      // "updates": verified sellers with a replaced document or new details waiting (21 Nov 2026).
+      if (status === "updates") params.set("queue", "updates");
+      else if (status) params.set("status", status);
       if (pageParam) params.set("cursor", pageParam);
       return adminRequest(`/v1/admin/sellers?${params}`, adminSellerListSchema);
     },
@@ -39,6 +42,19 @@ export function useReviewSeller(userId: string) {
     onSuccess: (detail) => {
       queryClient.setQueryData(["admin", "sellers", "detail", userId], detail);
       // Lists and counts changed too.
+      void queryClient.invalidateQueries({ queryKey: ["admin", "sellers"], predicate: (query) => query.queryKey[2] !== "detail" });
+    },
+  });
+}
+
+/** Decide on a verified seller's updates (replaced documents, new company details). */
+export function useReviewSellerUpdate(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ReviewSellerUpdateInput) =>
+      adminRequest(`/v1/admin/sellers/${encodeURIComponent(userId)}/review-update`, adminSellerDetailSchema, { method: "POST", body: input }),
+    onSuccess: (detail) => {
+      queryClient.setQueryData(["admin", "sellers", "detail", userId], detail);
       void queryClient.invalidateQueries({ queryKey: ["admin", "sellers"], predicate: (query) => query.queryKey[2] !== "detail" });
     },
   });

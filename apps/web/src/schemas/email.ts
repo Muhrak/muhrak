@@ -91,5 +91,17 @@ export const emailJobSchema = z.discriminatedUnion("template", [
       requestUrl: z.string().url(),
     }),
   }),
+  z.object({
+    /** An admin decided on a verified seller's updates (21 Nov 2026). */
+    template: z.literal("seller-update-reviewed"),
+    to: z.string().email(),
+    data: z.object({
+      fullName: z.string(),
+      companyName: z.string(),
+      approved: z.array(z.string()),
+      rejected: z.array(z.object({ label: z.string(), reason: z.string() })),
+      verificationUrl: z.string().url(),
+    }),
+  }),
 ]);
 export type EmailJob = z.infer<typeof emailJobSchema>;

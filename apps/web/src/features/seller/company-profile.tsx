@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { GCC_COUNTRY_NAMES, gccCountrySchema, type SellerAccount, type UploadPurpose } from "@/schemas";
+import { GCC_COUNTRY_NAMES, gccCountrySchema, type SellerAccount, type SellerProfileInput, type UploadPurpose } from "@/schemas";
 import { ChevronDown, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
@@ -14,14 +14,21 @@ import { applyApiError } from "@/features/auth/form-errors";
 import { acceptFor, checkFile, describeRules, uploadFile } from "@/features/upload/upload-file";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useProductsPreview } from "@/features/catalog/api";
 import { useSaveProfile, useSellerAccount } from "./api";
 import { describedBy, FieldBlock, focusRing, initials, inputClass } from "./parts";
 import { useToast } from "@/components/ui/toast";
+import { ConfirmDialog } from "./confirm-dialog";
 
 /**
  * Figma "Seller – Company Profile" (179:797), dark frame converted to the
  * light Seller Centre palette: store preview card on the left, company
  * details form on the right. "Save changes" in the header submits the form.
+ *
+ * Verified sellers (developer decision, 21 Nov 2026): a new company name,
+ * country or VAT status is confirmed first, then sent to Muhrak for review;
+ * the approved values stay on the store until it is approved. The form shows
+ * the requested values while they wait.
  */
 
 const FORM_ID = "company-profile-form";
@@ -44,14 +51,16 @@ const FIELDS = ["companyName", "country", "city", "phone", "website", "about", "
 
 function valuesFrom(account: SellerAccount | undefined, fallbackName: string): FormValues {
   const profile = account?.profile;
+  // A change waiting for review: show what the seller asked for.
+  const requested = account?.profileUpdate?.status === "pending" ? account.profileUpdate : null;
   return {
-    companyName: profile?.companyName ?? fallbackName,
-    country: profile?.country ?? "",
+    companyName: requested?.companyName ?? profile?.companyName ?? fallbackName,
+    country: requested?.country ?? profile?.country ?? "",
     city: profile?.city ?? "",
     phone: profile?.phone ?? "",
     website: profile?.website?.replace(/^https:\/\//, "") ?? "",
     about: profile?.about ?? "",
-    vatRegistered: profile?.vatRegistered ? "yes" : "no",
+    vatRegistered: (requested ? requested.vatRegistered : profile?.vatRegistered) ? "yes" : "no",
   };
 }
 
@@ -80,6 +89,9 @@ function ProfileEditor({ account, fallbackName, userId }: { account: SellerAccou
   const [brands, setBrands] = useState<string[]>(account.profile?.brands ?? []);
   const [logo, setLogo] = useState<PickedImage | null>(null);
   const underReview = account.verification.status === "pending";
+  const verified = account.verification.status === "approved";
+  /** Verified: a save that asks for new company details waits for this confirmation. */
+  const [confirming, setConfirming] = useState<SellerProfileInput | null>(null);
 
   const {
     register,
@@ -87,7 +99,7 @@ function ProfileEditor({ account, fallbackName, userId }: { account: SellerAccou
     reset,
     setError,
     control,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: valuesFrom(account, fallbackName),
@@ -96,33 +108,47 @@ function ProfileEditor({ account, fallbackName, userId }: { account: SellerAccou
   // Release the local previews when they are replaced or the page closes.
   useEffect(() => () => void (logo && URL.revokeObjectURL(logo.previewUrl)), [logo]);
 
+  function send(input: SellerProfileInput) {
+    const before = account.profileUpdate;
+    save.mutate(input, {
+      onSuccess: (next) => {
+        reset(valuesFrom(next, fallbackName));
+        const requested = next.profileUpdate?.status === "pending" && next.profileUpdate.id !== (before?.status === "pending" ? before.id : null);
+        if (requested) {
+          toast.info("Company profile saved.", "Your new company details went to Muhrak for review. Your store keeps the current ones until then.");
+        } else {
+          toast.success("Company profile saved.");
+        }
+        setLogo(null);
+      },
+      onError: (error) => applyApiError(error, setError, FIELDS),
+    });
+  }
+
   const onSubmit = handleSubmit((values) => {
-    save.mutate(
-      {
-        companyName: values.companyName,
-        country: gccCountrySchema.parse(values.country),
-        city: values.city,
-        phone: values.phone,
-        website: values.website,
-        about: values.about,
-        brands,
-        vatRegistered: values.vatRegistered === "yes",
-        ...(logo ? { logoUploadId: logo.uploadId } : {}),
-      },
-      {
-        onSuccess: (next) => {
-          reset(valuesFrom(next, fallbackName));
-          // Changes after approval send the company back to review (developer rule, 12 Nov 2026).
-          if (account.verification.status === "approved" && next.verification.status !== "approved") {
-            toast.info("Company profile saved.", "Your changes go to the Muhrak team for review.");
-          } else {
-            toast.success("Company profile saved.");
-          }
-          setLogo(null);
-        },
-        onError: (error) => applyApiError(error, setError, FIELDS),
-      },
-    );
+    // Enter in a field submits too: nothing changed, nothing to save.
+    if (!changed) return;
+    const input: SellerProfileInput = {
+      companyName: values.companyName,
+      country: gccCountrySchema.parse(values.country),
+      city: values.city,
+      phone: values.phone,
+      website: values.website,
+      about: values.about,
+      brands,
+      vatRegistered: values.vatRegistered === "yes",
+      ...(logo ? { logoUploadId: logo.uploadId } : {}),
+    };
+    const profile = account.profile;
+    const pending = account.profileUpdate?.status === "pending" ? account.profileUpdate : null;
+    const differs = (target: { companyName: string; country: string; vatRegistered: boolean } | null | undefined) =>
+      !target || target.companyName !== input.companyName.trim() || target.country !== input.country || target.vatRegistered !== input.vatRegistered;
+    // Verified: a NEW request for company details needs the seller's OK first.
+    if (verified && differs(profile) && differs(pending)) {
+      setConfirming(input);
+      return;
+    }
+    send(input);
   });
 
   const [watchedName, city, countryValue, about, vat] = useWatch({
@@ -130,6 +156,11 @@ function ProfileEditor({ account, fallbackName, userId }: { account: SellerAccou
     name: ["companyName", "city", "country", "about", "vatRegistered"],
   });
   const name = watchedName || fallbackName;
+  // Save only when something changed: a field, the brands or the logo.
+  const savedBrands = account.profile?.brands ?? [];
+  const brandsChanged = brands.length !== savedBrands.length || brands.some((brand, index) => brand !== savedBrands[index]);
+  const changed = !account.profile || isDirty || brandsChanged || logo !== null;
+  const liveProducts = useProductsPreview(1).data?.counts.published ?? null;
   const parsedCountry = gccCountrySchema.safeParse(countryValue);
   const country = parsedCountry.success ? parsedCountry.data : null;
 
@@ -156,9 +187,10 @@ function ProfileEditor({ account, fallbackName, userId }: { account: SellerAccou
           <button
             type="submit"
             form={FORM_ID}
-            disabled={save.isPending}
+            disabled={save.isPending || !changed}
+            title={changed ? undefined : "Nothing to save yet"}
             className={cn(
-              "flex h-[52px] items-center justify-center rounded-full bg-side-accent px-7 text-base font-semibold whitespace-nowrap text-white hover:opacity-90 disabled:opacity-60",
+              "flex h-[52px] items-center justify-center rounded-full bg-side-accent px-7 text-base font-semibold whitespace-nowrap text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50",
               focusRing,
             )}
           >
@@ -173,9 +205,31 @@ function ProfileEditor({ account, fallbackName, userId }: { account: SellerAccou
           location={[city, country ? GCC_COUNTRY_NAMES[country] : ""].filter(Boolean).join(", ")}
           about={about}
           brandCount={brands.length}
+          productCount={liveProducts}
           logoUrl={logo?.previewUrl ?? account.profile?.logo?.url ?? null}
           onLogo={setLogo}
         />
+
+        {confirming ? (
+          <ConfirmDialog
+            title="Send new company details for review?"
+            confirmLabel="Send for review"
+            onCancel={() => setConfirming(null)}
+            onConfirm={() => {
+              const input = confirming;
+              setConfirming(null);
+              send(input);
+            }}
+          >
+            <p>Your company stays verified. A new company name, country or VAT status must match your documents, so the Muhrak team checks it first.</p>
+            <p>Until it is approved, your store, products and quotations keep showing your current details. Your other changes are saved now.</p>
+            {confirming.vatRegistered && !account.profile?.vatRegistered ? (
+              <p className="rounded-[12px] bg-seller-orange/10 px-3.5 py-2.5 text-sm text-text-strong">
+                Becoming VAT registered: upload your VAT certificate on the Verification page so it can be reviewed with this change.
+              </p>
+            ) : null}
+          </ConfirmDialog>
+        ) : null}
 
         <form
           id={FORM_ID}
@@ -191,9 +245,19 @@ function ProfileEditor({ account, fallbackName, userId }: { account: SellerAccou
             <p role="note" className="rounded-[12px] bg-surface px-4 py-3 text-sm leading-normal text-text-body">
               Your company is being reviewed, so the company name, country and VAT status are locked until the review is done.
             </p>
-          ) : account.verification.status === "approved" ? (
+          ) : verified && account.profileUpdate?.status === "pending" && account.profile ? (
+            <p role="note" className="rounded-[12px] bg-seller-orange/10 px-4 py-3 text-sm leading-normal text-text-strong">
+              Your new company details are being reviewed by Muhrak. Until they are approved, your store shows{" "}
+              <strong>{account.profile.companyName}</strong>, {GCC_COUNTRY_NAMES[account.profile.country]}, VAT registered:{" "}
+              {account.profile.vatRegistered ? "yes" : "no"}.
+            </p>
+          ) : verified && account.profileUpdate?.status === "rejected" ? (
+            <p role="note" className="rounded-[12px] bg-destructive/8 px-4 py-3 text-sm leading-normal text-destructive">
+              Your requested company details were not accepted: {account.profileUpdate.rejectionReason ?? "no reason given"}. Your approved details stay in use.
+            </p>
+          ) : verified ? (
             <p role="note" className="rounded-[12px] bg-surface px-4 py-3 text-sm leading-normal text-text-body">
-              Changing the company name, country or VAT status sends your company for review again.
+              A new company name, country or VAT status is reviewed by Muhrak before it shows on your store. You stay verified meanwhile.
             </p>
           ) : null}
 
@@ -329,6 +393,7 @@ function StorePreview({
   location,
   about,
   brandCount,
+  productCount,
   logoUrl,
   onLogo,
 }: {
@@ -336,6 +401,8 @@ function StorePreview({
   location: string;
   about: string;
   brandCount: number;
+  /** Live (published) products: what buyers can see. Null while loading. */
+  productCount: number | null;
   logoUrl: string | null;
   onLogo: (image: PickedImage) => void;
 }) {
@@ -378,8 +445,8 @@ function StorePreview({
         <div className="h-px bg-line" />
         <dl className="flex gap-8 leading-[normal]">
           {[
-            { label: "Products", value: 0 },
-            { label: "Store views", value: 0 },
+            // Store views are not tracked yet, so no number is shown for them (no made-up data).
+            { label: "Live products", value: productCount ?? "–" },
             { label: "Brands", value: brandCount },
           ].map((stat) => (
             <div key={stat.label} className="flex flex-col-reverse gap-0.5">
