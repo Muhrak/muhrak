@@ -403,6 +403,11 @@ export async function getRfqForQuote(id: string, now = new Date()): Promise<
  * it expires). The row stays locked until the transaction ends, so two
  * quotations for one request are written one after the other. False when not allowed.
  */
+/** Lock this buyer's request for an order (Day 12), in the order's transaction. Its stored status, or undefined. */
+export async function lockRfqForOrder(tx: repo.Tx, input: { rfqId: string; buyerUserId: string }): Promise<RfqStatus | undefined> {
+  return (await repo.lockForOrder(tx, { id: input.rfqId, buyerUserId: input.buyerUserId }))?.status;
+}
+
 export async function markRfqQuoted(tx: repo.Tx, input: { rfqId: string; sellerUserId: string; at: Date }): Promise<boolean> {
   const t = RFQ_TRANSITIONS.quote;
   return repo.markQuoted(tx, { id: input.rfqId, sellerUserId: input.sellerUserId, from: [...t.from], to: t.to, at: input.at });

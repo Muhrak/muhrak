@@ -9,6 +9,8 @@ import { authRouter } from "./modules/auth";
 import { catalogRouter, sellerProductsRouter } from "./modules/catalog";
 import { healthRouter } from "./modules/health/health.routes";
 import { maintenanceGate, statusRouter } from "./modules/maintenance";
+import { buyerOrderRouter, sellerOrderRouter } from "./modules/order";
+import { buyerOrderPayRouter, buyerPaymentRouter, paymentWebhookRouter } from "./modules/payment";
 import { buyerQuoteRouter, sellerQuoteRouter } from "./modules/quotation";
 import { buyerRfqRouter, sellerRfqRouter } from "./modules/rfq";
 import { sellerRouter } from "./modules/seller";
@@ -26,6 +28,11 @@ export function createApp() {
   app.set("trust proxy", env.TRUST_PROXY_HOPS);
   app.use(helmet());
   app.use(cors({ origin: env.CORS_ORIGINS, credentials: false }));
+  // Payment gateway webhooks (Day 12): BEFORE the JSON parser, because the
+  // signature is checked over the exact bytes received. Outside /v1's
+  // maintenance gate on purpose: they report money that has already moved
+  // and must never be refused. Their own rate limit is in the router.
+  app.use("/v1/payments/webhook", paymentWebhookRouter);
   app.use(express.json({ limit: "100kb" }));
 
   app.use("/health", healthRouter);
@@ -48,10 +55,14 @@ export function createApp() {
   // The signed-in buyer's own data.
   v1.use("/buyer/rfqs", buyerRfqRouter);
   v1.use("/buyer/quotes", buyerQuoteRouter);
+  v1.use("/buyer/orders", buyerOrderPayRouter);
+  v1.use("/buyer/orders", buyerOrderRouter);
+  v1.use("/buyer/payments", buyerPaymentRouter);
   // Before /seller: these sub-routers have their own auth and limits.
   v1.use("/seller/products", sellerProductsRouter);
   v1.use("/seller/rfqs", sellerRfqRouter);
   v1.use("/seller/quotes", sellerQuoteRouter);
+  v1.use("/seller/orders", sellerOrderRouter);
   v1.use("/seller/ai", sellerAiRouter);
   v1.use("/buyer/ai", buyerAiRouter);
   v1.use("/buyer/chat", buyerChatRouter);

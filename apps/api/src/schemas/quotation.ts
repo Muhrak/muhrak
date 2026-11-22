@@ -25,7 +25,9 @@ import { moneySchema } from "./money-schema";
  *   active -> withdrawn   (seller)
  *   active -> superseded  (seller sends a revised quotation)
  *   active -> expired     (valid-until date passed)
- *   active -> accepted    (buyer; Day 12, with the order)
+ *   active -> accepted    (buyer confirms an order; Day 12)
+ *   accepted -> active    (that order is cancelled before payment, quote still valid)
+ *   accepted -> expired   (that order is cancelled before payment, quote no longer valid)
  */
 
 export const QUOTE_LIMITS = {
@@ -46,7 +48,7 @@ export const QUOTE_LIMITS = {
 /** VAT rate in basis points (500 = 5%), applied only for VAT-registered sellers (developer decision, 21 Nov 2026). */
 export const QUOTE_VAT_RATE_BP = 500;
 
-export const quoteStatusSchema = z.enum(["active", "withdrawn", "superseded", "expired"]);
+export const quoteStatusSchema = z.enum(["active", "withdrawn", "superseded", "expired", "accepted"]);
 export type QuoteStatus = z.infer<typeof quoteStatusSchema>;
 
 export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
@@ -54,6 +56,7 @@ export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
   withdrawn: "Withdrawn",
   superseded: "Replaced by a newer quote",
   expired: "Expired",
+  accepted: "Accepted",
 };
 
 /** Plain single-line text: no control characters. */

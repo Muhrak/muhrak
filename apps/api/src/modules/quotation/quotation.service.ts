@@ -44,6 +44,7 @@ import * as repo from "./quotation.repository";
  */
 
 const NOT_FOUND = "Quotation not found";
+const ACCEPTED_MESSAGE = "The buyer has confirmed an order for your quotation, so it can no longer be changed. You can send a new one only if that order is cancelled.";
 const RFQ_NOT_FOUND = "Quote request not found";
 const CURRENCY = "OMR" as const;
 const DAY_MS = 86_400_000;
@@ -55,6 +56,10 @@ export const QUOTE_TRANSITIONS = {
   supersede: { by: "seller", from: ["active"], to: "superseded" },
   /** The expiry sweep (repository expireDue applies exactly this). */
   expire: { by: "system", from: ["active"], to: "expired" },
+  /** The buyer confirms an order for it (Day 12; repository accept, in the order transaction). */
+  accept: { by: "buyer", from: ["active"], to: "accepted" },
+  /** Its order is cancelled before payment: valid again, or expired if its time has passed (repository release). */
+  release: { by: "system", from: ["accepted"], to: "active" },
 } as const satisfies Record<string, { by: "buyer" | "seller" | "system"; from: readonly QuoteStatus[]; to: QuoteStatus }>;
 
 // ---------------------------------------------------------------- amounts
@@ -211,6 +216,9 @@ export async function createQuote(sellerUserId: string, input: QuoteCreateInput,
       if (twin && twin.rfqId !== rfq.id) throw new KeyRace();
       if (twin) return { row: twin, created: false };
 
+      // The buyer confirmed an order for the current quotation (Day 12): no revision while it is being paid or after.
+      if (await repo.hasAccepted(tx, rfq.id)) throw conflict(ACCEPTED_MESSAGE);
+
       if ((await repo.countForRfq(tx, rfq.id)) >= QUOTE_LIMITS.maxPerRfq) {
         throw conflict(`This request already has ${QUOTE_LIMITS.maxPerRfq} quotations. Talk to the buyer in chat instead.`);
       }
@@ -314,6 +322,7 @@ export async function withdrawQuote(sellerUserId: string, id: string, now = new 
   if (!row) {
     const state = effective(current, now).status;
     if (state === "active") throw conflict("This quotation was just changed. Reload to see its current state.");
+    if (state === "accepted") throw conflict(ACCEPTED_MESSAGE);
     throw conflict(`This quotation is ${state === "superseded" ? "already replaced by a newer one" : state}; it cannot be withdrawn.`);
   }
   logger.info({ quoteId: id }, "Quotation withdrawn");
@@ -378,6 +387,70 @@ export async function getQuoteForChat(id: string): Promise<{ id: string; referen
   const row = await repo.findQuote(id);
   if (!row) return undefined;
   return { id: row.id, reference: reference(row.number), rfqId: row.rfqId, sellerUserId: row.sellerUserId };
+}
+
+// ---------------------------------------------------------------- for the order module (Day 12)
+
+/** What the order needs from a quotation: its parties, amounts and places. Undefined if it does not exist. */
+export async function getQuoteForOrder(id: string, now = new Date()): Promise<
+  | {
+      id: string;
+      reference: string;
+      rfqId: string;
+      buyerUserId: string;
+      sellerUserId: string;
+      status: QuoteStatus;
+      currency: "OMR";
+      subtotalAmount: number;
+      shippingAmount: number;
+      vatRateBp: number;
+      vatAmount: number;
+      totalAmount: number;
+      deliveryDays: number;
+      validUntil: Date;
+      sellerCompanyName: string;
+      deliveryCity: string;
+      deliveryCountry: string;
+    }
+  | undefined
+> {
+  const row = await repo.findQuote(id);
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    reference: reference(row.number),
+    rfqId: row.rfqId,
+    buyerUserId: row.buyerUserId,
+    sellerUserId: row.sellerUserId,
+    status: effective(row, now).status,
+    currency: CURRENCY,
+    subtotalAmount: row.subtotalAmount,
+    shippingAmount: row.shippingAmount,
+    vatRateBp: row.vatRateBp,
+    vatAmount: row.vatAmount,
+    totalAmount: row.totalAmount,
+    deliveryDays: row.deliveryDays,
+    validUntil: row.validUntil,
+    sellerCompanyName: row.sellerCompanyName,
+    deliveryCity: row.deliveryCity,
+    deliveryCountry: row.deliveryCountry,
+  };
+}
+
+/** References of these quotations ("QT-1001"), for order lists. */
+export async function getQuoteReferences(ids: string[]): Promise<Map<string, string>> {
+  const rows = await repo.findNumbers([...new Set(ids)]);
+  return new Map(rows.map((row) => [row.id, reference(row.number)]));
+}
+
+/** QUOTE_TRANSITIONS.accept, in the order's transaction. False when it is no longer active and valid, or not this buyer's. */
+export async function acceptQuoteForOrder(tx: repo.Tx, input: { quotationId: string; buyerUserId: string; at: Date }): Promise<boolean> {
+  return (await repo.accept(tx, { id: input.quotationId, buyerUserId: input.buyerUserId, at: input.at })) !== undefined;
+}
+
+/** QUOTE_TRANSITIONS.release, in the cancelling transaction: the quotation can be confirmed again while still valid. */
+export async function releaseQuoteForOrder(tx: repo.Tx, input: { quotationId: string; at: Date }): Promise<void> {
+  await repo.release(tx, { id: input.quotationId, at: input.at });
 }
 
 // ---------------------------------------------------------------- helpers

@@ -127,3 +127,60 @@ export async function expireDue(now: Date, limit: number): Promise<number> {
   `);
   return result.rowCount ?? 0;
 }
+
+/**
+ * The buyer confirms an order (Day 12): active and still valid -> accepted,
+ * for this buyer only, in the order's transaction. One conditional update,
+ * so a revision or withdrawal racing with it cannot both succeed.
+ */
+export async function accept(tx: Tx, input: { id: string; buyerUserId: string; at: Date }): Promise<QuotationRow | undefined> {
+  const rows = await tx
+    .update(quotations)
+    .set({ status: "accepted", closedAt: input.at, updatedAt: input.at })
+    .where(
+      and(
+        eq(quotations.id, input.id),
+        eq(quotations.buyerUserId, input.buyerUserId),
+        eq(quotations.status, "active"),
+        sql`${quotations.validUntil} > ${input.at}`,
+      ),
+    )
+    .returning();
+  return rows[0];
+}
+
+/**
+ * Its order was cancelled before payment: accepted -> active again while it
+ * is still valid (and the request has no other active quotation), otherwise
+ * -> expired. Returns the new status, or undefined when it was not accepted.
+ */
+export async function release(tx: Tx, input: { id: string; at: Date }): Promise<"active" | "expired" | undefined> {
+  const at = sql`${input.at.toISOString()}::timestamptz`;
+  const reopen = sql`q.valid_until > ${at} and not exists (select 1 from ${quotations} o where o.rfq_id = q.rfq_id and o.status = 'active' and o.id <> q.id)`;
+  const result = await tx.execute(sql`
+    update ${quotations} q set
+      status = case when ${reopen} then 'active'::quotation_status else 'expired'::quotation_status end,
+      closed_at = case when ${reopen} then null::timestamptz else ${at} end,
+      updated_at = ${at}
+    where q.id = ${input.id}::uuid and q.status = 'accepted'
+    returning q.status
+  `);
+  const row = result.rows[0] as { status?: string } | undefined;
+  return row?.status === "active" || row?.status === "expired" ? row.status : undefined;
+}
+
+/** True while the request has an accepted quotation (an order awaiting payment or paid). */
+export async function hasAccepted(tx: Tx, rfqId: string): Promise<boolean> {
+  const rows = await tx
+    .select({ id: quotations.id })
+    .from(quotations)
+    .where(and(eq(quotations.rfqId, rfqId), eq(quotations.status, "accepted")))
+    .limit(1);
+  return rows.length > 0;
+}
+
+/** Numbers of these quotations (for order lists). */
+export async function findNumbers(ids: string[]): Promise<{ id: string; number: number }[]> {
+  if (ids.length === 0) return [];
+  return db.select({ id: quotations.id, number: quotations.number }).from(quotations).where(inArray(quotations.id, ids));
+}

@@ -16,8 +16,9 @@ import { activeWindow, getOpenWindows, maintenanceError, scopeCovers, type Reque
  *   non-admin account on that side, and refresh uses the admin cookie only);
  * - any request carrying a valid ADMIN access token (signature checked).
  *
- * Add payment-gateway webhooks here when they are built (Days 12-16): they
- * report money that has already moved and must never be refused.
+ * Payment-gateway webhooks (Day 12) never reach this gate: app.ts mounts
+ * them before /v1's routers, because they report money that has already
+ * moved and must never be refused.
  *
  * Paths are compared lower-cased without a trailing slash, the way Express
  * routes them (case-insensitive, non-strict), so a request cannot dodge the

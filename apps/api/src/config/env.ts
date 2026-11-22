@@ -116,9 +116,39 @@ const envSchema = z.object({
     .string()
     .default("http://localhost:3000")
     .transform((value) => value.split(",").map((origin) => origin.trim()).filter(Boolean)),
+  /**
+   * Muhrak's commission on the items subtotal of each order, in basis points
+   * (500 = 5%; developer default, 22 Nov 2026). Taken from the seller's
+   * payout; the buyer pays the quotation total. Applies to new orders only.
+   */
+  PLATFORM_FEE_BP: z.coerce.number().int().min(0).max(3000).default(500),
+  /**
+   * Payment gateway (Day 12). "none": buyers can confirm orders but cannot
+   * pay yet. "fake": a TEST gateway that never moves money, for local runs
+   * and tests; with it, anyone can mark their own order paid, so it is
+   * refused in production unless ALLOW_FAKE_PAYMENTS=true (staging only,
+   * never on the live site). Real gateways are added on Day 13.
+   */
+  PAYMENT_PROVIDER: z.enum(["none", "fake"]).default("none"),
+  ALLOW_FAKE_PAYMENTS: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  /** Signs the fake gateway's webhooks (at least 32 characters). Required with PAYMENT_PROVIDER=fake. */
+  FAKE_PAYMENT_SECRET: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || undefined)
+    .refine((value) => value === undefined || value.length >= 32, "FAKE_PAYMENT_SECRET must be at least 32 characters"),
 });
 
-const parsed = envSchema.safeParse(process.env);
+const parsed = envSchema
+  .superRefine((value, ctx) => {
+    if (value.PAYMENT_PROVIDER !== "fake") return;
+    if (!value.FAKE_PAYMENT_SECRET) ctx.addIssue({ code: "custom", path: ["FAKE_PAYMENT_SECRET"], message: "Required when PAYMENT_PROVIDER=fake" });
+    if (value.NODE_ENV === "production" && !value.ALLOW_FAKE_PAYMENTS) {
+      ctx.addIssue({ code: "custom", path: ["PAYMENT_PROVIDER"], message: "The fake (test) gateway is refused in production. Set ALLOW_FAKE_PAYMENTS=true only on staging." });
+    }
+  })
+  .safeParse(process.env);
 
 if (!parsed.success) {
   console.error("Invalid environment variables:");

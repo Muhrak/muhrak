@@ -625,7 +625,7 @@ export type RfqBuyerPhotoRow = typeof rfqBuyerPhotos.$inferSelect;
 
 // ---------------------------------------------------------------- quotation (Day 11)
 
-export const quotationStatus = pgEnum("quotation_status", ["active", "withdrawn", "superseded", "expired"]);
+export const quotationStatus = pgEnum("quotation_status", ["active", "withdrawn", "superseded", "expired", "accepted"]);
 
 /**
  * A seller's priced answer to a quote request (Day 11, 21 Nov 2026). Never
@@ -731,6 +731,262 @@ export const quotationItems = pgTable(
 );
 
 export type QuotationItemRow = typeof quotationItems.$inferSelect;
+
+// ---------------------------------------------------------------- order (Day 12)
+
+export const orderStatus = pgEnum("order_status", ["awaiting_payment", "paid", "packed", "shipped", "delivered", "completed", "cancelled", "refunded"]);
+
+/**
+ * A buyer's order for one accepted quotation (Day 12, 22 Nov 2026). Never
+ * deleted (business record). Status changes only through ORDER_TRANSITIONS
+ * in order.service.ts, as conditional updates.
+ *
+ * - Amounts are copied from the quotation by the server; Muhrak's fee is
+ *   computed on the items subtotal at the rate in force when ordered.
+ *   total = subtotal + shipping + vat = platform_fee + seller_amount.
+ * - (buyer, order_key) is unique: confirming twice returns the first order.
+ * - At most one order per quotation that is not cancelled.
+ * - Delivery city and country are the quotation's; the seller sees the
+ *   address only once the order is paid.
+ */
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Human reference "OR-<number>". */
+    number: integer("number").notNull().generatedAlwaysAsIdentity({ startWith: 1001 }),
+    buyerUserId: uuid("buyer_user_id")
+      .notNull()
+      .references(() => users.id),
+    sellerUserId: uuid("seller_user_id")
+      .notNull()
+      .references(() => users.id),
+    rfqId: uuid("rfq_id")
+      .notNull()
+      .references(() => rfqs.id),
+    quotationId: uuid("quotation_id")
+      .notNull()
+      .references(() => quotations.id),
+    orderKey: uuid("order_key").notNull(),
+    status: orderStatus("status").notNull().default("awaiting_payment"),
+    currency: text("currency").notNull(),
+    subtotalAmount: bigint("subtotal_amount", { mode: "number" }).notNull(),
+    shippingAmount: bigint("shipping_amount", { mode: "number" }).notNull(),
+    vatRateBp: integer("vat_rate_bp").notNull(),
+    vatAmount: bigint("vat_amount", { mode: "number" }).notNull(),
+    totalAmount: bigint("total_amount", { mode: "number" }).notNull(),
+    /** Muhrak's commission rate in basis points when ordered (500 = 5%). */
+    platformFeeBp: integer("platform_fee_bp").notNull(),
+    platformFeeAmount: bigint("platform_fee_amount", { mode: "number" }).notNull(),
+    sellerAmount: bigint("seller_amount", { mode: "number" }).notNull(),
+    deliveryDays: integer("delivery_days").notNull(),
+    /** Copies taken when ordered. */
+    sellerCompanyName: text("seller_company_name").notNull(),
+    buyerName: text("buyer_name").notNull(),
+    recipientName: text("recipient_name").notNull(),
+    recipientPhone: text("recipient_phone").notNull(),
+    addressLine: text("address_line").notNull(),
+    deliveryNotes: text("delivery_notes"),
+    deliveryCity: text("delivery_city").notNull(),
+    deliveryCountry: text("delivery_country").notNull(),
+    paymentDueAt: timestamp("payment_due_at", { withTimezone: true, precision: 3 }).notNull(),
+    paidAt: timestamp("paid_at", { withTimezone: true, precision: 3 }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true, precision: 3 }),
+    cancelReason: text("cancel_reason"),
+    // Millisecond precision (like JavaScript dates) so list cursors are exact.
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("orders_number_idx").on(table.number),
+    uniqueIndex("orders_buyer_key_idx").on(table.buyerUserId, table.orderKey),
+    uniqueIndex("orders_one_live_per_quotation_idx")
+      .on(table.quotationId)
+      .where(sql`${table.status} <> 'cancelled'`),
+    // Lists, newest first (keyset cursor on created_at, id).
+    index("orders_buyer_created_idx").on(table.buyerUserId, table.createdAt, table.id),
+    index("orders_seller_created_idx").on(table.sellerUserId, table.createdAt, table.id),
+    // The unpaid-order sweep.
+    index("orders_awaiting_due_idx")
+      .on(table.paymentDueAt)
+      .where(sql`${table.status} = 'awaiting_payment'`),
+    check("orders_currency", sql`${table.currency} = 'OMR'`),
+    check(
+      "orders_amounts",
+      sql`${table.subtotalAmount} > 0 AND ${table.shippingAmount} >= 0 AND ${table.vatAmount} >= 0 AND ${table.totalAmount} = ${table.subtotalAmount} + ${table.shippingAmount} + ${table.vatAmount} AND ${table.totalAmount} <= 10000000000`,
+    ),
+    check(
+      "orders_split",
+      sql`${table.platformFeeAmount} >= 0 AND ${table.platformFeeAmount} <= ${table.subtotalAmount} AND ${table.sellerAmount} = ${table.totalAmount} - ${table.platformFeeAmount}`,
+    ),
+    check("orders_fee_bp", sql`${table.platformFeeBp} BETWEEN 0 AND 3000`),
+    check("orders_vat_rate", sql`${table.vatRateBp} IN (0, 500)`),
+    check("orders_country", sql`${table.deliveryCountry} IN ('OM','AE','SA','QA','KW','BH')`),
+    check("orders_buyer_not_seller", sql`${table.buyerUserId} <> ${table.sellerUserId}`),
+    // Paid orders carry the payment time; unpaid ones do not (a cancelled order may be either: paid ones are refunded, Day 15).
+    check("orders_paid_at", sql`${table.status} = 'cancelled' OR (${table.status} = 'awaiting_payment') = (${table.paidAt} IS NULL)`),
+    check("orders_cancelled", sql`(${table.status} = 'cancelled') = (${table.cancelledAt} IS NOT NULL)`),
+  ],
+);
+
+export type OrderRow = typeof orders.$inferSelect;
+
+/**
+ * Every status change of an order, in order (append-only: the database
+ * refuses UPDATE and DELETE, see migration 0019). The buyer's timeline and
+ * the trail for disputes.
+ */
+export const orderEvents = pgTable(
+  "order_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id),
+    fromStatus: orderStatus("from_status"),
+    toStatus: orderStatus("to_status").notNull(),
+    /** buyer, seller, admin or system. */
+    actor: text("actor").notNull(),
+    actorUserId: uuid("actor_user_id").references(() => users.id),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("order_events_order_idx").on(table.orderId, table.createdAt),
+    check("order_events_actor", sql`${table.actor} IN ('buyer','seller','admin','system')`),
+  ],
+);
+
+export type OrderEventRow = typeof orderEvents.$inferSelect;
+
+// ---------------------------------------------------------------- payment (Day 12)
+
+export const paymentStatus = pgEnum("payment_status", ["pending", "succeeded", "failed", "expired", "refunded", "partially_refunded"]);
+
+/**
+ * One attempt to pay an order through the gateway (Day 12). Never deleted.
+ * Status changes only through PAYMENT_TRANSITIONS in payment.service.ts.
+ * Only the gateway's signed webhook marks a payment succeeded.
+ *
+ * - The amount and currency are the order's total, set by the server.
+ * - At most one PENDING attempt per order, and at most one counted success
+ *   per order. A second success (paid twice, or paid after the order was
+ *   cancelled) is kept with a refund_reason so it is paid back, never counted.
+ * - No card data: the gateway's hosted page takes the card.
+ */
+export const payments = pgTable(
+  "payments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id),
+    buyerUserId: uuid("buyer_user_id")
+      .notNull()
+      .references(() => users.id),
+    provider: text("provider").notNull(),
+    /** The gateway's id for this payment (its checkout or charge id); set once the checkout exists. */
+    providerPaymentId: text("provider_payment_id"),
+    status: paymentStatus("status").notNull().default("pending"),
+    currency: text("currency").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    /** Set when the money must go back (paid twice, or paid after the order was cancelled). */
+    refundReason: text("refund_reason"),
+    checkoutUrl: text("checkout_url"),
+    checkoutExpiresAt: timestamp("checkout_expires_at", { withTimezone: true, precision: 3 }),
+    succeededAt: timestamp("succeeded_at", { withTimezone: true, precision: 3 }),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("payments_provider_id_idx").on(table.provider, table.providerPaymentId),
+    uniqueIndex("payments_one_pending_per_order_idx")
+      .on(table.orderId)
+      .where(sql`${table.status} = 'pending'`),
+    uniqueIndex("payments_one_success_per_order_idx")
+      .on(table.orderId)
+      .where(sql`${table.status} IN ('succeeded','refunded','partially_refunded') AND ${table.refundReason} IS NULL`),
+    index("payments_order_created_idx").on(table.orderId, table.createdAt),
+    check("payments_currency", sql`${table.currency} = 'OMR'`),
+    check("payments_amount", sql`${table.amount} > 0 AND ${table.amount} <= 10000000000`),
+    check("payments_succeeded_at", sql`(${table.status} IN ('pending','failed','expired')) = (${table.succeededAt} IS NULL)`),
+  ],
+);
+
+export type PaymentRow = typeof payments.$inferSelect;
+
+/**
+ * Webhook events from the gateway, each stored ONCE (unique provider +
+ * event id): a retried or replayed webhook changes nothing. Only the fields
+ * we act on are kept, never the raw body (no card or personal data).
+ */
+export const paymentEvents = pgTable(
+  "payment_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    provider: text("provider").notNull(),
+    eventId: text("event_id").notNull(),
+    type: text("type").notNull(),
+    providerPaymentId: text("provider_payment_id").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    currency: text("currency").notNull(),
+    paymentId: uuid("payment_id").references(() => payments.id),
+    /** What we did with it, e.g. "applied", "ignored: already succeeded", "mismatch: amount". */
+    outcome: text("outcome"),
+    receivedAt: timestamp("received_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+    processedAt: timestamp("processed_at", { withTimezone: true, precision: 3 }),
+  },
+  (table) => [uniqueIndex("payment_events_provider_event_idx").on(table.provider, table.eventId), index("payment_events_payment_idx").on(table.paymentId)],
+);
+
+export type PaymentEventRow = typeof paymentEvents.$inferSelect;
+
+// ---------------------------------------------------------------- ledger (Day 12)
+
+export const ledgerAccount = pgEnum("ledger_account", ["gateway", "platform", "seller", "buyer"]);
+export const ledgerKind = pgEnum("ledger_kind", ["payment", "refund", "payout"]);
+
+/**
+ * Every money movement, append-only (the database refuses UPDATE and
+ * DELETE, see migration 0019). Amounts in the smallest unit, signed.
+ * Accounts: gateway = money Muhrak holds at the gateway; platform = Muhrak's
+ * fees; seller = owed to a seller; buyer = owed back to a buyer. Every group
+ * (one movement) balances: gateway = platform + seller + buyer. A seller's
+ * balance is the sum of their rows, never a stored number.
+ */
+export const ledgerEntries = pgTable(
+  "ledger_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** The rows of one movement share a group id. */
+    groupId: uuid("group_id").notNull(),
+    kind: ledgerKind("kind").notNull(),
+    account: ledgerAccount("account").notNull(),
+    sellerUserId: uuid("seller_user_id").references(() => users.id),
+    buyerUserId: uuid("buyer_user_id").references(() => users.id),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id),
+    paymentId: uuid("payment_id").references(() => payments.id),
+    currency: text("currency").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (table) => [
+    // A payment is written to the ledger once.
+    uniqueIndex("ledger_payment_once_idx")
+      .on(table.paymentId, table.account)
+      .where(sql`${table.kind} = 'payment'`),
+    index("ledger_group_idx").on(table.groupId),
+    index("ledger_seller_idx").on(table.sellerUserId, table.createdAt),
+    index("ledger_order_idx").on(table.orderId),
+    check("ledger_currency", sql`${table.currency} = 'OMR'`),
+    check("ledger_seller_account", sql`(${table.account} = 'seller') = (${table.sellerUserId} IS NOT NULL)`),
+    check("ledger_buyer_account", sql`(${table.account} = 'buyer') = (${table.buyerUserId} IS NOT NULL)`),
+  ],
+);
+
+export type LedgerEntryRow = typeof ledgerEntries.$inferSelect;
 
 // ---------------------------------------------------------------- ai
 

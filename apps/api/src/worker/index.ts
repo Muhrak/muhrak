@@ -4,6 +4,8 @@ import { claimDueJobs, markJobDone, markJobFailed, onJobAdded, releaseStaleJobs 
 import { logger } from "../shared/logger";
 import { failAiJob, PermanentAiJobError, runAiJob } from "../modules/ai";
 import { PermanentChatJobError, runChatJob } from "../modules/chat";
+import { expireUnpaidOrders } from "../modules/order";
+import { expireStalePayments } from "../modules/payment";
 import { expireDueQuotes } from "../modules/quotation";
 import { expireDueRfqs } from "../modules/rfq";
 import type { EmailProvider } from "./email/email-provider";
@@ -116,7 +118,7 @@ async function drainChat(): Promise<void> {
   }
 }
 
-/** Close expired quote requests and quotations, at most once a minute. Safe with several API copies (SKIP LOCKED). */
+/** Close expired quote requests, quotations and unpaid orders, at most once a minute. Safe with several API copies (SKIP LOCKED). */
 async function sweep(): Promise<void> {
   if (Date.now() - lastSweep < SWEEP_MS) return;
   lastSweep = Date.now();
@@ -124,6 +126,11 @@ async function sweep(): Promise<void> {
   if (expired > 0) logger.info(`Closed ${expired} expired quote request(s)`);
   const expiredQuotes = await expireDueQuotes();
   if (expiredQuotes > 0) logger.info(`Closed ${expiredQuotes} expired quotation(s)`);
+  // Day 12: unpaid orders past their time (their quotations become valid again), and checkouts left open.
+  const unpaid = await expireUnpaidOrders();
+  if (unpaid > 0) logger.info(`Cancelled ${unpaid} unpaid order(s)`);
+  const stale = await expireStalePayments();
+  if (stale > 0) logger.info(`Closed ${stale} abandoned payment attempt(s)`);
 }
 
 /** One pass. Never runs twice at once; a wake-up during a pass triggers one more pass. */

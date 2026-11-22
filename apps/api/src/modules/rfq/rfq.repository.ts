@@ -238,3 +238,17 @@ export async function listWithoutChat(side: "buyer" | "seller", userId: string, 
   return rows.map((row) => row.id);
 }
 
+
+/**
+ * Lock a request row for an order (Day 12), in the caller's transaction:
+ * this buyer's request only. A quotation being sent locks the same row, so
+ * confirming an order and revising its quotation happen one after the other.
+ */
+export async function lockForOrder(tx: Tx, input: { id: string; buyerUserId: string }): Promise<{ status: RfqStatus } | undefined> {
+  const rows = await tx
+    .select({ status: rfqs.status })
+    .from(rfqs)
+    .where(and(eq(rfqs.id, input.id), eq(rfqs.buyerUserId, input.buyerUserId)))
+    .for("update");
+  return rows[0];
+}

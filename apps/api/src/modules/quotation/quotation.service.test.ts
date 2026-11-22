@@ -22,6 +22,10 @@ vi.mock("./quotation.repository", () => ({
   listForRfq: vi.fn(),
   transition: vi.fn(),
   expireDue: vi.fn(),
+  hasAccepted: vi.fn(async () => false),
+  accept: vi.fn(),
+  release: vi.fn(),
+  findNumbers: vi.fn(async () => []),
 }));
 vi.mock("../auth", () => ({ getUsersByIds: vi.fn() }));
 vi.mock("../notification", () => ({ sendNewQuoteEmail: vi.fn() }));
@@ -120,6 +124,7 @@ beforeEach(() => {
   vi.mocked(repo.listItems).mockResolvedValue([]);
   vi.mocked(repo.findByKey).mockResolvedValue(undefined);
   vi.mocked(repo.countForRfq).mockResolvedValue(0);
+  vi.mocked(repo.hasAccepted).mockResolvedValue(false);
   vi.mocked(repo.supersedeActive).mockResolvedValue(undefined);
   vi.mocked(repo.insertQuote).mockImplementation(async (_tx, values) => quoteRow({ ...values, validUntil: values.validUntil as Date }));
   vi.mocked(getRfqForQuote).mockResolvedValue(rfq());
@@ -302,6 +307,15 @@ describe("createQuote", () => {
     await expect(service.createQuote(SELLER, input(), now)).rejects.toMatchObject({ status: 409 });
     expect(repo.insertQuote).not.toHaveBeenCalled();
   });
+
+  it("Day 12: no revision once the buyer confirmed an order (checked under the request lock): nothing superseded or written", async () => {
+    vi.mocked(repo.hasAccepted).mockResolvedValue(true);
+    await expect(service.createQuote(SELLER, input(), now)).rejects.toMatchObject({ status: 409 });
+    expect(repo.hasAccepted).toHaveBeenCalledWith(TX, RFQ);
+    expect(repo.supersedeActive).not.toHaveBeenCalled();
+    expect(repo.insertQuote).not.toHaveBeenCalled();
+    expect(sendNewQuoteEmail).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------- withdraw
@@ -334,6 +348,12 @@ describe("withdrawQuote", () => {
     vi.mocked(repo.findQuote).mockResolvedValue(quoteRow({ status: _label === "expired" ? "active" : (_label as "superseded"), closedAt: now, ...overrides }));
     vi.mocked(repo.transition).mockResolvedValue(undefined);
     await expect(service.withdrawQuote(SELLER, QUOTE, now)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("Day 12: an accepted quotation (the buyer confirmed an order) cannot be withdrawn", async () => {
+    vi.mocked(repo.findQuote).mockResolvedValue(quoteRow({ status: "accepted", closedAt: now }));
+    vi.mocked(repo.transition).mockResolvedValue(undefined);
+    await expect(service.withdrawQuote(SELLER, QUOTE, now)).rejects.toMatchObject({ status: 409, message: expect.stringMatching(/confirmed an order/) });
   });
 });
 

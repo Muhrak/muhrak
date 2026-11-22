@@ -134,6 +134,13 @@
       "when": 1795250468898,
       "tag": "0018_giant_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795328292021,
+      "tag": "0019_futuristic_fenris",
+      "breakpoints": true
     }
   ]
 }

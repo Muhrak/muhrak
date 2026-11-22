@@ -473,6 +473,67 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   and decision, DB checks (name and bank proof switched, old file kept,
   still verified, audit row, email).
 
+### Day 12: payment foundation (Sun 22 Nov, one day late; API only)
+- **Order module** (`modules/order`): the buyer confirms an ACTIVE, still
+  valid quotation (`POST /v1/buyer/orders`, with an `orderKey` for double
+  submits and the delivery recipient, phone, address and notes). Amounts
+  are copied from the quotation on the server; city and country are the
+  quotation's. Muhrak's fee = `PLATFORM_FEE_BP` (default 500 = 5%) of the
+  items subtotal, half up, taken from the seller's share. Order
+  `OR-<number>`, `awaiting_payment` for 24 h. `ORDER_TRANSITIONS` (one
+  place) lists every status change through Day 15; `order_events` keeps
+  each change. Buyer: list, read, cancel before paying, last address
+  (`GET /v1/buyer/orders/last-delivery`). Seller: list, read; the address
+  and phone only once paid; the seller sees their share and the fee, the
+  buyer never does.
+- **Quotations**: new status `accepted` (`QUOTE_TRANSITIONS.accept` /
+  `release`). Confirming locks the request row (as sending a quotation
+  does) and accepts the quotation in the same transaction; while accepted
+  the seller cannot revise or withdraw it. Cancelling or expiring an
+  unpaid order makes it valid again (or expired if its time has passed).
+- **Payment module** (`modules/payment`): `PaymentProvider` interface
+  (hosted checkout + signed webhook) and a FAKE test gateway. `POST
+  /v1/buyer/orders/:id/pay` opens a checkout for the order total from the
+  database (one open checkout per order; paying again returns it).
+  Webhook `POST /v1/payments/webhook/:provider` is mounted before the JSON
+  parser (signature over the raw bytes) and outside the maintenance gate.
+  Every event is stored once (unique provider + event id); event, payment,
+  order and ledger are written in one transaction with the payment row
+  locked. Wrong amount or currency: kept as a mismatch, nothing changes,
+  error logged. Money for an order already paid or cancelled: payment
+  kept with `refund_reason`, ledger "owed to buyer" (refund itself Day 15).
+  Unique indexes: one pending attempt and one counted success per order.
+- **Ledger module** (`modules/ledger`): append-only `ledger_entries`;
+  each movement balances (gateway = platform + seller + buyer), checked
+  before writing; a payment is written once.
+- **Database** (migration `0019`, additive): `orders`, `order_events`,
+  `payments`, `payment_events`, `ledger_entries`, enums, `accepted` quote
+  status. Triggers refuse UPDATE/DELETE on `ledger_entries` and
+  `order_events`, and DELETE on `orders`, `payments`, `payment_events`.
+- **Worker sweep**: unpaid orders past their time are cancelled (quotation
+  valid again); checkouts abandoned for an hour are closed (a late success
+  still counts, or is owed back).
+- **Settings**: `PLATFORM_FEE_BP` (500), `PAYMENT_PROVIDER` (`none`
+  default: orders work, paying says "not switched on yet"; `fake` for
+  local tests, needs `FAKE_PAYMENT_SECRET` and is refused in production
+  unless `ALLOW_FAKE_PAYMENTS=true`). Fake checkout page:
+  `/buyer/orders/:id/test-checkout` (web page still to build) with
+  `POST /v1/buyer/payments/:id/test-complete`, which sends a signed
+  webhook through the normal path.
+- **Tests**: 424 API tests (order 26, payment 26, ledger 7, quotation +2):
+  wrong buyer/seller/side, tampered amounts, forged/tampered/replayed
+  webhooks, amount and currency mismatch, paid twice, paid after cancel,
+  late success, double submit, races. End to end on the local database
+  (47 checks): 5 simultaneous confirms -> one order; 3 simultaneous
+  replays -> stored once; ledger 20.500 = 0.925 + 19.575; the database
+  refuses ledger edits; cancel -> confirm again; expiry sweep. That run
+  found a real bug the mocks could not (a date parameter typed as text in
+  the quotation release), fixed.
+- **Developer defaults used** (change any time): fee 5% of items, address
+  typed per order (filled from the last one), no "decline" button, 24 h to
+  pay. Not built yet: web pages (Confirm order, test checkout, orders),
+  emails (Day 13).
+
 ### New-message bell (Sat 21 Nov, developer request)
 - The chat connection now lives in the Buyer and Seller Centre layout
   (`features/chat/chat-provider.tsx`, one per side, kept between pages);
@@ -1255,12 +1316,18 @@ Still open (Day 4 admin):
 
 ## Next up, see `docs/PLAN.md`
 
-- Day 11 is done (21 Nov, a day late). Next: Day 12, payment foundation
-  (order from an accepted ACTIVE quotation, fake gateway provider, webhook,
-  ledger). Day 13 needs a chosen gateway's sandbox keys.
-- Staging: migration `0018` (verified-seller updates) runs on the next
-  deploy (`0017` quotations went with the Day 11 push). No new environment
-  variables.
+- Day 12 API is done (22 Nov, a day late). Next: the web pages for it
+  (buyer Confirm order from a quotation, the fake test-checkout page,
+  "checking payment", buyer and seller order lists), then Day 13: the
+  real gateway (needs the developer's choice and sandbox keys).
+- Staging: migration `0019` (orders, payments, ledger, append-only
+  triggers) runs on the next deploy. New optional variables:
+  `PLATFORM_FEE_BP` (default 500), `PAYMENT_PROVIDER` (default `none`, so
+  staging cannot take payments until set). Do NOT set `fake` on the live
+  site; on staging only with `ALLOW_FAKE_PAYMENTS=true` and a
+  `FAKE_PAYMENT_SECRET`.
+- Developer to confirm the Day 12 defaults: fee 5% of the items subtotal
+  from the seller's share, 24 h to pay, address per order.
 - Developer to confirm: the Muhrak contact lines on the PDF
   (`MUHRAK_CONTACT` in `quotation.pdf.ts`, from the reference), and the
   Day 11 defaults listed in the Day 11 section.
