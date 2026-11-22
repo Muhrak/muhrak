@@ -14,6 +14,10 @@ import { saveSession } from "@/features/auth/session";
 const formSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter your email"),
   password: z.string().min(1, "Enter your password").max(200),
+  totpCode: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app"),
 });
 
 const inputClass =
@@ -26,6 +30,10 @@ const inputClass =
  * sessions in the same browser (own cookie, own note, own token).
  * There is no sign-up and no "forgot password": admins are created and
  * reset from the command line.
+ *
+ * Two-factor login (22 Nov 2026): the password AND the 6-digit code from
+ * the admin's authenticator app (set up with `pnpm admin 2fa`). Each code
+ * works once; wrong codes count as failed logins.
  */
 export function LoginForm() {
   return (
@@ -44,12 +52,15 @@ function LoginFormBody() {
   const {
     register,
     handleSubmit,
+    resetField,
     formState: { errors },
-  } = useForm({ resolver: zodResolver(formSchema), defaultValues: { email: "", password: "" } });
+  } = useForm({ resolver: zodResolver(formSchema), defaultValues: { email: "", password: "", totpCode: "" } });
   const mutation = useMutation({
     mutationFn: (values: z.infer<typeof formSchema>) => login({ ...values, role: "admin" }),
     // SignedOutOnly then sends the admin on (to `next` if it is an /admin/ page).
     onSuccess: (response) => saveSession("admin", response),
+    // A code is used up once tried (right or wrong): clear it for the next one.
+    onError: () => resetField("totpCode"),
   });
   const serverError = mutation.error
     ? mutation.error instanceof ApiError
@@ -90,6 +101,30 @@ function LoginFormBody() {
             {...register("password")}
           />
           {errors.password ? <p className="text-[13px] text-destructive">{errors.password.message}</p> : null}
+        </div>
+        <div className="flex flex-col gap-2">
+          <label htmlFor="totpCode" className="text-sm font-medium text-text-strong">
+            Authenticator code
+          </label>
+          <input
+            id="totpCode"
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            placeholder="6-digit code"
+            aria-invalid={errors.totpCode ? true : undefined}
+            aria-describedby="totpCode-hint"
+            className={cn(inputClass, "tracking-[0.2em] tabular-nums")}
+            {...register("totpCode")}
+          />
+          {errors.totpCode ? (
+            <p className="text-[13px] text-destructive">{errors.totpCode.message}</p>
+          ) : (
+            <p id="totpCode-hint" className="text-[13px] text-text-muted">
+              From the authenticator app on your phone.
+            </p>
+          )}
         </div>
         {serverError ? (
           <p role="alert" className="rounded-[12px] bg-destructive/10 px-4 py-3 text-sm text-destructive">

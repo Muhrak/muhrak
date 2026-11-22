@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Albert_Sans, Geist, Geist_Mono, Gloock, Manrope } from "next/font/google";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { MaintenanceOverlay, SITE_CONTENT_ID } from "@/features/maintenance/gate";
 import { Providers } from "./providers";
@@ -41,7 +42,11 @@ export const metadata: Metadata = {
 };
 
 // Light theme first (developer decision, 11 Nov 2026).
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Render every page per request: Next.js puts this request's CSP nonce
+  // on its scripts (src/proxy.ts, src/lib/csp.ts); a page built ahead of
+  // time would have none, and its scripts would be blocked.
+  await connection();
   return (
     <html
       lang="en"

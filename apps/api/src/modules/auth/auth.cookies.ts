@@ -76,3 +76,41 @@ export const requireTrustedOrigin: RequestHandler = (req, _res, next) => {
   }
   next();
 };
+
+/**
+ * The admin console has its own origin (`ADMIN_WEB_ORIGIN`, 22 Nov 2026).
+ * Admin sessions are started, refreshed and ended only from it; buyer and
+ * seller sessions never from it. So an injected script on the public site
+ * cannot reach an admin session, and the console's origin cannot be used
+ * for the public sides. Without ADMIN_WEB_ORIGIN (local): no extra rule.
+ * Runs after the body is validated (it reads the side from `role`).
+ */
+export const requireSideOrigin: RequestHandler = (req, _res, next) => {
+  const adminOrigin = env.ADMIN_WEB_ORIGIN;
+  if (!adminOrigin) {
+    next();
+    return;
+  }
+  const side = (req.body as { role?: Role } | undefined)?.role;
+  const fromAdminOrigin = req.headers.origin === adminOrigin;
+  if (!side || (side === "admin") !== fromAdminOrigin) {
+    next(forbidden("Request origin is not allowed"));
+    return;
+  }
+  next();
+};
+
+/**
+ * For the admin API (`/v1/admin/*`): a browser request that names another
+ * origin is refused (defence in depth; the admin token only ever lives on
+ * the admin origin). Same-origin reads send no Origin and pass.
+ */
+export const refuseOtherOrigins: RequestHandler = (req, _res, next) => {
+  const adminOrigin = env.ADMIN_WEB_ORIGIN;
+  const origin = req.headers.origin;
+  if (adminOrigin && origin && origin !== adminOrigin) {
+    next(forbidden("Request origin is not allowed"));
+    return;
+  }
+  next();
+};

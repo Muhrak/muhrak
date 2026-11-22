@@ -1,6 +1,7 @@
 import type { LoginInput, PublicUser, RegisterInput, ResetPasswordInput, Role, VerifyEmailCodeInput } from "../../schemas";
 import { env } from "../../config/env";
 import type { UserRow } from "../../db/schema";
+import { TWO_FACTOR_INVALID, TWO_FACTOR_NOT_SET_UP, TWO_FACTOR_REQUIRED } from "../../schemas";
 import { AppError, badRequest, conflict, emailNotVerified, forbidden, notFound, unauthorized } from "../../shared/errors";
 import { logger } from "../../shared/logger";
 import { hit, peek, reset, subjectHash, tooManyRequests, type Limit } from "../../shared/rate-limit";
@@ -18,6 +19,7 @@ import {
   sameHash,
   signAccessToken,
 } from "./tokens";
+import { base32Decode, base32Encode, generateTotpKey, matchTotp, openTotpKey, otpauthUri, sealTotpKey } from "./totp";
 
 /**
  * Service layer: the business rules of the auth module.
@@ -46,13 +48,28 @@ export interface IssuedSession {
   refreshExpiresAt: Date;
 }
 
-async function issueTokens(user: UserRow): Promise<IssuedSession> {
+/**
+ * When a session's refresh token stops working. Buyers and sellers: the
+ * usual long session. Admins (22 Nov 2026): after ADMIN_SESSION_IDLE_MINUTES
+ * without a refresh, and never later than ADMIN_SESSION_MAX_HOURS after
+ * the login that started the session.
+ */
+export function sessionExpiry(role: Role, sessionStartedAt: Date, now = new Date()): Date {
+  if (role !== "admin") return refreshTokenExpiry(now);
+  const idle = now.getTime() + env.ADMIN_SESSION_IDLE_MINUTES * 60_000;
+  const hardEnd = sessionStartedAt.getTime() + env.ADMIN_SESSION_MAX_HOURS * 60 * 60_000;
+  return new Date(Math.min(idle, hardEnd));
+}
+
+/** A new token pair. `sessionStartedAt` is the login time (kept through refreshes). */
+async function issueTokens(user: UserRow, sessionStartedAt = new Date()): Promise<IssuedSession> {
   const refreshToken = generateRefreshToken();
-  const refreshExpiresAt = refreshTokenExpiry();
+  const refreshExpiresAt = sessionExpiry(user.role, sessionStartedAt);
   await repo.insertRefreshToken({
     userId: user.id,
     tokenHash: hashRefreshToken(refreshToken),
     expiresAt: refreshExpiresAt,
+    sessionStartedAt,
   });
   const accessToken = await signAccessToken({ userId: user.id, role: user.role });
   return { user: toPublicUser(user), accessToken, refreshToken, refreshExpiresAt };
@@ -221,7 +238,7 @@ const LOCKED_MESSAGE = "Too many failed attempts. Wait a few minutes, or reset y
 /** Checked for unknown emails too, so the response time does not reveal whether an account exists. */
 const DUMMY_PASSWORD_HASH = ["scrypt", "00".repeat(16), "00".repeat(64)].join("$");
 
-export async function login(input: LoginInput, clientIp: string): Promise<IssuedSession> {
+export async function login(input: LoginInput, clientIp: string, now = new Date()): Promise<IssuedSession> {
   const emailKey = subjectHash(input.email);
   const pairKey = `${emailKey}:${clientIp}`;
   const checks: [Limit, string][] = [
@@ -241,16 +258,44 @@ export async function login(input: LoginInput, clientIp: string): Promise<Issued
     for (const [limit, subject] of checks) await hit(limit, subject);
     throw unauthorized("Email or password is incorrect");
   }
-  await reset(LOGIN_FAILURE_LIMITS.emailAndIp, pairKey);
   // Buyer, seller and admin are separate sides: an account logs in only on its own.
   if (user.role !== input.role) {
+    await reset(LOGIN_FAILURE_LIMITS.emailAndIp, pairKey);
     throw forbidden(WRONG_SIDE_MESSAGE[user.role]);
   }
+  if (user.role === "admin") {
+    // The failure count is cleared only after the second factor too, so a
+    // known password cannot be used to guess codes without limit.
+    await checkAdminCode(user, input.totpCode, now, checks);
+  }
+  await reset(LOGIN_FAILURE_LIMITS.emailAndIp, pairKey);
   // Checked only after the password is right, so it tells a stranger nothing.
   if (!user.emailVerifiedAt) {
     throw emailNotVerified("Verify your email first. Enter the code we sent you, or ask for a new one.");
   }
   return issueTokens(user);
+}
+
+/**
+ * Two-factor login for admins (22 Nov 2026): after the right password, the
+ * 6-digit code from the authenticator app. A wrong or reused code counts as
+ * a failed login (same limits as a wrong password). Each code works once.
+ */
+async function checkAdminCode(user: UserRow, code: string | undefined, now: Date, checks: [Limit, string][]): Promise<void> {
+  const key = user.totpSecret ? openTotpKey(user.totpSecret) : null;
+  if (!key) {
+    logger.warn({ userId: user.id }, user.totpSecret ? "Admin authenticator key cannot be read (JWT_SECRET changed?)" : "Admin has no authenticator key");
+    throw new AppError(403, TWO_FACTOR_NOT_SET_UP, "Two-factor login is not set up for this admin. Set it up on the server with: pnpm admin 2fa");
+  }
+  if (!code) {
+    throw new AppError(401, TWO_FACTOR_REQUIRED, "Enter the 6-digit code from your authenticator app.");
+  }
+  const step = matchTotp(key, code, now, user.totpLastStep ?? null);
+  if (step === null || !(await repo.useTotpStep(user.id, step))) {
+    for (const [limit, subject] of checks) await hit(limit, subject);
+    logger.info({ userId: user.id }, "Admin two-factor code refused");
+    throw new AppError(401, TWO_FACTOR_INVALID, "That code is not right. Enter the newest code from your authenticator app.");
+  }
 }
 
 const WRONG_SIDE_MESSAGE: Record<Role, string> = {
@@ -285,7 +330,11 @@ export async function refresh(refreshToken: string, side: Role): Promise<IssuedS
   if (!user || user.role !== side || !user.emailVerifiedAt) {
     throw unauthorized("Session is not valid");
   }
-  return issueTokens(user);
+  // Admin sessions also end a fixed time after login, however often they refresh.
+  if (user.role === "admin" && sessionExpiry("admin", stored.sessionStartedAt).getTime() <= Date.now()) {
+    throw unauthorized("Session has expired");
+  }
+  return issueTokens(user, stored.sessionStartedAt);
 }
 
 export async function logout(refreshToken: string): Promise<void> {
@@ -341,6 +390,33 @@ export async function changeAdminEmail(input: { currentEmail: string; newEmail: 
   }
   await repo.updateUserEmail(admin.id, input.newEmail);
   await repo.markUserEmailVerified(admin.id);
+  await repo.revokeAllRefreshTokensForUser(admin.id);
+}
+
+/**
+ * Two-factor setup, from the command line only (`pnpm admin 2fa`). Step 1
+ * makes a new key and shows it; nothing is saved yet.
+ */
+export async function startAdminTwoFactorSetup(email: string): Promise<{ key: string; uri: string }> {
+  const admin = await repo.findUserByEmail(email);
+  if (!admin || admin.role !== "admin") throw notFound("No admin account has this email. Nothing was changed.");
+  const key = generateTotpKey();
+  return { key: base32Encode(key), uri: otpauthUri(key, admin.email) };
+}
+
+/**
+ * Step 2: the admin types a code from the app; only a right code saves the
+ * key (so a mistyped key cannot lock the admin out). Replaces any older
+ * key and signs that admin out everywhere.
+ */
+export async function confirmAdminTwoFactorSetup(input: { email: string; key: string; code: string }, now = new Date()): Promise<void> {
+  const admin = await repo.findUserByEmail(input.email);
+  if (!admin || admin.role !== "admin") throw notFound("No admin account has this email. Nothing was changed.");
+  const key = base32Decode(input.key);
+  if (matchTotp(key, input.code.trim(), now, null) === null) {
+    throw badRequest("That code does not match. Check the phone's clock and try again. Nothing was changed.");
+  }
+  await repo.setUserTotpSecret(admin.id, sealTotpKey(key));
   await repo.revokeAllRefreshTokensForUser(admin.id);
 }
 

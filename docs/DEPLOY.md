@@ -207,16 +207,49 @@ prints `[muhrak] STORAGE_ORIGIN: allowed …` when the bucket is in the CSP.
 
 ## Admin console (`/admin` in the web app, since 14 Nov 2026)
 
-The admin console is part of the web app: `https://muhrak.vercel.app/admin`
-(login at `/admin/login`). Nothing extra to deploy; it uses the web
-project's variables and the web origin already in `CORS_ORIGINS`.
+The admin console is part of the web app (`apps/web`, pages under
+`/admin`), but since 22 Nov 2026 it is served from **its own host**, so a
+script injected into any public page cannot reach an admin session. Same
+Vercel project, a second domain:
 
-Until 14 Nov 2026 it was a separate app (`apps/admin`, Vercel project
-`muhrak-admin`). Clean-up after the move:
-1. Vercel: delete the `muhrak-admin` project (or disconnect its Git
-   repository). Its root folder no longer exists, so its builds fail.
-2. Railway, service `muhrak`: remove `https://muhrak-admin.vercel.app`
-   from `CORS_ORIGINS`, leaving `https://muhrak.vercel.app`.
+1. Vercel: delete the old `muhrak-admin` project (its builds fail since
+   14 Nov). This frees the `muhrak-admin.vercel.app` domain.
+2. Vercel, project `muhrak`, Settings → Domains: add
+   `muhrak-admin.vercel.app`.
+3. Vercel, project `muhrak`, Environment Variables: `ADMIN_HOST` =
+   `muhrak-admin.vercel.app` (host only, no `https://`). Redeploy.
+   Then `muhrak.vercel.app/admin/...` sends you to the admin host, and the
+   admin host serves only `/admin`.
+4. Railway, service `muhrak`: `ADMIN_WEB_ORIGIN` =
+   `https://muhrak-admin.vercel.app`, and keep BOTH origins in
+   `CORS_ORIGINS` (`https://muhrak.vercel.app,https://muhrak-admin.vercel.app`;
+   the API refuses to start otherwise). Admin login, refresh and logout are
+   then accepted only from the admin host, buyer and seller ones never.
+5. Set up two-factor login for each admin (below, `admin.ts 2fa`). Since
+   migration `0020` every admin is signed out once, and an admin without
+   two-factor cannot log in.
+
+Admin sessions: signed out after 1 hour without use, and 8 hours after
+login at the latest (`ADMIN_SESSION_IDLE_MINUTES`, `ADMIN_SESSION_MAX_HOURS`
+on Railway). Buyers and sellers keep 30 days.
+
+Two-factor login (22 Nov 2026): password plus the 6-digit code from an
+authenticator app (Google Authenticator, Microsoft Authenticator,
+1Password...). Set up from the server:
+
+```bash
+railway ssh --service muhrak
+cd /app/apps/api
+export PATH="$(dirname "$(find / -type f -path '*/bin/node' 2>/dev/null | head -1)")":$PATH
+./node_modules/.bin/tsx src/scripts/admin.ts 2fa
+exit
+```
+
+It prints a setup key: in the app choose "Enter a setup key", type it,
+then type the code the app shows. The key is saved (encrypted) only after a
+right code. Lost phone: run the same command again (it replaces the key and
+signs the admin out). Changing `JWT_SECRET` makes stored keys unreadable:
+run it again for each admin.
 
 First admin on staging (the password is typed into a hidden prompt, never
 into chat or a file):

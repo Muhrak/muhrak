@@ -3,6 +3,11 @@
  *
  *   pnpm admin                 (in apps/api)
  *   pnpm admin change-email    move an existing admin to another email
+ *   pnpm admin 2fa             set up (or replace) two-factor login
+ *
+ * Admins log in with their password AND a 6-digit code from an
+ * authenticator app (22 Nov 2026). A new admin is asked to set it up right
+ * away; an admin without it cannot log in.
  *
  * Asks for the email, name and password (the password is not shown while
  * typed and never printed or logged). There is no admin sign-up endpoint,
@@ -16,7 +21,7 @@ import { createInterface } from "node:readline";
 import { Writable } from "node:stream";
 import { z } from "zod";
 import { pool } from "../db/client";
-import { changeAdminEmail, upsertAdminAccount } from "../modules/auth";
+import { changeAdminEmail, confirmAdminTwoFactorSetup, startAdminTwoFactorSetup, upsertAdminAccount } from "../modules/auth";
 
 const MIN_PASSWORD = 14;
 
@@ -56,8 +61,39 @@ async function changeEmail() {
   console.log(`\nAdmin moved from ${currentEmail} to ${newEmail}. Every session of this admin was signed out.`);
 }
 
+/**
+ * Two-factor login: show a new key, then save it only once a code from the
+ * app matches. Replacing the key signs that admin out everywhere.
+ */
+async function setUpTwoFactor(knownEmail?: string) {
+  if (!knownEmail) console.log("Muhrak: set up two-factor login for an admin.\n");
+  const email = knownEmail ?? emailSchema.parse(await ask("Admin email: "));
+  const { key, uri } = await startAdminTwoFactorSetup(email);
+  console.log(
+    [
+      "",
+      "In an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password...),",
+      'add an account, choose "Enter a setup key", and type:',
+      "",
+      `  Account:  Muhrak Admin (${email})`,
+      `  Key:      ${key.replace(/(.{4})/g, "$1 ").trim()}`,
+      "  Type:     Time based",
+      "",
+      "Or paste this link into an app that accepts one:",
+      `  ${uri}`,
+      "",
+      "Keep this key private. It is shown only now and stored encrypted.",
+      "",
+    ].join("\n"),
+  );
+  const code = await ask("Enter the 6-digit code the app shows now: ");
+  await confirmAdminTwoFactorSetup({ email, key, code });
+  console.log(`\nTwo-factor login is on for ${email}. Every session of this admin was signed out.`);
+}
+
 async function main() {
   if (process.argv[2] === "change-email") return changeEmail();
+  if (process.argv[2] === "2fa") return setUpTwoFactor();
   console.log("Muhrak: create an admin, or set a new password for an existing admin.\n");
   const email = emailSchema.parse(await ask("Admin email: "));
   const fullName = z.string().trim().min(2).max(120).parse(await ask("Full name: "));
@@ -71,9 +107,10 @@ async function main() {
   const result = await upsertAdminAccount({ email, fullName, password });
   console.log(
     result === "created"
-      ? `\nAdmin ${email} created. Log in on the admin app.`
+      ? `\nAdmin ${email} created. Now set up two-factor login (needed to log in).`
       : `\nNew password set for admin ${email}. Every session of this admin was signed out.`,
   );
+  if (result === "created") await setUpTwoFactor(email);
 }
 
 main()

@@ -560,6 +560,49 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   quote reads accepted; seller sees paid, share 19.575 and the address; no
   page scroll on desktop, phone and the zoomed Seller Centre.
 
+### Security fixes 8, 9, 10 (Sun 22 Nov, developer request)
+- **Admin on its own host.** Web: with `ADMIN_HOST` set (Vercel), `/admin`
+  is served only on that host (the public host redirects there; the admin
+  host redirects everything else to `/admin`; the public host answers 404
+  for `/api/v1/admin/*`). API: with `ADMIN_WEB_ORIGIN` (Railway), admin
+  login/refresh/logout only from that origin and buyer/seller never from
+  it (`requireSideOrigin`); `/v1/admin/*` refuses any other Origin. The
+  admin cookie lives on the admin host only. Unset locally (one host).
+- **Short admin sessions.** `refresh_tokens.session_started_at` (copied on
+  every refresh): admin sessions end after 1 h without use and 8 h after
+  login (`ADMIN_SESSION_IDLE_MINUTES`, `ADMIN_SESSION_MAX_HOURS`).
+- **Two-factor login for admins.** TOTP (RFC 6238, 6 digits, 30 s, one
+  step of drift) on node:crypto, no dependency (`auth/totp.ts`). Key
+  AES-256-GCM encrypted in `users.totp_secret` (key derived from
+  JWT_SECRET); `users.totp_last_step` makes each code single use (checked
+  in the UPDATE, so racing logins cannot both pass). Wrong codes count as
+  failed logins (5 per email+IP per 15 min); the failure count is cleared
+  only after the code. Admin without a key: 403, cannot log in. Set up with
+  `pnpm admin 2fa` (saves the key only after a right code; signs the admin
+  out); a new admin is asked right after creation. Login form has an
+  "Authenticator code" field. Migration `0020` (additive) also signs every
+  admin out once.
+- **CSP without `'unsafe-inline'` for scripts.** `src/proxy.ts` makes a
+  fresh nonce per request (`src/lib/csp.ts`), `'strict-dynamic'`; Next.js
+  puts it on its scripts. Styles keep `'unsafe-inline'`. The admin host's
+  CSP has no Stream Chat origin. Cost: every page is rendered per request
+  (`cacheComponents` / partial prefetching off, root layout
+  `await connection()`, the 24 `instant = false` lines removed).
+- Checked end to end locally (30 checks, two hosts `localhost` and
+  `admin.localhost`): CLI setup (wrong code saves nothing), admin login
+  from the public origin 403, no code / old code / replayed code refused,
+  cookie ~1 h and only on the admin host, refresh only from the admin
+  origin, buyer login from the admin origin 403, every `<script>` has the
+  nonce (new one per request), an injected `onerror` handler is blocked,
+  buyer and seller pages still interactive, redirects both ways. API tests
+  453. Test admins removed.
+- **Developer actions (staging):** see `docs/DEPLOY.md`, "Admin console":
+  delete the old `muhrak-admin` Vercel project, add the
+  `muhrak-admin.vercel.app` domain to project `muhrak`, set `ADMIN_HOST`
+  (Vercel) and `ADMIN_WEB_ORIGIN` + both origins in `CORS_ORIGINS`
+  (Railway), then `admin.ts 2fa` over `railway ssh`. Until 2FA is set up
+  the admin cannot log in.
+
 ### New-message bell (Sat 21 Nov, developer request)
 - The chat connection now lives in the Buyer and Seller Centre layout
   (`features/chat/chat-provider.tsx`, one per side, kept between pages);
@@ -1284,10 +1327,8 @@ Still open (security):
 - **Developer action:** enable backups on the Railway Postgres volume
   (dashboard, volume, Backups). Plan: also a nightly `pg_dump` job from the
   worker to private storage once the storage provider exists (Day 3).
-- CSP allows inline scripts (`'unsafe-inline'`): Next.js streams page data
-  in inline scripts; removing it needs per-request nonces, which turns off
-  static pages. Revisit before launch. Mitigated: React escaping, lint ban
-  on raw HTML, `connect-src 'self'`, httpOnly refresh cookie.
+- (Fixed 22 Nov: no more `'unsafe-inline'` for scripts; per-request nonce.
+  See "Security fixes 8, 9, 10".)
 - Access tokens stay valid up to 15 min after logout or password reset
   (stateless JWT). Consider a per-user token version check for money
   actions.
@@ -1326,14 +1367,13 @@ Other:
 - `refs/` (design references) is kept locally and not committed.
 
 Still open (Day 4 admin):
-- **Developer action (14 Nov):** the admin console is now
-  `https://muhrak.vercel.app/admin`. Delete the `muhrak-admin` Vercel
-  project (its builds fail now) and remove its URL from `CORS_ORIGINS` on
-  Railway (steps in `docs/DEPLOY.md`, "Admin console").
+- **Developer action (22 Nov):** move the admin console to its own host
+  `https://muhrak-admin.vercel.app` and set up two-factor (steps in
+  `docs/DEPLOY.md`, "Admin console"). Replaces the 14 Nov clean-up step.
 - There is one admin level (no "super admin" or roles yet). Every admin can
   approve and reject. The Figma "Admin Users & Roles" page is for later.
-- Admin sessions use the same 30-day refresh cookie as buyers and sellers.
-  Consider shorter admin sessions and two-factor login before launch.
+- (Fixed 22 Nov: admin sessions 1 h idle / 8 h max, two-factor login,
+  own host. See "Security fixes 8, 9, 10".)
 - No admin page shows the audit log yet ("Activity Logs" is Coming soon);
   the rows are in the `audit_log` table.
 - The workers now run inside the API and share its AWS key (one IAM user,

@@ -46,6 +46,7 @@ export async function insertRefreshToken(values: {
   userId: string;
   tokenHash: string;
   expiresAt: Date;
+  sessionStartedAt: Date;
 }): Promise<void> {
   await db.insert(refreshTokens).values(values);
 }
@@ -189,4 +190,23 @@ export async function invalidateEmailVerificationTokensForUser(userId: string): 
     .update(emailVerificationTokens)
     .set({ usedAt: new Date() })
     .where(and(eq(emailVerificationTokens.userId, userId), isNull(emailVerificationTokens.usedAt)));
+}
+
+/** Save an admin's (encrypted) authenticator key; the step count starts again. */
+export async function setUserTotpSecret(userId: string, sealedKey: string): Promise<void> {
+  await db.update(users).set({ totpSecret: sealedKey, totpLastStep: null, updatedAt: new Date() }).where(eq(users.id, userId));
+}
+
+/**
+ * Record the time step of an accepted code. Returns true only if the step
+ * is newer than the last accepted one (checked in the same statement), so
+ * two logins racing with the same code cannot both pass.
+ */
+export async function useTotpStep(userId: string, step: number): Promise<boolean> {
+  const rows = await db
+    .update(users)
+    .set({ totpLastStep: step })
+    .where(and(eq(users.id, userId), sql`(${users.totpLastStep} is null or ${users.totpLastStep} < ${step})`))
+    .returning({ id: users.id });
+  return rows.length === 1;
 }

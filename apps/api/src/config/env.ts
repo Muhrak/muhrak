@@ -23,6 +23,25 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  /**
+   * Admin sessions are short (22 Nov 2026): signed out after this long
+   * without use (no refresh), and in any case this long after logging in.
+   */
+  ADMIN_SESSION_IDLE_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(60),
+  ADMIN_SESSION_MAX_HOURS: z.coerce.number().int().min(1).max(24).default(8),
+  /**
+   * The admin console's own web origin (e.g. https://muhrak-admin.vercel.app).
+   * When set, admin login, refresh and logout are accepted only from it,
+   * and buyer and seller ones never from it, so a script on the public
+   * site can never reach an admin session. Must also be in CORS_ORIGINS.
+   * Unset locally: one origin for everything.
+   */
+  ADMIN_WEB_ORIGIN: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || undefined)
+    .refine((value) => value === undefined || /^https?:\/\/[a-z0-9.-]+(:\d+)?$/.test(value), "ADMIN_WEB_ORIGIN must be an origin like https://admin.example.com (no path)"),
   /** Public URL of the web app, used to build links in emails (no trailing slash). */
   WEB_APP_URL: z
     .string()
@@ -142,6 +161,9 @@ const envSchema = z.object({
 
 const parsed = envSchema
   .superRefine((value, ctx) => {
+    if (value.ADMIN_WEB_ORIGIN && !value.CORS_ORIGINS.includes(value.ADMIN_WEB_ORIGIN)) {
+      ctx.addIssue({ code: "custom", path: ["ADMIN_WEB_ORIGIN"], message: "Add ADMIN_WEB_ORIGIN to CORS_ORIGINS too" });
+    }
     if (value.PAYMENT_PROVIDER !== "fake") return;
     if (!value.FAKE_PAYMENT_SECRET) ctx.addIssue({ code: "custom", path: ["FAKE_PAYMENT_SECRET"], message: "Required when PAYMENT_PROVIDER=fake" });
     if (value.NODE_ENV === "production" && !value.ALLOW_FAKE_PAYMENTS) {

@@ -10,69 +10,28 @@ const isDev = process.env.NODE_ENV === "development";
 const API_ORIGIN = (process.env.API_ORIGIN ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
 /**
- * The private S3 bucket. Browsers upload files straight to it with signed
- * links, and show logos from it (admins also open seller documents from
- * it), so the CSP allows exactly this one origin.
- * Only an https S3 origin is accepted; anything else is ignored.
+ * The private S3 bucket's origin, allowed by the CSP (built per request in
+ * src/lib/csp.ts). Checked here only to print it in the build log, so a
+ * missing or refused value is easy to spot.
  */
-const STORAGE_ORIGIN = (() => {
-  // Tolerate surrounding quotes or spaces pasted into the hosting dashboard.
+(() => {
   const value = process.env.STORAGE_ORIGIN?.trim().replace(/^["']|["']$/g, "").trim();
-  // Printed in the build log so a missing or refused value is easy to spot.
   const report = (message: string) => console.log(`[muhrak] STORAGE_ORIGIN: ${message}`);
-  if (!value) {
-    report("not set. File uploads will be blocked by the CSP.");
-    return "";
-  }
+  if (!value) return report("not set. File uploads will be blocked by the CSP.");
   try {
     const url = new URL(value);
-    if (url.protocol === "https:" && /\.s3[.-][a-z0-9-]+\.amazonaws\.com$/.test(url.hostname)) {
-      report(`allowed ${url.origin}`);
-      return url.origin;
-    }
+    if (url.protocol === "https:" && /\.s3[.-][a-z0-9-]+\.amazonaws\.com$/.test(url.hostname)) return report(`allowed ${url.origin}`);
   } catch {
     // Not a URL; reported below.
   }
   report("refused (must be https://<bucket>.s3.<region>.amazonaws.com). File uploads will be blocked by the CSP.");
-  return "";
 })();
 
 /**
- * Content Security Policy. The site loads nothing from other origins, so
- * everything is 'self'. Script files also carry build-time integrity
- * hashes (SRI, below).
- * - connect-src 'self': scripts can only talk to this site (the API is
- *   proxied under /api), storage uploads and the Stream Chat connection.
- * - frame-ancestors 'none': no clickjacking.
- * Dev only: 'unsafe-eval' (React dev tooling) and ws: (hot reload).
+ * Security headers for every response. The Content-Security-Policy is NOT
+ * here: it carries a fresh nonce per request, so src/proxy.ts sets it.
  */
-const STREAM_CHAT_ORIGINS = "https://chat.stream-io-api.com wss://chat.stream-io-api.com";
-
-const csp = [
-  "default-src 'self'",
-  // 'unsafe-inline' is needed: Next.js streams page data in inline <script>
-  // tags. A nonce would remove it but forces every page to render per
-  // request (no static pages); see PROGRESS.md. Mitigations: React escapes
-  // all output, `react/no-danger` is an ESLint error, and connect-src below
-  // keeps injected code from sending data anywhere but this site.
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob:${STORAGE_ORIGIN ? ` ${STORAGE_ORIGIN}` : ""}`,
-  "font-src 'self'",
-  // Stream Chat (Day 10): the buyer–seller chat's live connection (REST + WebSocket). Only
-  // messages travel there; photos and the quote request card come from our own API.
-  `connect-src 'self'${STORAGE_ORIGIN ? ` ${STORAGE_ORIGIN}` : ""} ${STREAM_CHAT_ORIGINS}${isDev ? " ws:" : ""}`,
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  "worker-src 'self' blob:",
-  "manifest-src 'self'",
-  ...(isDev ? [] : ["upgrade-insecure-requests"]),
-].join("; ");
-
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: csp },
   // HTTPS only, for two years, including subdomains.
   ...(isDev ? [] : [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }]),
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -85,8 +44,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  cacheComponents: true,
-  partialPrefetching: true,
+  // No cacheComponents / partial prerendering (22 Nov 2026): pages are
+  // rendered per request so each carries its own CSP nonce (src/lib/csp.ts).
   poweredByHeader: false,
   experimental: {
     // Integrity hashes on every script tag: a tampered or swapped file will not run.

@@ -42,6 +42,8 @@ const seller: UserRow = {
   emailVerifiedAt: null,
   createdAt: now,
   updatedAt: now,
+  totpSecret: null,
+  totpLastStep: null,
 };
 
 function tokenRow(overrides: Partial<PasswordResetTokenRow> = {}): PasswordResetTokenRow {

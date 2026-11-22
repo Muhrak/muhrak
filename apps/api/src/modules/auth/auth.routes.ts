@@ -20,7 +20,7 @@ import { unauthorized } from "../../shared/errors";
 import { validateBody } from "../../shared/http";
 import { logger } from "../../shared/logger";
 import { clientIp, limitByIp, type Limit } from "../../shared/rate-limit";
-import { clearRefreshCookie, readRefreshCookie, requireTrustedOrigin, setRefreshCookie } from "./auth.cookies";
+import { clearRefreshCookie, readRefreshCookie, requireSideOrigin, requireTrustedOrigin, setRefreshCookie } from "./auth.cookies";
 import { requireAuth } from "./auth.middleware";
 import * as authService from "./auth.service";
 
@@ -62,6 +62,7 @@ authRouter.post(
   limitByIp(LIMITS.register),
   requireTrustedOrigin,
   validateBody(registerSchema),
+  requireSideOrigin,
   async (req, res) => {
     // 202 with no body, the same for a new or an existing email; answered
     // before the work so the response time reveals nothing either. The new
@@ -80,6 +81,7 @@ authRouter.post(
   limitByIp(LIMITS.verifyEmail),
   requireTrustedOrigin,
   validateBody(verifyEmailCodeSchema),
+  requireSideOrigin,
   async (req, res) => {
     sendSession(res, await authService.verifyEmailCode(req.body as VerifyEmailCodeInput));
   },
@@ -98,7 +100,7 @@ authRouter.post(
   },
 );
 
-authRouter.post("/login", limitByIp(LIMITS.login), requireTrustedOrigin, validateBody(loginSchema), async (req, res) => {
+authRouter.post("/login", limitByIp(LIMITS.login), requireTrustedOrigin, validateBody(loginSchema), requireSideOrigin, async (req, res) => {
   try {
     sendSession(res, await authService.login(req.body as LoginInput, clientIp(req)));
   } catch (error) {
@@ -116,6 +118,7 @@ authRouter.post(
   limitByIp(LIMITS.refresh),
   requireTrustedOrigin,
   validateBody(sessionSideSchema),
+  requireSideOrigin,
   async (req, res) => {
     const { role } = req.body as SessionSideInput;
     const token = readRefreshCookie(req, role);
@@ -134,6 +137,7 @@ authRouter.post(
   limitByIp(LIMITS.logout),
   requireTrustedOrigin,
   validateBody(sessionSideSchema),
+  requireSideOrigin,
   async (req, res) => {
     const { role } = req.body as SessionSideInput;
     const token = readRefreshCookie(req, role);

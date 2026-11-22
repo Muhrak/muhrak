@@ -18,7 +18,7 @@ import {
 } from "../../schemas";
 import { validateBody, validateParams, validateQuery } from "../../shared/http";
 import { clientIp, limitByUser } from "../../shared/rate-limit";
-import { requireAuth, requireRole } from "../auth";
+import { refuseOtherOrigins, requireAuth, requireRole } from "../auth";
 import {
   cancelMaintenance,
   endMaintenance,
@@ -46,7 +46,7 @@ export const adminRouter = Router();
 const MINUTE = 60_000;
 const readLimit = limitByUser({ name: "admin-read:user", max: 600, windowMs: 15 * MINUTE });
 
-adminRouter.use(requireAuth, requireRole("admin"));
+adminRouter.use(refuseOtherOrigins, requireAuth, requireRole("admin"));
 
 adminRouter.get("/sellers/stats", readLimit, async (_req, res) => {
   res.json(await getSellerStatsForAdmin());

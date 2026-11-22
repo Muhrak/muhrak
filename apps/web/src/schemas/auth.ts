@@ -26,8 +26,23 @@ export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1).max(200),
   role: roleSchema,
+  /** Admins only: the 6-digit code from the authenticator app (two-factor login). */
+  totpCode: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app")
+    .optional(),
 });
 export type LoginInput = z.infer<typeof loginSchema>;
+
+/**
+ * Error codes of an admin login whose password was right (401): the
+ * authenticator code is still needed, or it was wrong / already used.
+ * 403 `two_factor_not_set_up`: the admin has no authenticator key yet.
+ */
+export const TWO_FACTOR_REQUIRED = "two_factor_required";
+export const TWO_FACTOR_INVALID = "two_factor_invalid";
+export const TWO_FACTOR_NOT_SET_UP = "two_factor_not_set_up";
 
 /**
  * POST /v1/auth/refresh and /v1/auth/logout. The refresh token itself is in

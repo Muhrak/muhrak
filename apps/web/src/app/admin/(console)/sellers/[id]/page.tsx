@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ReviewPage } from "@/features/admin/sellers/review-page";
 
-export const instant = false;
 export const metadata: Metadata = { title: "Seller review · Muhrak Admin Console" };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -56,6 +56,8 @@ function user(overrides: Partial<UserRow> = {}): UserRow {
     emailVerifiedAt: null,
     createdAt: now,
     updatedAt: now,
+    totpSecret: null,
+    totpLastStep: null,
     ...overrides,
   };
 }

@@ -3,9 +3,6 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { EditProduct } from "@/features/catalog/edit-product";
 
-// Browser-only page inside the signed-in centre (see the layout).
-export const instant = false;
-
 export const metadata: Metadata = { title: "Edit product · Muhrak Seller Centre" };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

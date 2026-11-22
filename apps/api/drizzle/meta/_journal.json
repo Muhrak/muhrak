@@ -141,6 +141,13 @@
       "when": 1795328292021,
       "tag": "0019_futuristic_fenris",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795348860069,
+      "tag": "0020_large_fenris",
+      "breakpoints": true
     }
   ]
 }

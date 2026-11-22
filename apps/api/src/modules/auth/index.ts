@@ -7,4 +7,13 @@
  */
 export { authRouter } from "./auth.routes";
 export { requireAuth, requireRole, tokenRole } from "./auth.middleware";
-export { changeAdminEmail, confirmPassword, getCurrentUser, getUsersByIds, upsertAdminAccount } from "./auth.service";
+export {
+  changeAdminEmail,
+  confirmAdminTwoFactorSetup,
+  confirmPassword,
+  getCurrentUser,
+  getUsersByIds,
+  startAdminTwoFactorSetup,
+  upsertAdminAccount,
+} from "./auth.service";
+export { refuseOtherOrigins } from "./auth.cookies";

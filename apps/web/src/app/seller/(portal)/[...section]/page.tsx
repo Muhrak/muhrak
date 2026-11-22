@@ -3,9 +3,6 @@ import { Suspense } from "react";
 import { ComingSoon } from "@/components/layout/coming-soon";
 import { allSectionSlugs, sectionLabel } from "@/components/layout/portal-nav";
 
-// Browser-only page inside the signed-in centre (see the layout).
-export const instant = false;
-
 /** Pages with their own route folder. */
 const BUILT = new Set(["dashboard", "company-profile", "verification", "products", "rfq-inbox", "orders"]);
 

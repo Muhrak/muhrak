@@ -25,6 +25,15 @@ export const users = pgTable("users", {
    * verified from the command line.
    */
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+  /**
+   * Admins only: the authenticator-app key for two-factor login (22 Nov
+   * 2026), AES-256-GCM encrypted with a key derived from JWT_SECRET (see
+   * `auth/totp.ts`). Set from the command line (`pnpm admin 2fa`). An admin
+   * without it cannot log in.
+   */
+  totpSecret: text("totp_secret"),
+  /** The 30-second step of the last accepted code, so a code works only once. */
+  totpLastStep: bigint("totp_last_step", { mode: "number" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -43,6 +52,12 @@ export const refreshTokens = pgTable(
     tokenHash: text("token_hash").notNull().unique(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    /**
+     * When the sign-in that started this chain of tokens happened (copied on
+     * every refresh). Admin sessions end a fixed time after it, however
+     * often they refresh.
+     */
+    sessionStartedAt: timestamp("session_started_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("refresh_tokens_user_id_idx").on(table.userId)],

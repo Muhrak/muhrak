@@ -3,8 +3,6 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { SOON_PAGES } from "@/features/admin/nav";
 
-export const instant = false;
-
 /** Menu items from the Figma sidebar that are not built yet. Unknown slugs are a real 404. */
 export function generateStaticParams() {
   return Object.keys(SOON_PAGES).map((slug) => ({ slug }));

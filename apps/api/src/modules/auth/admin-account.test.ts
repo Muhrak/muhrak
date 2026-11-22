@@ -29,6 +29,8 @@ const account = (overrides: Partial<UserRow>): UserRow => ({
   emailVerifiedAt: at,
   createdAt: at,
   updatedAt: at,
+  totpSecret: null,
+  totpLastStep: null,
   ...overrides,
 });
 
