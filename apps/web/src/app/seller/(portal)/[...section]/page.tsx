@@ -7,7 +7,7 @@ import { allSectionSlugs, sectionLabel } from "@/components/layout/portal-nav";
 export const instant = false;
 
 /** Pages with their own route folder. */
-const BUILT = new Set(["dashboard", "company-profile", "verification", "products", "rfq-inbox"]);
+const BUILT = new Set(["dashboard", "company-profile", "verification", "products", "rfq-inbox", "orders"]);
 
 /** Menu pages that are not built yet. Unknown paths are a real 404. */
 export function generateStaticParams() {

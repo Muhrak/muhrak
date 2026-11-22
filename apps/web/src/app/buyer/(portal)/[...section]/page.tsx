@@ -8,7 +8,7 @@ export const instant = false;
 
 /** Menu pages that are not built yet. Unknown paths are a real 404. */
 /** Pages with their own route folder. */
-const BUILT = new Set(["dashboard", "requests"]);
+const BUILT = new Set(["dashboard", "requests", "orders"]);
 
 export function generateStaticParams() {
   return allSectionSlugs("buyer")

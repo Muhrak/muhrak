@@ -531,8 +531,25 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   the quotation release), fixed.
 - **Developer defaults used** (change any time): fee 5% of items, address
   typed per order (filled from the last one), no "decline" button, 24 h to
-  pay. Not built yet: web pages (Confirm order, test checkout, orders),
-  emails (Day 13).
+  pay. Emails come with Day 13.
+- **Web (same day, developer request)**: buyer quotation card has "Confirm
+  order · <total>" (active quotes) or "View order" (accepted).
+  `/buyer/orders/new?quote=…` Confirm order: delivery form (filled from the
+  last order; city and country read-only from the quotation) beside the
+  quotation summary; "Confirm and pay" makes the order (form key against
+  double clicks) and goes straight to the gateway; if payments are off it
+  opens the order instead. `/buyer/orders` and `/seller/orders`: one
+  full-height panel (WorkspacePanel), list + order. Buyer: Pay, Cancel, the
+  24 h deadline, "Checking your payment…" (polls every 2 s after
+  `checking=1`, slower message after 30 s), paid / failed / cancelled
+  notices. Seller: "Buyer pays / Muhrak fee / You receive", address only
+  once paid. `/buyer/orders/test-checkout?order=…&payment=…`: the fake
+  gateway's page ("Pay (test)" / "Make it fail (test)"). The gateway
+  returns to `/buyer/orders?id=…&checking=1`.
+- **Checked in headless Chrome (14 checks)**: quote -> Confirm order ->
+  empty form errors -> test checkout shows 20.500 -> Pay -> back, paid ->
+  quote reads accepted; seller sees paid, share 19.575 and the address; no
+  page scroll on desktop, phone and the zoomed Seller Centre.
 
 ### New-message bell (Sat 21 Nov, developer request)
 - The chat connection now lives in the Buyer and Seller Centre layout

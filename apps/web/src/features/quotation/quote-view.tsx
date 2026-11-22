@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, FileDown, Loader2 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { formatMoney, QUOTE_STATUS_LABELS, type Quote, type QuoteStatus } from "@/schemas";
 import type { PortalSide } from "@/features/auth/paths";
@@ -21,7 +22,7 @@ const dateFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "sh
 export const quoteDate = (iso: string) => dateFormat.format(new Date(iso));
 
 export function quoteStatus(status: QuoteStatus): { label: string; tone: "new" | "closed" } {
-  return { label: status === "active" ? "Valid" : status === "superseded" ? "Replaced" : QUOTE_STATUS_LABELS[status], tone: status === "active" ? "new" : "closed" };
+  return { label: status === "active" ? "Valid" : status === "superseded" ? "Replaced" : QUOTE_STATUS_LABELS[status], tone: status === "active" || status === "accepted" ? "new" : "closed" };
 }
 
 export function itemCountLabel(quote: Pick<Quote, "items">): string {
@@ -153,6 +154,25 @@ function QuoteDetails({ side, quote }: { side: PortalSide; quote: Quote }) {
       {quote.notes ? <TextBlock title="Notes" text={quote.notes} /> : null}
 
       {side === "seller" && quote.status === "active" ? <WithdrawControl quote={quote} /> : null}
+      {side === "buyer" && quote.status === "active" ? (
+        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
+          <Link
+            href={`/buyer/orders/new?quote=${encodeURIComponent(quote.id)}`}
+            className={cn("flex h-11 items-center rounded-full bg-side-accent px-6 text-[15px] font-semibold text-white hover:opacity-90", focusRing)}
+          >
+            Confirm order · {formatMoney(quote.total)}
+          </Link>
+          <p className="text-[13px] text-text-muted">You pay Muhrak; the seller is paid after delivery.</p>
+        </div>
+      ) : null}
+      {quote.status === "accepted" ? (
+        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
+          <p className="text-sm text-text-body">{side === "buyer" ? "You confirmed this quotation as an order." : "The buyer confirmed this quotation as an order."}</p>
+          <Link href={`/${side}/orders`} className={cn("rounded-full border border-line px-4 py-2 text-sm font-medium text-text-strong hover:bg-black/4", focusRing)}>
+            View order
+          </Link>
+        </div>
+      ) : null}
     </section>
   );
 }

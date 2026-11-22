@@ -38,7 +38,8 @@ export function createFakePaymentProvider(config: { secret: string; webAppUrl: s
     name: "fake",
 
     async createCheckout(request: CheckoutRequest): Promise<Checkout> {
-      const url = new URL(`${config.webAppUrl}/buyer/orders/${encodeURIComponent(request.orderId)}/test-checkout`);
+      const url = new URL(`${config.webAppUrl}/buyer/orders/test-checkout`);
+      url.searchParams.set("order", request.orderId);
       url.searchParams.set("payment", request.reference);
       return { providerPaymentId: `fake_${randomUUID()}`, checkoutUrl: url.toString(), expiresAt: request.expiresAt };
     },

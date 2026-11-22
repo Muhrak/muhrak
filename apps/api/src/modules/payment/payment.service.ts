@@ -107,7 +107,7 @@ export async function startPayment(buyerUserId: string, orderId: string, now = n
       orderReference: order.reference,
       amountMinor: payment.amount,
       currency: order.currency,
-      returnUrl: `${env.WEB_APP_URL}/buyer/orders/${order.id}?checking=1`,
+      returnUrl: `${env.WEB_APP_URL}/buyer/orders?id=${order.id}&checking=1`,
       expiresAt,
     });
   } catch (error) {

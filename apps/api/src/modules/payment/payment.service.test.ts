@@ -101,7 +101,7 @@ describe("startPayment", () => {
     const result = await service.startPayment(BUYER, ORDER, now);
     expect(repo.insertPending).toHaveBeenCalledWith(expect.objectContaining({ orderId: ORDER, buyerUserId: BUYER, amount: 20500, currency: "OMR", provider: "fake" }));
     expect(result.paymentId).toBe(PAYMENT);
-    expect(result.checkoutUrl).toContain(`/buyer/orders/${ORDER}/test-checkout`);
+    expect(result.checkoutUrl).toBe(`http://localhost:3000/buyer/orders/test-checkout?order=${ORDER}&payment=${PAYMENT}`);
   });
 
   it("another buyer, or the seller, cannot pay someone else's order: not found", async () => {
