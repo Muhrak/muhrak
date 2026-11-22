@@ -496,9 +496,9 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
 ### Muhrak AI page touches (Sat 21 Nov, developer requests)
 - Search box: only the black send button, shown once something is typed
   (no browser "x", hidden site-wide in `globals.css`; no grey icon).
-- One logo: a four-point sparkle in the Muhrak blues (colours drift, it
-  breathes; still with reduced motion) + bold "Muhrak AI"; plain
-  background behind it.
+- Header: the Muhrak logo, a divider and "Muhrak AI" in the Muhrak blue.
+  (A sparkle logo was tried on 21 Nov and removed on 22 Nov: the developer
+  wants Muhrak's own style, never a copy of another brand's look.)
 
 ### Staging data (Sat 21 Nov, developer request)
 - 10 filter products added to DQC (dqc@gmail.com) through the API,
