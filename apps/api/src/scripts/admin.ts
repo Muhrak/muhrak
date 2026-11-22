@@ -89,8 +89,27 @@ async function setUpTwoFactor(knownEmail?: string) {
       "",
     ].join("\n"),
   );
-  const code = await ask("Enter the 6-digit code the app shows now: ");
-  await confirmAdminTwoFactorSetup({ email, key, code });
+  // Up to 5 tries with the same key, so one slow or mistyped code does not mean scanning again.
+  for (let attempt = 1; ; attempt++) {
+    const code = await ask("Enter the 6-digit code the app shows now: ");
+    try {
+      await confirmAdminTwoFactorSetup({ email, key, code });
+      break;
+    } catch (error) {
+      if (attempt >= 5) throw error;
+      const serverTime = new Date().toISOString().slice(11, 19);
+      console.log(
+        [
+          "",
+          "That code does not match this key. Check that:",
+          "  - you read the code from the entry you just scanned (delete older Muhrak entries),",
+          `  - the phone's clock is on automatic time (server time now: ${serverTime} UTC),`,
+          "  - you type the newest code (it changes every 30 seconds).",
+          "",
+        ].join("\n"),
+      );
+    }
+  }
   console.log(`\nTwo-factor login is on for ${email}. Every session of this admin was signed out.`);
 }
 

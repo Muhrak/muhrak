@@ -29,8 +29,10 @@ export const loginSchema = z.object({
   /** Admins only: the 6-digit code from the authenticator app (two-factor login). */
   totpCode: z
     .string()
-    .trim()
-    .regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app")
+    .max(20)
+    // Apps show the code as "123 456": spaces are ignored.
+    .transform((value) => value.replace(/\s+/g, ""))
+    .pipe(z.string().regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app"))
     .optional(),
 });
 export type LoginInput = z.infer<typeof loginSchema>;

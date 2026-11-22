@@ -16,8 +16,10 @@ const formSchema = z.object({
   password: z.string().min(1, "Enter your password").max(200),
   totpCode: z
     .string()
-    .trim()
-    .regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app"),
+    .max(20)
+    // Apps show the code as "123 456": spaces are ignored.
+    .transform((value) => value.replace(/\s+/g, ""))
+    .pipe(z.string().regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app")),
 });
 
 const inputClass =
@@ -111,7 +113,7 @@ function LoginFormBody() {
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
-            maxLength={6}
+            maxLength={8}
             placeholder="6-digit code"
             aria-invalid={errors.totpCode ? true : undefined}
             aria-describedby="totpCode-hint"

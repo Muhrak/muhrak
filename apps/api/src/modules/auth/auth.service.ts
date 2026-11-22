@@ -413,7 +413,7 @@ export async function confirmAdminTwoFactorSetup(input: { email: string; key: st
   const admin = await repo.findUserByEmail(input.email);
   if (!admin || admin.role !== "admin") throw notFound("No admin account has this email. Nothing was changed.");
   const key = base32Decode(input.key);
-  if (matchTotp(key, input.code.trim(), now, null) === null) {
+  if (matchTotp(key, input.code.replace(/\s+/g, ""), now, null) === null) {
     throw badRequest("That code does not match. Check the phone's clock and try again. Nothing was changed.");
   }
   await repo.setUserTotpSecret(admin.id, sealTotpKey(key));

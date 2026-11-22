@@ -268,3 +268,23 @@ describe("two-factor setup (command line)", () => {
     expect(repo.setUserTotpSecret).not.toHaveBeenCalled();
   });
 });
+
+describe("codes typed with a space (apps show 123 456)", () => {
+  it("the login schema removes spaces and still refuses junk", async () => {
+    const { loginSchema } = await import("../../schemas");
+    const base = { email: "admin@muhrak.test", password: "x", role: "admin" as const };
+    expect(loginSchema.parse({ ...base, totpCode: "875 499" }).totpCode).toBe("875499");
+    expect(loginSchema.parse({ ...base, totpCode: " 875499 " }).totpCode).toBe("875499");
+    expect(loginSchema.safeParse({ ...base, totpCode: "875 49" }).success).toBe(false);
+    expect(loginSchema.safeParse({ ...base, totpCode: "87a 499" }).success).toBe(false);
+  });
+
+  it("setup accepts a right code typed with a space", async () => {
+    vi.resetAllMocks();
+    vi.mocked(repo.findUserByEmail).mockResolvedValue(admin({ totpSecret: null }));
+    const { key: shown } = await startAdminTwoFactorSetup("admin@muhrak.test");
+    const code = totp.totpCode(totp.base32Decode(shown), totp.totpStep(new Date()));
+    await confirmAdminTwoFactorSetup({ email: "admin@muhrak.test", key: shown, code: `${code.slice(0, 3)} ${code.slice(3)}` });
+    expect(repo.setUserTotpSecret).toHaveBeenCalled();
+  });
+});
