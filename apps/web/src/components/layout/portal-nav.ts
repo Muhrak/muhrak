@@ -44,6 +44,13 @@ export const BUYER_NAV: NavEntry[] = [
   { label: "Settings", slug: "settings", icon: "cog" },
 ];
 
+/**
+ * Seller menu, cut to what the MVP needs (developer request, 22 Nov 2026).
+ * Removed: Quotations (inside each request in RFQ Inbox), Categories (set by
+ * Muhrak), Inventory and Pricing (fields of a product), Transactions (in
+ * Payouts), Analytics (after launch), Team Members (one account per seller),
+ * Settings and Help & Support (not in the MVP plan). Payouts is Day 15.
+ */
 export const SELLER_NAV: NavEntry[] = [
   {
     label: "Workspace",
@@ -51,40 +58,19 @@ export const SELLER_NAV: NavEntry[] = [
       { label: "Dashboard", slug: "dashboard", icon: "grid" },
       { label: "RFQ Inbox", slug: "rfq-inbox", icon: "mail" },
       { label: "Messages", slug: "messages", icon: "message" },
-      { label: "Quotations", slug: "quotations", icon: "file" },
       { label: "Orders", slug: "orders", icon: "truck" },
-    ],
-  },
-  {
-    label: "Product management",
-    items: [
       { label: "Products", slug: "products", icon: "box" },
-      { label: "Categories", slug: "categories", icon: "folder" },
-      { label: "Inventory", slug: "inventory", icon: "layers" },
-      { label: "Pricing", slug: "pricing", icon: "tag" },
     ],
   },
   {
-    label: "Business & finance",
-    items: [
-      { label: "Payments", slug: "payments", icon: "credit-card" },
-      { label: "Transactions", slug: "transactions", icon: "refresh" },
-      { label: "Analytics", slug: "analytics", icon: "bar-chart" },
-    ],
+    label: "Finance",
+    items: [{ label: "Payouts", slug: "payouts", icon: "credit-card" }],
   },
   {
     label: "Company",
     items: [
       { label: "Company Profile", slug: "company-profile", icon: "building" },
-      { label: "Team Members", slug: "team", icon: "users" },
       { label: "Verification", slug: "verification", icon: "check-circle" },
-    ],
-  },
-  {
-    label: "Preferences",
-    items: [
-      { label: "Settings", slug: "settings", icon: "cog" },
-      { label: "Help & Support", slug: "help", icon: "help-circle" },
     ],
   },
 ];

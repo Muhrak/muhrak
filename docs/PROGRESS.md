@@ -473,6 +473,15 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   and decision, DB checks (name and bank proof switched, old file kept,
   still verified, audit row, email).
 
+### Seller sidebar trimmed to the MVP (Sun 22 Nov, developer request)
+- Menu now: Workspace (Dashboard, RFQ Inbox, Messages, Orders, Products),
+  Finance (Payouts, "coming soon" until Day 15), Company (Company Profile,
+  Verification). Removed: Quotations (inside each request), Categories
+  (set by Muhrak), Inventory and Pricing (product fields), Transactions,
+  Analytics (after launch), Team Members (one account per seller),
+  Settings, Help & Support. Removed paths are a real 404; nothing linked
+  to them. The message-sound switch is now visible without scrolling.
+
 ### Day 12: payment foundation (Sun 22 Nov, one day late; API only)
 - **Order module** (`modules/order`): the buyer confirms an ACTIVE, still
   valid quotation (`POST /v1/buyer/orders`, with an `orderKey` for double
