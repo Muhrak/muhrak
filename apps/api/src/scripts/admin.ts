@@ -19,6 +19,7 @@
  */
 import { createInterface } from "node:readline";
 import { Writable } from "node:stream";
+import QRCode from "qrcode";
 import { z } from "zod";
 import { pool } from "../db/client";
 import { changeAdminEmail, confirmAdminTwoFactorSetup, startAdminTwoFactorSetup, upsertAdminAccount } from "../modules/auth";
@@ -69,20 +70,22 @@ async function setUpTwoFactor(knownEmail?: string) {
   if (!knownEmail) console.log("Muhrak: set up two-factor login for an admin.\n");
   const email = knownEmail ?? emailSchema.parse(await ask("Admin email: "));
   const { key, uri } = await startAdminTwoFactorSetup(email);
+  // Drawn here in the terminal only; the key never goes to any website.
+  const qr = await QRCode.toString(uri, { type: "terminal", small: true, errorCorrectionLevel: "M" });
   console.log(
     [
       "",
-      "In an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password...),",
-      'add an account, choose "Enter a setup key", and type:',
+      "Scan this QR code with an authenticator app (Google Authenticator,",
+      "Microsoft Authenticator, 1Password...): Add account, Scan a QR code.",
+      "",
+      qr,
+      "Cannot scan? Choose \"Enter a setup key\" instead and type:",
       "",
       `  Account:  Muhrak Admin (${email})`,
       `  Key:      ${key.replace(/(.{4})/g, "$1 ").trim()}`,
       "  Type:     Time based",
       "",
-      "Or paste this link into an app that accepts one:",
-      `  ${uri}`,
-      "",
-      "Keep this key private. It is shown only now and stored encrypted.",
+      "Keep this private. It is shown only now and stored encrypted.",
       "",
     ].join("\n"),
   );

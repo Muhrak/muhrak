@@ -245,8 +245,9 @@ export PATH="$(dirname "$(find / -type f -path '*/bin/node' 2>/dev/null | head -
 exit
 ```
 
-It prints a setup key: in the app choose "Enter a setup key", type it,
-then type the code the app shows. The key is saved (encrypted) only after a
+It shows a QR code in the terminal: in the app choose "Scan a QR code"
+(or "Enter a setup key" and type the key printed below it), then type the
+code the app shows. Never paste the key or QR link into a website. The key is saved (encrypted) only after a
 right code. Lost phone: run the same command again (it replaces the key and
 signs the admin out). Changing `JWT_SECRET` makes stored keys unreadable:
 run it again for each admin.

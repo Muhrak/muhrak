@@ -578,8 +578,10 @@ standalone apps, all frontend in `apps/web`, all backend in `apps/api`
   in the UPDATE, so racing logins cannot both pass). Wrong codes count as
   failed logins (5 per email+IP per 15 min); the failure count is cleared
   only after the code. Admin without a key: 403, cannot log in. Set up with
-  `pnpm admin 2fa` (saves the key only after a right code; signs the admin
-  out); a new admin is asked right after creation. Login form has an
+  `pnpm admin 2fa` (shows a QR code in the terminal plus the typed key;
+  saves the key only after a right code; signs the admin out); a new admin
+  is asked right after creation. Dependency `qrcode` 1.5.4 (developer OK,
+  22 Nov; CLI only, audit clean). Login form has an
   "Authenticator code" field. Migration `0020` (additive) also signs every
   admin out once.
 - **CSP without `'unsafe-inline'` for scripts.** `src/proxy.ts` makes a
