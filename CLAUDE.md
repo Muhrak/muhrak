@@ -18,14 +18,19 @@ An MVP for a market test, built in 20 days starting Tue 10 Nov 2026:
 limited features, every one working properly (cut scope, never quality).
 Web only. No mobile app.
 
-**Payment is inside the platform (strict, set by the developer on 13 Nov
-2026; replaces "no online payment").** The buyer pays Muhrak through a
-payment gateway (not chosen yet; it sits behind a provider interface),
-the order is live only once the gateway's signed webhook confirms payment,
-and Muhrak pays the seller out after delivery. Follow the "Payment rules"
-in `docs/PLAN.md`: no card data on our servers, server-computed amounts,
-idempotent webhooks, one payment per order, append-only ledger, audited
-refunds and payouts, daily reconciliation.
+**Launch with cash on delivery (developer decision, 28 Nov 2026).** The
+buyer confirms a quotation and pays the seller in cash on delivery;
+Muhrak records the order and the commission the seller owes (append-only
+ledger, admin-recorded settlements). Follow the "Cash on delivery rules"
+in `docs/PLAN.md`. Launch moved to Sun 6 Dec 2026.
+
+**Online payment is phase 2** (after launch, or earlier if the gateway is
+approved in time). The Day 12 foundation stays in the code, switched off.
+When it is built and switched on, the strict "Payment rules" in
+`docs/PLAN.md` apply in full (set by the developer on 13 Nov 2026): no
+card data on our servers, server-computed amounts, idempotent signed
+webhooks, one payment per order, append-only ledger, audited refunds and
+payouts, daily reconciliation.
 
 The architecture below stays as it is (confirmed by the developer on
 13 Nov 2026; on 14 Nov 2026 the developer moved the admin console into

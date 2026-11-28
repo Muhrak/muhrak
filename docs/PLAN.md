@@ -1,15 +1,22 @@
 # 20-day build plan
 
-Start: Tue 10 Nov 2026. Public launch: Sun 29 Nov 2026. Calendar days.
+Start: Tue 10 Nov 2026. Public launch: **Sun 6 Dec 2026** (moved from
+Sun 29 Nov on 28 Nov: Days 13-18 were not done, and the launch changed to
+cash on delivery). Calendar days.
 
 Goal: an MVP to test the market. **Limited features, every one of them
 working properly.** Web only, no mobile app. One seller type
 (manufacturers, distributors and suppliers are all "seller").
 
-**Payment happens inside the platform (strict, set by the developer on
-13 Nov 2026).** The buyer pays Muhrak through a payment gateway; the order
-is live only when the gateway confirms the payment; Muhrak pays the seller
-out after delivery. The gateway is not chosen yet (see "Decisions needed").
+**Launch with cash on delivery (developer decision, 28 Nov 2026; replaces
+"payment inside the platform" of 13 Nov for the launch).** The buyer
+confirms a quotation and pays the seller in cash when the parts arrive.
+Muhrak does not hold buyers' money at launch; it records each order and
+the commission the seller owes. **Online payment comes next** as a second
+method, after launch (or inside these 20 days if the gateway is approved
+in time): the Day 12 payment foundation (orders, fake gateway, webhooks,
+ledger) stays in the code, switched off (`PAYMENT_PROVIDER=none`), and the
+"Payment rules" below apply in full when it is switched on.
 
 Rule for every day: finish by deploying to staging and checking the aim
 there. If a day runs late, a feature moves to "After launch"; it is never
@@ -19,8 +26,13 @@ shipped half-done.
 
 > Seller signs up → gets verified → adds products → buyer uploads a photo →
 > AI identifies the part → matched sellers get a quote request → they chat →
-> seller sends a quote → buyer confirms → **buyer pays on Muhrak** → order is
-> created → seller ships → buyer confirms delivery → **Muhrak pays the seller**
+> seller sends a quote → buyer confirms → **order is placed (cash on
+> delivery)** → seller confirms and ships → **buyer pays the seller in cash
+> on delivery** → seller marks it delivered and paid → buyer confirms →
+> **Muhrak records the seller's commission**
+>
+> Later (phase 2): the buyer can pay online on Muhrak, and Muhrak pays the
+> seller out after delivery.
 
 ## MVP scope
 
@@ -31,14 +43,20 @@ shipped half-done.
 4. Buyer photo search with editable AI results; plain text search
 5. Seller matching, quote request, seller RFQ inbox
 6. Messenger with quote request and quotation cards
-7. Send quote; buyer confirms and **pays online**
-8. Orders: status, tracking, buyer confirms delivery
-9. Refunds and cancellations; seller payouts after delivery
-10. Emails for request, quote, payment, order and payout events
-11. Admin: seller approval (done), orders and payments, refunds, payouts,
+7. Send quote; buyer confirms and places a **cash on delivery** order
+8. Orders: seller confirms, packed, shipped, delivered and cash received;
+   buyer confirms receipt or reports a problem; cancellations
+9. Commission: what each seller owes Muhrak, recorded per order; admin
+   records the seller's settlement
+10. Emails for request, quote and order events
+11. Admin: seller approval (done), orders, problem reports, commission,
     suspend user, AI switch
-12. Landing pages (done); terms, privacy, refund policy, contact
-13. Production: domain, backups, monitoring, rate limits, live gateway
+12. Landing pages (done); terms, privacy, cancellation policy, contact
+13. Production: domain, backups, monitoring, rate limits
+
+**Phase 2: online payment** (after launch, or earlier if the gateway is
+approved in time; see "Phase 2" below): pay online, refunds, seller
+payouts, daily reconciliation.
 
 **After launch** (moved out to make room for payment)
 - Sellers directory, public seller and product pages
@@ -48,7 +66,29 @@ shipped half-done.
 - Arabic, Google and Apple sign-in, saved items and history
 - Mobile app
 
-## Payment rules (strict)
+## Cash on delivery rules (launch)
+
+These come on top of the security standard in `CLAUDE.md`.
+
+1. **Amounts come from the server.** The order total is the accepted
+   quotation, copied by the API (as now). The client never sends an amount.
+2. **State machine in one place.** Cash order: `placed → confirmed →
+   packed → shipped → delivered → completed`, or `cancelled` (before
+   shipping) or `refused` (the buyer refused at the door). Only the allowed
+   side moves each step (seller: confirm or decline, pack, ship, delivered;
+   buyer: confirm receipt, report a problem, cancel before shipping).
+3. **"Delivered and cash received" is the seller's statement**, recorded
+   with time and user. The buyer confirms receipt, or the order completes
+   by itself N days after delivery unless the buyer reports a problem.
+4. **Commission** is computed on the server (`PLATFORM_FEE_BP` of the
+   items subtotal) when the order completes, and written as an
+   append-only ledger row "owed by seller". Settlements are admin actions
+   in the audit log with a reference. No edits, no deletes.
+5. **Abuse tests:** wrong buyer or seller, wrong side, skipped steps,
+   delivered twice, cancelling after shipping, commission on a cancelled
+   or refused order, double submit, races.
+
+## Payment rules (strict, for online payment in phase 2)
 
 These come on top of the security standard in `CLAUDE.md`.
 
@@ -86,19 +126,24 @@ These come on top of the security standard in `CLAUDE.md`.
 
 ## Decisions needed from the developer
 
+Decisions 1-3 are now needed for phase 2 (online payment), not for the
+launch. Apply to the gateway anyway: approval can take 1-2 weeks.
+
 | # | Decision | Needed by | Recommendation |
 |---|---|---|---|
-| 1 | **Payment gateway.** Must support the GCC countries we sell in, OMR (3 decimals), hosted checkout, webhooks, refunds; ideally marketplace payouts. Candidates: Tap Payments, Checkout.com, PayTabs, Thawani (Oman), Stripe (only with a UAE company). | **Tue 17 Nov** (apply now; merchant approval can take 1-2 weeks) | Choose by country of the company and OMR support; ask each for marketplace terms |
-| 2 | **Legal: may Muhrak hold buyers' money until delivery?** Holding funds for others can need a licence; some gateways offer a marketplace/escrow product that covers it. | Tue 17 Nov | Ask the gateway and a local lawyer |
-| 3 | **Payout method**: Muhrak pays sellers by bank transfer (admin records it), or the gateway splits the payment automatically. | Tue 17 Nov | Bank transfer recorded by admin for the MVP, if decision 2 allows it |
-| 4 | **Commission** (percent per order) and who pays the gateway fee. | Sun 22 Nov | |
-| 5 | **Hold period** after delivery before payout, and **auto-confirm** delivery after N days if the buyer does nothing. | Sun 22 Nov | 3-day hold; auto-confirm 7 days after "shipped" |
-| 6 | **Cancellation and refund policy** (who can cancel, until when). | Tue 24 Nov | Buyer cancels free before "shipped"; after that only through a problem report |
+| 1 | **Payment gateway.** Must support the GCC countries we sell in, OMR (3 decimals), hosted checkout, webhooks, refunds; ideally marketplace payouts. Candidates: Tap Payments, Checkout.com, PayTabs, Thawani (Oman), Stripe (only with a UAE company). | Phase 2 (apply now) | Choose by country of the company and OMR support; ask each for marketplace terms |
+| 2 | **Legal: may Muhrak hold buyers' money until delivery?** Holding funds for others can need a licence; some gateways offer a marketplace/escrow product that covers it. | Phase 2 | Ask the gateway and a local lawyer |
+| 3 | **Payout method**: Muhrak pays sellers by bank transfer (admin records it), or the gateway splits the payment automatically. | Phase 2 | Bank transfer recorded by admin, if decision 2 allows it |
+| 4 | **Commission** (percent per order) and who pays the gateway fee. | Tue 1 Dec | 5% of the items subtotal (Day 12 default) |
+| 5 | **Hold period** after delivery before payout (phase 2). | Phase 2 | 3-day hold |
+| 6 | **Cancellation policy** (who can cancel, until when). | Sun 29 Nov | Buyer cancels free before "shipped"; seller may decline before confirming; after shipping only through a problem report |
 | 7 | **VAT on commission** and invoices. | Before launch | Ask an accountant |
+| 8 | **Commission during the market test** (cash on delivery): charge it from day one, or free for the first sellers? How does the seller pay it? | Tue 1 Dec | Record it from day one (data for later); seller pays by monthly bank transfer; waive per seller if wanted |
+| 9 | **Auto-complete**: days after "delivered" before the order completes if the buyer does nothing. | Mon 30 Nov | 3 days |
+| 10 | **Cash orders**: must the seller confirm each order? A maximum order value? | Sun 29 Nov | Seller confirms or declines (with a reason); no maximum at launch |
 
-**Launch gate:** the site does not open to the public until the live
-gateway works end to end on production (Day 19). If the gateway is not
-approved in time, launch moves; payment is not skipped.
+**Launch gate:** the site opens when the cash on delivery loop works end
+to end on production (Day 19).
 
 ## Done
 
@@ -113,6 +158,12 @@ approved in time, launch moves; payment is not skipped.
 - **Day 6, Mon 16 Nov:** AI module on Google Gemini instead (developer
   decision, 16 Nov): API, job, limits, budget cap, tests. Prompt tuning on
   real photos waits for the developer's key and OK.
+- **Day 10, Thu 19 Nov:** buyer–seller chat (Stream).
+- **Day 11, Fri 20 Nov:** send quote, quotation PDF, buyer quote view.
+- **Day 12, Sun 22 Nov (a day late):** payment foundation (orders, fake
+  gateway, webhooks, ledger) and its web pages; it stays in the code for
+  phase 2. Same day: admin on its own host, admin two-factor login, CSP
+  with a per-request nonce.
 - **Early:** buyer and seller landing pages.
 
 Details in `docs/PROGRESS.md`.
@@ -146,7 +197,6 @@ Details in `docs/PROGRESS.md`.
 - Buyer photo upload page and editable result page.
 - Matching by part number, category and text; results with seller, price,
   stock and match label. Plain text search as the non-AI route.
-- **Gateway decision due (decisions 1-3).**
 - **Aim:** a buyer uploads a photo and sees matching sellers' products.
 
 ### Day 9, Wed 18 Nov
@@ -166,110 +216,125 @@ Details in `docs/PROGRESS.md`.
   request. Email the buyer on a new quote.
 - **Aim:** a buyer receives a quotation in chat and by email.
 
-## Week 3: payment, orders, payouts
+## Week 3: orders (cash on delivery)
 
-### Day 12, Sat 21 Nov: payment foundation
+### Day 12, Sat 21 Nov: payment foundation (done 22 Nov)
 - `order` module: buyer accepts a quotation (still valid, not withdrawn)
-  → order in `awaiting_payment` with the amounts copied from the quote and
-  a delivery address. Order state machine in one place.
+  → order with the amounts copied from the quote and a delivery address.
+  Order state machine in one place.
 - `payment` module: gateway interface + a fake provider for local and test
   runs; payments table; webhook endpoint (signature check, stored once,
-  idempotent); unpaid-order expiry job.
-- `ledger` module: append-only entries; charge, fee and seller-credit
-  rows written in one transaction when a payment succeeds.
-- Tests: every payment abuse case listed above.
+  idempotent); unpaid-order expiry job. Kept for phase 2.
+- `ledger` module: append-only entries.
 - **Aim:** with the fake provider, a confirmed quote becomes a paid order,
   and a replayed or forged webhook changes nothing.
 
-### Day 13, Sun 22 Nov: real gateway (sandbox)
-- Gateway provider implementation (sandbox keys): hosted checkout,
-  webhook, status lookup. OMR/KWD/BHD 3-decimal amounts mapped exactly.
-- Buyer "Pay" page, "checking payment" return page, success and failure
-  screens; retry payment on failure.
-- Emails: payment received (buyer), new paid order (seller).
-- **Aim:** a buyer pays a quote with a sandbox card and the seller sees
-  the paid order.
+### Original Days 13-20 (22-29 Nov): replaced
 
-### Day 14, Mon 23 Nov: fulfilment
-- Seller orders list and detail: packed, shipped (tracking number).
-- Buyer orders list with timeline; "Confirm delivery"; "Report a problem"
-  (holds the payout and alerts the admin).
-- Auto-confirm delivery job. Order emails.
-- **Aim:** one order goes from photo to delivered, paid online.
+Days 13-18 were not done by Sat 28 Nov. The developer moved the launch to
+cash on delivery (28 Nov); the new days follow. The online payment work
+(old Day 13 gateway, Day 15 refunds and payouts, the reconciliation job of
+Day 16) moved to "Phase 2".
+
+### Day 13, Sun 29 Nov: cash on delivery orders
+- Orders get a payment method; `cash_on_delivery` orders start `placed`
+  (no payment step, no 24 h payment deadline). Online pay stays off.
+- Seller confirms or declines (with a reason) a placed order; the buyer
+  may cancel before it ships (the quotation becomes valid again, as now).
+- Buyer "Confirm order" says "Pay in cash on delivery"; the Orders pages
+  show the cash flow. Emails: new order (seller), confirmed or declined
+  (buyer).
+- Tests: the abuse cases in "Cash on delivery rules".
+- **Aim:** a buyer confirms a quote and the seller confirms the cash order.
+
+### Day 14, Mon 30 Nov: fulfilment
+- Seller: packed, shipped (courier and tracking optional), delivered and
+  cash received; "buyer refused" at the door.
+- Buyer: order timeline; "Confirm receipt"; "Report a problem" (alerts the
+  admin, stops auto-complete).
+- Auto-complete job (decision 9). Order emails.
+- **Aim:** one order goes from photo to completed, paid in cash.
   **Checkpoint 2: the full loop works.**
 
-### Day 15, Tue 24 Nov: refunds and payouts
-- Cancel before shipping → full refund through the gateway; admin refund
-  (full or partial) for problem reports. Ledger rows for every refund.
-- Seller "Payouts" page: balance pending, available, paid out, history.
-- Admin payouts: list of sellers with available balance, record a payout
-  (bank reference), audit log. (Or gateway split, per decision 3.)
-- **Payout hold (developer decision, 21 Nov 2026):** no payout while the
-  seller's new bank account proof waits for review
-  (`hasPendingBankProofUpdate` in the seller module). Pay only to the bank
-  proof in force.
-- **Aim:** a refund and a payout both reconcile to zero in the ledger.
+### Day 15, Tue 1 Dec: commission and admin
+- Ledger: commission "owed by seller" when an order completes; seller
+  Finance page "Commission" (owed, settled, history) in place of Payouts.
+- Admin: orders list and detail, problem reports, commission per seller,
+  record a settlement (reference, audit log), suspend user, AI on/off.
+- **Aim:** an admin can follow every order and what each seller owes.
 
-### Day 16, Wed 25 Nov: admin and legal
-- Admin: orders and payments list and detail, problem reports, refunds,
-  payouts, suspend user, AI on/off switch.
-- Daily reconciliation job (gateway vs ledger) with an alert.
-- Terms, privacy, refund policy and contact pages; 404 and error pages.
-- **Aim:** an admin can follow every order and every rial.
+### Day 16, Wed 2 Dec: legal and finish
+- Terms, privacy, cancellation and cash on delivery policy, contact pages;
+  404 and error pages.
+- Phone-width check of every buyer and seller screen.
+- **Aim:** every page a visitor can reach is finished.
 
 ## Week 4: launch
 
-### Day 17, Thu 26 Nov: security pass
-- Security review of payment, order, ledger and payout code; try to break
-  each (wrong user, wrong side, tampered ids and amounts, replay, double
+### Day 17, Thu 3 Dec: security pass
+- Security review of order, commission and admin code; try to break each
+  (wrong user, wrong side, tampered ids and amounts, replay, double
   submit, races).
 - Permission tests across all modules; rate limits on AI, messaging,
-  uploads, payment endpoints.
-- Phone-width check of every buyer and seller screen.
+  uploads and order endpoints.
 - **Aim:** no known hole. **Checkpoint 3.**
 
-### Day 18, Fri 27 Nov: production
-- Production environment (separate from staging): Railway, Vercel web and
-  admin, S3 bucket, Redis, keys. Domain, HTTPS, Resend domain verified.
-- Live gateway keys and production webhook. Backups on, restore tested,
-  nightly off-site copy. Error monitoring and uptime alerts.
+### Day 18, Fri 4 Dec: production
+- Production environment (separate from staging): Railway, Vercel (site
+  and admin host), S3 bucket, keys. Domain, HTTPS, Resend domain verified.
+- Backups on, restore tested, nightly off-site copy. Error monitoring and
+  uptime alerts. Admin accounts with two-factor login.
 - **Aim:** production is live but not yet public.
 
-### Day 19, Sat 28 Nov: real run
-- Every flow on production with two buyers, two sellers and an admin:
-  a real small payment, a refund, a payout. Check the ledger and the
-  gateway dashboard agree. Emails reach the inbox, not spam.
+### Day 19, Sat 5 Dec: real run
+- Every flow on production with two buyers, two sellers and an admin: a
+  cash order completed, one cancelled, one refused, a problem report, the
+  commission recorded and settled. Emails reach the inbox, not spam.
 - Fix what breaks. Load the first sellers' products.
 - **Aim:** no blocking bugs. **Launch gate.**
 
-### Day 20, Sun 29 Nov
-- Final fixes, admin accounts created, first sellers onboarded.
-- Open the site; watch errors, payments and AI cost through the day.
+### Day 20, Sun 6 Dec
+- Final fixes, first sellers onboarded.
+- Open the site; watch errors, orders and AI cost through the day.
 - **Aim:** the site is public.
+
+## Phase 2: online payment (after launch, or earlier)
+
+Starts when the gateway is approved (decisions 1-3). About 4 to 5 days:
+1. Real gateway provider (sandbox, then live): hosted checkout, webhook,
+   status lookup; the buyer chooses "Pay online" or "Cash on delivery".
+   Emails: payment received, new paid order.
+2. Refunds (cancel before shipping, admin refunds) through the gateway,
+   with ledger rows for each.
+3. Seller payouts: balance pending, available, paid out; admin records
+   payouts (bank reference, audit log). No payout while a new bank proof
+   waits for review (`hasPendingBankProofUpdate`, developer decision
+   21 Nov 2026).
+4. Daily reconciliation job (gateway vs ledger) with an alert.
+5. Security pass of the payment code and a real small payment on
+   production before switching it on.
 
 ## If behind
 
-- Never cut: payment rules, Days 17-19, abuse tests.
+- Never cut: the cash on delivery rules, Days 17-19, abuse tests.
 - First to go: AI mode on Add product (manual form stays), then photo
-  messages in chat (text only), then partial refunds (full refunds stay).
-- If the gateway is late: build and test everything on the fake provider
-  and sandbox; launch waits for the live gateway.
+  messages in chat (text only), then courier and tracking fields.
+- Online payment is never switched on half-done: phase 2 ships complete
+  (payments, refunds, payouts, reconciliation) or not at all.
 
 ## In parallel, not code (developer)
 
-- **Now:** apply to the chosen gateway(s); start the legal question
-  (decision 2).
-- From Day 1: recruit 20 to 30 sellers; collect product data and photos
-  and their bank details for payouts (through verification).
-- Week 2: gather real part photos for AI testing.
-- By Day 15: terms, privacy and refund policy text written.
-- By Day 18: domain bought; sellers' products loaded into production.
+- **Now:** decisions 6, 8, 9 and 10; apply to the chosen gateway for
+  phase 2 and start the legal question (decision 2).
+- Recruit 20 to 30 sellers; collect product data and photos.
+- By Tue 1 Dec: terms, privacy and cancellation policy text written.
+- By Fri 4 Dec: domain bought; sellers' products loaded into production.
 
 ## After launch
 
-Sellers directory and public pages, notification bell, full dashboards,
-admin AI cost view and analytics, Arabic, Google and Apple sign-in, saved
-items, mobile app, automated payouts (if not at launch).
+Online payment (phase 2), sellers directory and public pages, notification
+bell, full dashboards, admin AI cost view and analytics, Arabic, Google
+and Apple sign-in, saved items, mobile app.
 
 ## Figma Link
 

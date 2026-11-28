@@ -1384,6 +1384,16 @@ Still open (Day 4 admin):
 
 ## Next up, see `docs/PLAN.md`
 
+- **28 Nov (developer decision): launch with cash on delivery**, online
+  payment becomes phase 2 (after launch, or earlier if the gateway is
+  approved). Launch moved to Sun 6 Dec. New days in PLAN.md: Day 13 (29
+  Nov) cash on delivery orders, Day 14 fulfilment, Day 15 commission and
+  admin, Day 16 legal and finish, Days 17-20 security, production, real
+  run, launch. The Day 12 payment code stays, switched off.
+- Developer decisions needed for Day 13-15 (PLAN.md decisions 6, 8, 9,
+  10): cancellation policy, commission during the test, auto-complete
+  days, seller confirms each cash order.
+
 - Day 12 API is done (22 Nov, a day late). Next: the web pages for it
   (buyer Confirm order from a quotation, the fake test-checkout page,
   "checking payment", buyer and seller order lists), then Day 13: the
